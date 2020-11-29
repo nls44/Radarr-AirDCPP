@@ -15,3 +15,10 @@
 .unknown {
   composes: label from '~Components/Label.css';
 }
+
+.directConnect {
+  composes: label from '~Components/Label.css';
+
+  border-color: $usenetColor;
+  background-color: $usenetColor;
+}
