@@ -26,6 +26,10 @@ namespace NzbDrone.Windows.Disk
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
 
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CreateSymbolicLink(string lpSymlinkFileName, string lpTargetFileName, int dwFlags);
+
         public override IMount GetMount(string path)
         {
             var reparsePoint = GetReparsePoint(path);
@@ -205,6 +209,19 @@ namespace NzbDrone.Windows.Disk
             }
 
             return null;
+        }
+
+        public override bool TryCreateSymLink(string source, string destination)
+        {
+            try
+            {
+                return CreateSymbolicLink(destination, source, Path.HasExtension(source) ? 0 : 1);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug(ex, string.Format("Symlinking '{0}' to '{1}' failed.", source, destination));
+                return false;
+            }
         }
     }
 }

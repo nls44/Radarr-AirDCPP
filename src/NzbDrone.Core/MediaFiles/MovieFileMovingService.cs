@@ -89,6 +89,12 @@ namespace NzbDrone.Core.MediaFiles
 
             EnsureMovieFolder(movieFile, localMovie, filePath);
 
+            if (_configService.CopyUsingSymlinks)
+            {
+                _logger.Debug("Symlinking movie file: {0} to {1}", movieFile.Path, filePath);
+                return TransferFile(movieFile, localMovie.Movie, filePath, TransferMode.SymLink);
+            }
+
             if (_configService.CopyUsingHardlinks)
             {
                 _logger.Debug("Attempting to hardlink movie file: {0} to {1}", movieFile.Path, filePath);
