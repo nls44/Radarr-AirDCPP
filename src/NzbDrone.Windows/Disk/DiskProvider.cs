@@ -25,14 +25,30 @@ namespace NzbDrone.Windows.Disk
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
-
+        
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool CreateSymbolicLink(string lpSymlinkFileName, string lpTargetFileName, int dwFlags);
 
+        public override IMount GetMount(string path)
+        {
+            var reparsePoint = GetReparsePoint(path);
+
+            return reparsePoint ?? base.GetMount(path);
+        }
+
+        public override string GetPathRoot(string path)
+        {
+            Ensure.That(path, () => path).IsValidPath(PathValidationType.CurrentOs);
+
+            var reparsePoint = GetReparsePoint(path);
+
+            return reparsePoint?.RootDirectory ?? base.GetPathRoot(path);
+        }
+
         public override long? GetAvailableSpace(string path)
         {
-            Ensure.That(path, () => path).IsValidPath();
+            Ensure.That(path, () => path).IsValidPath(PathValidationType.CurrentOs);
 
             var root = GetPathRoot(path);
 
@@ -46,7 +62,7 @@ namespace NzbDrone.Windows.Disk
 
         public override void InheritFolderPermissions(string filename)
         {
-            Ensure.That(filename, () => filename).IsValidPath();
+            Ensure.That(filename, () => filename).IsValidPath(PathValidationType.CurrentOs);
 
             var fileInfo = new FileInfo(filename);
             var fs = fileInfo.GetAccessControl(AccessControlSections.Access);
@@ -80,8 +96,7 @@ namespace NzbDrone.Windows.Disk
                                                           PropagationFlags.InheritOnly,
                                                           controlType);
 
-                bool modified;
-                directorySecurity.ModifyAccessRule(AccessControlModification.Add, accessRule, out modified);
+                directorySecurity.ModifyAccessRule(AccessControlModification.Add, accessRule, out var modified);
 
                 if (modified)
                 {
@@ -109,7 +124,7 @@ namespace NzbDrone.Windows.Disk
 
         public override long? GetTotalSize(string path)
         {
-            Ensure.That(path, () => path).IsValidPath();
+            Ensure.That(path, () => path).IsValidPath(PathValidationType.CurrentOs);
 
             var root = GetPathRoot(path);
 
@@ -123,18 +138,14 @@ namespace NzbDrone.Windows.Disk
 
         private static long DriveFreeSpaceEx(string folderName)
         {
-            Ensure.That(folderName, () => folderName).IsValidPath();
+            Ensure.That(folderName, () => folderName).IsValidPath(PathValidationType.CurrentOs);
 
             if (!folderName.EndsWith("\\"))
             {
                 folderName += '\\';
             }
 
-            ulong free = 0;
-            ulong dummy1 = 0;
-            ulong dummy2 = 0;
-
-            if (GetDiskFreeSpaceEx(folderName, out free, out dummy1, out dummy2))
+            if (GetDiskFreeSpaceEx(folderName, out var free, out var dummy1, out var dummy2))
             {
                 return (long)free;
             }
@@ -144,18 +155,14 @@ namespace NzbDrone.Windows.Disk
 
         private static long DriveTotalSizeEx(string folderName)
         {
-            Ensure.That(folderName, () => folderName).IsValidPath();
+            Ensure.That(folderName, () => folderName).IsValidPath(PathValidationType.CurrentOs);
 
             if (!folderName.EndsWith("\\"))
             {
                 folderName += '\\';
             }
 
-            ulong total = 0;
-            ulong dummy1 = 0;
-            ulong dummy2 = 0;
-
-            if (GetDiskFreeSpaceEx(folderName, out dummy1, out total, out dummy2))
+            if (GetDiskFreeSpaceEx(folderName, out var dummy1, out var total, out var dummy2))
             {
                 return (long)total;
             }
@@ -167,6 +174,11 @@ namespace NzbDrone.Windows.Disk
         {
             try
             {
+                if (source.Length > 256 && !source.StartsWith(@"\\?\"))
+                {
+                    source = @"\\?\" + source;
+                }
+
                 return CreateHardLink(destination, source, IntPtr.Zero);
             }
             catch (Exception ex)
@@ -187,6 +199,29 @@ namespace NzbDrone.Windows.Disk
                 Logger.Debug(ex, string.Format("Symlinking '{0}' to '{1}' failed.", source, destination));
                 return false;
             }
+        }
+
+        private IMount GetReparsePoint(string path)
+        {
+            if (!Directory.Exists(path))
+            {
+                return null;
+            }
+
+            var di = new DirectoryInfo(path);
+            var isReparsePoint = di.Attributes.HasFlag(FileAttributes.ReparsePoint);
+
+            while (!isReparsePoint && (di = di.Parent) != null)
+            {
+                isReparsePoint = di.Attributes.HasFlag(FileAttributes.ReparsePoint);
+            }
+
+            if (isReparsePoint)
+            {
+                return new FolderMount(di);
+            }
+
+            return null;
         }
     }
 }

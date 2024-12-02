@@ -8,10 +8,11 @@ namespace NzbDrone.Core.Validation.Paths
         private readonly IMovieService _movieService;
 
         public MovieExistsValidator(IMovieService movieService)
-            : base("This movie has already been added")
         {
             _movieService = movieService;
         }
+
+        protected override string GetDefaultMessageTemplate() => "This movie has already been added";
 
         protected override bool IsValid(PropertyValidatorContext context)
         {
@@ -20,7 +21,7 @@ namespace NzbDrone.Core.Validation.Paths
                 return true;
             }
 
-            int tmdbId = (int)context.PropertyValue;
+            var tmdbId = (int)context.PropertyValue;
 
             return _movieService.FindByTmdbId(tmdbId) == null;
         }

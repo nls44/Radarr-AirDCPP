@@ -1,92 +1,76 @@
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using FluentValidation.Results;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Configuration;
+using NzbDrone.Core.Localization;
+using NzbDrone.Core.MediaCover;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Tags;
 using NzbDrone.Core.Validation;
 
 namespace NzbDrone.Core.Notifications.Webhook
 {
-    public class Webhook : NotificationBase<WebhookSettings>
+    public class Webhook : WebhookBase<WebhookSettings>
     {
         private readonly IWebhookProxy _proxy;
 
-        public Webhook(IWebhookProxy proxy)
+        public Webhook(IWebhookProxy proxy, IConfigFileProvider configFileProvider, IConfigService configService, ILocalizationService localizationService, ITagRepository tagRepository, IMapCoversToLocal mediaCoverService)
+            : base(configFileProvider, configService, localizationService, tagRepository, mediaCoverService)
         {
             _proxy = proxy;
         }
 
-        public override string Link => "https://wiki.servarr.com/Radarr_Settings#Connect";
+        public override string Link => "https://wiki.servarr.com/radarr/settings#connect";
 
         public override void OnGrab(GrabMessage message)
         {
-            var remoteMovie = message.RemoteMovie;
-            var quality = message.Quality;
-
-            var payload = new WebhookGrabPayload
-            {
-                EventType = WebhookEventType.Grab,
-                Movie = new WebhookMovie(message.Movie),
-                RemoteMovie = new WebhookRemoteMovie(remoteMovie),
-                Release = new WebhookRelease(quality, remoteMovie),
-                DownloadClient = message.DownloadClient,
-                DownloadId = message.DownloadId
-            };
-
-            _proxy.SendWebhook(payload, Settings);
+            _proxy.SendWebhook(BuildOnGrabPayload(message), Settings);
         }
 
         public override void OnDownload(DownloadMessage message)
         {
-            var movieFile = message.MovieFile;
-
-            var payload = new WebhookImportPayload
-            {
-                EventType = WebhookEventType.Download,
-                Movie = new WebhookMovie(message.Movie),
-                RemoteMovie = new WebhookRemoteMovie(message.Movie),
-                MovieFile = new WebhookMovieFile(movieFile),
-                IsUpgrade = message.OldMovieFiles.Any(),
-                DownloadClient = message.DownloadClient,
-                DownloadId = message.DownloadId
-            };
-
-            if (message.OldMovieFiles.Any())
-            {
-                payload.DeletedFiles = message.OldMovieFiles.ConvertAll(x =>
-                    new WebhookMovieFile(x)
-                    {
-                        Path = Path.Combine(message.Movie.Path, x.RelativePath)
-                    });
-            }
-
-            _proxy.SendWebhook(payload, Settings);
+            _proxy.SendWebhook(BuildOnDownloadPayload(message), Settings);
         }
 
-        public override void OnMovieRename(Movie movie)
+        public override void OnMovieRename(Movie movie, List<RenamedMovieFile> renamedFiles)
         {
-            var payload = new WebhookRenamePayload
-            {
-                EventType = WebhookEventType.Rename,
-                Movie = new WebhookMovie(movie)
-            };
+            _proxy.SendWebhook(BuildOnRenamePayload(movie, renamedFiles), Settings);
+        }
 
-            _proxy.SendWebhook(payload, Settings);
+        public override void OnMovieAdded(Movie movie)
+        {
+            _proxy.SendWebhook(BuildOnMovieAdded(movie), Settings);
+        }
+
+        public override void OnMovieFileDelete(MovieFileDeleteMessage deleteMessage)
+        {
+            _proxy.SendWebhook(BuildOnMovieFileDelete(deleteMessage), Settings);
+        }
+
+        public override void OnMovieDelete(MovieDeleteMessage deleteMessage)
+        {
+            _proxy.SendWebhook(BuildOnMovieDelete(deleteMessage), Settings);
         }
 
         public override void OnHealthIssue(HealthCheck.HealthCheck healthCheck)
         {
-            var payload = new WebhookHealthPayload
-                          {
-                              EventType = WebhookEventType.Health,
-                              Level = healthCheck.Type,
-                              Message = healthCheck.Message,
-                              Type = healthCheck.Source.Name,
-                              WikiUrl = healthCheck.WikiUrl?.ToString()
-                          };
+            _proxy.SendWebhook(BuildHealthPayload(healthCheck), Settings);
+        }
 
-            _proxy.SendWebhook(payload, Settings);
+        public override void OnHealthRestored(HealthCheck.HealthCheck previousCheck)
+        {
+            _proxy.SendWebhook(BuildHealthRestoredPayload(previousCheck), Settings);
+        }
+
+        public override void OnApplicationUpdate(ApplicationUpdateMessage updateMessage)
+        {
+            _proxy.SendWebhook(BuildApplicationUpdatePayload(updateMessage), Settings);
+        }
+
+        public override void OnManualInteractionRequired(ManualInteractionRequiredMessage message)
+        {
+            _proxy.SendWebhook(BuildManualInteractionRequiredPayload(message), Settings);
         }
 
         public override string Name => "Webhook";
@@ -104,39 +88,11 @@ namespace NzbDrone.Core.Notifications.Webhook
         {
             try
             {
-                var payload = new WebhookGrabPayload
-                {
-                    EventType = WebhookEventType.Test,
-                    Movie = new WebhookMovie
-                    {
-                        Id = 1,
-                        Title = "Test Title",
-                        FolderPath = "C:\\testpath",
-                        ReleaseDate = "1970-01-01"
-                    },
-                    RemoteMovie = new WebhookRemoteMovie
-                    {
-                        TmdbId = 1234,
-                        ImdbId = "5678",
-                        Title = "Test title",
-                        Year = 1970
-                    },
-                    Release = new WebhookRelease
-                    {
-                        Indexer = "Test Indexer",
-                        Quality = "Test Quality",
-                        QualityVersion = 1,
-                        ReleaseGroup = "Test Group",
-                        ReleaseTitle = "Test Title",
-                        Size = 9999999
-                    }
-                };
-
-                _proxy.SendWebhook(payload, Settings);
+                _proxy.SendWebhook(BuildTestPayload(), Settings);
             }
             catch (WebhookException ex)
             {
-                return new NzbDroneValidationFailure("Url", ex.Message);
+                return new NzbDroneValidationFailure("Url", _localizationService.GetLocalizedString("NotificationsValidationUnableToSendTestMessage", new Dictionary<string, object> { { "exceptionMessage", ex.Message } }));
             }
 
             return null;

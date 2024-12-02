@@ -1,7 +1,6 @@
-﻿using FizzWare.NBuilder;
+using FizzWare.NBuilder;
 using FluentAssertions;
 using NUnit.Framework;
-using NUnit.Framework.Internal;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Organizer;
 using NzbDrone.Core.Test.Framework;
@@ -46,6 +45,26 @@ namespace NzbDrone.Core.Test.OrganizerTests.FileNameBuilderTests
 
             Subject.GetMovieFolder(_movie)
                    .Should().Be($"Movie Title ({_movie.TmdbId})");
+        }
+
+        [Test]
+        public void should_add_imdb_tag()
+        {
+            _namingConfig.MovieFolderFormat = "{Movie Title} {imdb-{ImdbId}}";
+
+            Subject.GetMovieFolder(_movie)
+                   .Should().Be($"Movie Title {{imdb-{_movie.ImdbId}}}");
+        }
+
+        [Test]
+        public void should_skip_imdb_tag_if_null()
+        {
+            _namingConfig.MovieFolderFormat = "{Movie Title} {imdb-{ImdbId}}";
+
+            _movie.ImdbId = null;
+
+            Subject.GetMovieFolder(_movie)
+                   .Should().Be($"Movie Title");
         }
     }
 }

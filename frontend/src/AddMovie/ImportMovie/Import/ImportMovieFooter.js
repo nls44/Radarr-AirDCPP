@@ -83,7 +83,7 @@ class ImportMovieFooter extends Component {
   onInputChange = ({ name, value }) => {
     this.setState({ [name]: value });
     this.props.onInputChange({ name, value });
-  }
+  };
 
   //
   // Render
@@ -225,13 +225,19 @@ class ImportMovieFooter extends Component {
                   body={
                     <ul>
                       {
-                        importError.responseJSON.map((error, index) => {
-                          return (
-                            <li key={index}>
-                              {error.errorMessage}
-                            </li>
-                          );
-                        })
+                        Array.isArray(importError.responseJSON) ?
+                          importError.responseJSON.map((error, index) => {
+                            return (
+                              <li key={index}>
+                                {error.errorMessage}
+                              </li>
+                            );
+                          }) :
+                          <li>
+                            {
+                              JSON.stringify(importError.responseJSON)
+                            }
+                          </li>
                       }
                     </ul>
                   }

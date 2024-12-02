@@ -5,6 +5,7 @@ import { createThunk, handleThunks } from 'Store/thunks';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import serverSideCollectionHandlers from 'Utilities/serverSideCollectionHandlers';
 import translate from 'Utilities/String/translate';
+import { pingServer } from './appActions';
 import { set } from './baseActions';
 import createFetchHandler from './Creators/createFetchHandler';
 import createHandleActions from './Creators/createHandleActions';
@@ -81,35 +82,34 @@ export const defaultState = {
     columns: [
       {
         name: 'level',
-        columnLabel: translate('Level'),
+        columnLabel: () => translate('Level'),
         isSortable: false,
         isVisible: true,
         isModifiable: false
       },
       {
+        name: 'time',
+        label: () => translate('Time'),
+        isSortable: true,
+        isVisible: true,
+        isModifiable: false
+      },
+      {
         name: 'logger',
-        label: translate('Component'),
+        label: () => translate('Component'),
         isSortable: false,
         isVisible: true,
         isModifiable: false
       },
       {
         name: 'message',
-        label: translate('Message'),
-        isVisible: true,
-        isModifiable: false
-      },
-      {
-        name: 'time',
-        label: translate('Time'),
-        isSortable: true,
+        label: () => translate('Message'),
         isVisible: true,
         isModifiable: false
       },
       {
         name: 'actions',
-        columnLabel: translate('Actions'),
-        isSortable: true,
+        columnLabel: () => translate('Actions'),
         isVisible: true,
         isModifiable: false
       }
@@ -120,12 +120,12 @@ export const defaultState = {
     filters: [
       {
         key: 'all',
-        label: translate('All'),
+        label: () => translate('All'),
         filters: []
       },
       {
         key: 'info',
-        label: translate('Info'),
+        label: () => translate('Info'),
         filters: [
           {
             key: 'level',
@@ -136,7 +136,7 @@ export const defaultState = {
       },
       {
         key: 'warn',
-        label: translate('Warn'),
+        label: () => translate('Warn'),
         filters: [
           {
             key: 'level',
@@ -147,7 +147,7 @@ export const defaultState = {
       },
       {
         key: 'error',
-        label: translate('Error'),
+        label: () => translate('Error'),
         filters: [
           {
             key: 'level',
@@ -352,6 +352,7 @@ export const actionHandlers = handleThunks({
 
     promise.done(() => {
       dispatch(setAppValue({ isRestarting: true }));
+      dispatch(pingServer());
     });
   },
 

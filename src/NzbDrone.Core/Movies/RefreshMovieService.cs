@@ -1,21 +1,24 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
+using NzbDrone.Core.AutoTagging;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.MediaFiles;
+using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Movies.AlternativeTitles;
+using NzbDrone.Core.Movies.Collections;
 using NzbDrone.Core.Movies.Commands;
 using NzbDrone.Core.Movies.Credits;
 using NzbDrone.Core.Movies.Events;
 using NzbDrone.Core.Movies.Translations;
+using NzbDrone.Core.RootFolders;
 
 namespace NzbDrone.Core.Movies
 {
@@ -23,6 +26,9 @@ namespace NzbDrone.Core.Movies
     {
         private readonly IProvideMovieInfo _movieInfo;
         private readonly IMovieService _movieService;
+        private readonly IAddMovieCollectionService _movieCollectionService;
+        private readonly IMovieMetadataService _movieMetadataService;
+        private readonly IRootFolderService _folderService;
         private readonly IMovieTranslationService _movieTranslationService;
         private readonly IAlternativeTitleService _titleService;
         private readonly ICreditService _creditService;
@@ -30,11 +36,14 @@ namespace NzbDrone.Core.Movies
         private readonly IDiskScanService _diskScanService;
         private readonly ICheckIfMovieShouldBeRefreshed _checkIfMovieShouldBeRefreshed;
         private readonly IConfigService _configService;
-
+        private readonly IAutoTaggingService _autoTaggingService;
         private readonly Logger _logger;
 
         public RefreshMovieService(IProvideMovieInfo movieInfo,
                                     IMovieService movieService,
+                                    IAddMovieCollectionService movieCollectionService,
+                                    IMovieMetadataService movieMetadataService,
+                                    IRootFolderService folderService,
                                     IMovieTranslationService movieTranslationService,
                                     IAlternativeTitleService titleService,
                                     ICreditService creditService,
@@ -42,10 +51,14 @@ namespace NzbDrone.Core.Movies
                                     IDiskScanService diskScanService,
                                     ICheckIfMovieShouldBeRefreshed checkIfMovieShouldBeRefreshed,
                                     IConfigService configService,
+                                    IAutoTaggingService autoTaggingService,
                                     Logger logger)
         {
             _movieInfo = movieInfo;
             _movieService = movieService;
+            _movieCollectionService = movieCollectionService;
+            _movieMetadataService = movieMetadataService;
+            _folderService = folderService;
             _movieTranslationService = movieTranslationService;
             _titleService = titleService;
             _creditService = creditService;
@@ -53,6 +66,7 @@ namespace NzbDrone.Core.Movies
             _diskScanService = diskScanService;
             _checkIfMovieShouldBeRefreshed = checkIfMovieShouldBeRefreshed;
             _configService = configService;
+            _autoTaggingService = autoTaggingService;
             _logger = logger;
         }
 
@@ -61,10 +75,11 @@ namespace NzbDrone.Core.Movies
             // Get the movie before updating, that way any changes made to the movie after the refresh started,
             // but before this movie was refreshed won't be lost.
             var movie = _movieService.GetMovie(movieId);
+            var movieMetadata = _movieMetadataService.Get(movie.MovieMetadataId);
 
             _logger.ProgressInfo("Updating info for {0}", movie.Title);
 
-            Movie movieInfo;
+            MovieMetadata movieInfo;
             List<Credit> credits;
 
             try
@@ -75,10 +90,10 @@ namespace NzbDrone.Core.Movies
             }
             catch (MovieNotFoundException)
             {
-                if (movie.Status != MovieStatusType.Deleted)
+                if (movieMetadata.Status != MovieStatusType.Deleted)
                 {
-                    movie.Status = MovieStatusType.Deleted;
-                    _movieService.UpdateMovie(movie);
+                    movieMetadata.Status = MovieStatusType.Deleted;
+                    _movieMetadataService.Upsert(movieMetadata);
                     _logger.Debug("Movie marked as deleted on TMDb for {0}", movie.Title);
                     _eventAggregator.PublishEvent(new MovieUpdatedEvent(movie));
                 }
@@ -86,57 +101,76 @@ namespace NzbDrone.Core.Movies
                 throw;
             }
 
-            if (movie.TmdbId != movieInfo.TmdbId)
+            if (movieMetadata.TmdbId != movieInfo.TmdbId)
             {
                 _logger.Warn("Movie '{0}' (TMDb: {1}) was replaced with '{2}' (TMDb: {3}), because the original was a duplicate.", movie.Title, movie.TmdbId, movieInfo.Title, movieInfo.TmdbId);
-                movie.TmdbId = movieInfo.TmdbId;
+                movieMetadata.TmdbId = movieInfo.TmdbId;
             }
 
-            movie.Title = movieInfo.Title;
-            movie.TitleSlug = movieInfo.TitleSlug;
-            movie.ImdbId = movieInfo.ImdbId;
-            movie.Overview = movieInfo.Overview;
-            movie.Status = movieInfo.Status;
-            movie.CleanTitle = movieInfo.CleanTitle;
-            movie.SortTitle = movieInfo.SortTitle;
-            movie.LastInfoSync = DateTime.UtcNow;
-            movie.Runtime = movieInfo.Runtime;
-            movie.Images = movieInfo.Images;
-            movie.Ratings = movieInfo.Ratings;
-            movie.Collection = movieInfo.Collection;
-            movie.Genres = movieInfo.Genres;
-            movie.Certification = movieInfo.Certification;
-            movie.InCinemas = movieInfo.InCinemas;
-            movie.Website = movieInfo.Website;
+            movieMetadata.Title = movieInfo.Title;
+            movieMetadata.ImdbId = movieInfo.ImdbId;
+            movieMetadata.Overview = movieInfo.Overview;
+            movieMetadata.Status = movieInfo.Status;
+            movieMetadata.Images = movieInfo.Images;
+            movieMetadata.CleanTitle = movieInfo.CleanTitle;
+            movieMetadata.SortTitle = movieInfo.SortTitle;
+            movieMetadata.LastInfoSync = DateTime.UtcNow;
+            movieMetadata.Runtime = movieInfo.Runtime;
+            movieMetadata.Ratings = movieInfo.Ratings;
 
-            movie.Year = movieInfo.Year;
-            movie.SecondaryYear = movieInfo.SecondaryYear;
-            movie.PhysicalRelease = movieInfo.PhysicalRelease;
-            movie.DigitalRelease = movieInfo.DigitalRelease;
-            movie.YouTubeTrailerId = movieInfo.YouTubeTrailerId;
-            movie.Studio = movieInfo.Studio;
-            movie.OriginalTitle = movieInfo.OriginalTitle;
-            movie.OriginalLanguage = movieInfo.OriginalLanguage;
-            movie.HasPreDBEntry = movieInfo.HasPreDBEntry;
-            movie.Recommendations = movieInfo.Recommendations;
+            // movie.Genres = movieInfo.Genres;
+            movieMetadata.Certification = movieInfo.Certification;
+            movieMetadata.InCinemas = movieInfo.InCinemas;
+            movieMetadata.Website = movieInfo.Website;
 
-            try
+            movieMetadata.Year = movieInfo.Year;
+            movieMetadata.SecondaryYear = movieInfo.SecondaryYear;
+            movieMetadata.PhysicalRelease = movieInfo.PhysicalRelease;
+            movieMetadata.DigitalRelease = movieInfo.DigitalRelease;
+            movieMetadata.YouTubeTrailerId = movieInfo.YouTubeTrailerId;
+            movieMetadata.Studio = movieInfo.Studio;
+            movieMetadata.OriginalTitle = movieInfo.OriginalTitle;
+            movieMetadata.CleanOriginalTitle = movieInfo.CleanOriginalTitle;
+            movieMetadata.OriginalLanguage = movieInfo.OriginalLanguage;
+            movieMetadata.Recommendations = movieInfo.Recommendations;
+            movieMetadata.Popularity = movieInfo.Popularity;
+
+            // add collection
+            if (movieInfo.CollectionTmdbId > 0)
             {
-                movie.Path = new DirectoryInfo(movie.Path).FullName;
-                movie.Path = movie.Path.GetActualCasing();
+                var newCollection = _movieCollectionService.AddMovieCollection(new MovieCollection
+                {
+                    TmdbId = movieInfo.CollectionTmdbId,
+                    Title = movieInfo.CollectionTitle,
+                    Monitored = movie.AddOptions?.Monitor == MonitorTypes.MovieAndCollection,
+                    SearchOnAdd = movie.AddOptions?.SearchForMovie ?? false,
+                    QualityProfileId = movie.QualityProfileId,
+                    MinimumAvailability = movie.MinimumAvailability,
+                    RootFolderPath = _folderService.GetBestRootFolderPath(movie.Path).GetCleanPath(),
+                    Tags = movie.Tags
+                });
+
+                if (newCollection != null)
+                {
+                    movieMetadata.CollectionTmdbId = newCollection.TmdbId;
+                    movieMetadata.CollectionTitle = newCollection.Title;
+                }
             }
-            catch (Exception e)
+            else
             {
-                _logger.Warn(e, "Couldn't update movie path for " + movie.Path);
+                movieMetadata.CollectionTmdbId = 0;
+                movieMetadata.CollectionTitle = null;
             }
 
-            movie.AlternativeTitles = _titleService.UpdateTitles(movieInfo.AlternativeTitles, movie);
-            _movieTranslationService.UpdateTranslations(movieInfo.Translations, movie);
+            movieMetadata.AlternativeTitles = _titleService.UpdateTitles(movieInfo.AlternativeTitles, movieMetadata);
+            _movieTranslationService.UpdateTranslations(movieInfo.Translations, movieMetadata);
 
-            _movieService.UpdateMovie(new List<Movie> { movie }, true);
-            _creditService.UpdateCredits(credits, movie);
+            _movieMetadataService.Upsert(movieMetadata);
+            _creditService.UpdateCredits(credits, movieMetadata);
 
-            _logger.Debug("Finished movie refresh for {0}", movie.Title);
+            movie.MovieMetadata = movieMetadata;
+
+            _logger.Debug("Finished movie metadata refresh for {0}", movieMetadata.Title);
             _eventAggregator.PublishEvent(new MovieUpdatedEvent(movie));
 
             return movie;
@@ -145,26 +179,23 @@ namespace NzbDrone.Core.Movies
         private void RescanMovie(Movie movie, bool isNew, CommandTrigger trigger)
         {
             var rescanAfterRefresh = _configService.RescanAfterRefresh;
-            var shouldRescan = true;
 
             if (isNew)
             {
                 _logger.Trace("Forcing rescan of {0}. Reason: New movie", movie);
-                shouldRescan = true;
             }
             else if (rescanAfterRefresh == RescanAfterRefreshType.Never)
             {
                 _logger.Trace("Skipping rescan of {0}. Reason: Never rescan after refresh", movie);
-                shouldRescan = false;
+                _eventAggregator.PublishEvent(new MovieScanSkippedEvent(movie, MovieScanSkippedReason.NeverRescanAfterRefresh));
+
+                return;
             }
             else if (rescanAfterRefresh == RescanAfterRefreshType.AfterManual && trigger != CommandTrigger.Manual)
             {
                 _logger.Trace("Skipping rescan of {0}. Reason: Not after automatic scans", movie);
-                shouldRescan = false;
-            }
+                _eventAggregator.PublishEvent(new MovieScanSkippedEvent(movie, MovieScanSkippedReason.RescanAfterManualRefreshOnly));
 
-            if (!shouldRescan)
-            {
                 return;
             }
 
@@ -175,6 +206,16 @@ namespace NzbDrone.Core.Movies
             catch (Exception e)
             {
                 _logger.Error(e, "Couldn't rescan movie {0}", movie);
+            }
+        }
+
+        private void UpdateTags(Movie movie)
+        {
+            var tagsUpdated = _movieService.UpdateTags(movie);
+
+            if (tagsUpdated)
+            {
+                _movieService.UpdateMovie(movie);
             }
         }
 
@@ -193,6 +234,7 @@ namespace NzbDrone.Core.Movies
                     try
                     {
                         movie = RefreshMovieInfo(movieId);
+                        UpdateTags(movie);
                         RescanMovie(movie, isNew, trigger);
                     }
                     catch (MovieNotFoundException)
@@ -202,6 +244,7 @@ namespace NzbDrone.Core.Movies
                     catch (Exception e)
                     {
                         _logger.Error(e, "Couldn't refresh info for {0}", movie);
+                        UpdateTags(movie);
                         RescanMovie(movie, isNew, trigger);
                         throw;
                     }
@@ -209,7 +252,8 @@ namespace NzbDrone.Core.Movies
             }
             else
             {
-                var allMovie = _movieService.GetAllMovies().OrderBy(c => c.SortTitle).ToList();
+                // TODO refresh all moviemetadata here, even if not used by a Movie
+                var allMovie = _movieService.GetAllMovies().OrderBy(c => c.MovieMetadata.Value.SortTitle).ToList();
 
                 var updatedTMDBMovies = new HashSet<int>();
 
@@ -221,7 +265,7 @@ namespace NzbDrone.Core.Movies
                 foreach (var movie in allMovie)
                 {
                     var movieLocal = movie;
-                    if ((updatedTMDBMovies.Count == 0 && _checkIfMovieShouldBeRefreshed.ShouldRefresh(movie)) || updatedTMDBMovies.Contains(movie.TmdbId) || message.Trigger == CommandTrigger.Manual)
+                    if ((updatedTMDBMovies.Count == 0 && _checkIfMovieShouldBeRefreshed.ShouldRefresh(movie.MovieMetadata)) || updatedTMDBMovies.Contains(movie.TmdbId) || message.Trigger == CommandTrigger.Manual)
                     {
                         try
                         {
@@ -237,11 +281,13 @@ namespace NzbDrone.Core.Movies
                             _logger.Error(e, "Couldn't refresh info for {0}", movieLocal);
                         }
 
+                        UpdateTags(movie);
                         RescanMovie(movieLocal, false, trigger);
                     }
                     else
                     {
                         _logger.Debug("Skipping refresh of movie: {0}", movieLocal.Title);
+                        UpdateTags(movie);
                         RescanMovie(movieLocal, false, trigger);
                     }
                 }

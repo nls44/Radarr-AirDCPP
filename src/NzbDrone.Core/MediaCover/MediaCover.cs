@@ -1,3 +1,4 @@
+using Equ;
 using NzbDrone.Core.Datastore;
 
 namespace NzbDrone.Core.MediaCover
@@ -9,10 +10,11 @@ namespace NzbDrone.Core.MediaCover
         Banner = 2,
         Fanart = 3,
         Screenshot = 4,
-        Headshot = 5
+        Headshot = 5,
+        Clearlogo = 6
     }
 
-    public class MediaCover : IEmbeddedDocument
+    public class MediaCover : MemberwiseEquatable<MediaCover>, IEmbeddedDocument
     {
         public MediaCoverTypes CoverType { get; set; }
         public string Url { get; set; }
@@ -22,10 +24,10 @@ namespace NzbDrone.Core.MediaCover
         {
         }
 
-        public MediaCover(MediaCoverTypes coverType, string url)
+        public MediaCover(MediaCoverTypes coverType, string remoteUrl)
         {
             CoverType = coverType;
-            Url = url;
+            RemoteUrl = remoteUrl;
         }
     }
 }

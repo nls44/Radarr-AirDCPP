@@ -33,18 +33,18 @@ class CustomFormats extends Component {
       isCustomFormatModalOpen: true,
       tagsFromId: id
     });
-  }
+  };
 
   onEditCustomFormatPress = () => {
     this.setState({ isCustomFormatModalOpen: true });
-  }
+  };
 
   onModalClose = () => {
     this.setState({
       isCustomFormatModalOpen: false,
       tagsFromId: undefined
     });
-  }
+  };
 
   //
   // Render
@@ -61,8 +61,8 @@ class CustomFormats extends Component {
     return (
       <FieldSet legend={translate('CustomFormats')}>
         <PageSectionContent
-          errorMessage={translate('UnableToLoadCustomFormats')}
-          {...otherProps}c={true}
+          errorMessage={translate('CustomFormatsLoadError')}
+          {...otherProps}
         >
           <div className={styles.customFormats}>
             {

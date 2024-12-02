@@ -31,16 +31,17 @@ namespace NzbDrone.Core.Extras.Metadata
 
         public override int Order => 0;
 
-        public override IEnumerable<ExtraFile> ProcessFiles(Movie movie, List<string> filesOnDisk, List<string> importedFiles)
+        public override IEnumerable<ExtraFile> ProcessFiles(Movie movie, List<string> filesOnDisk, List<string> importedFiles, string fileNameBeforeRename)
         {
             _logger.Debug("Looking for existing metadata in {0}", movie.Path);
 
             var metadataFiles = new List<MetadataFile>();
-            var filterResult = FilterAndClean(movie, filesOnDisk, importedFiles);
+            var filterResult = FilterAndClean(movie, filesOnDisk, importedFiles, fileNameBeforeRename is not null);
 
             foreach (var possibleMetadataFile in filterResult.FilesOnDisk)
             {
-                // Don't process files that have known Subtitle file extensions (saves a bit of unecessary processing)
+                // Don't process files that have known Subtitle file extensions (saves a bit of unnecessary processing)
+
                 if (SubtitleFileExtensions.Extensions.Contains(Path.GetExtension(possibleMetadataFile)))
                 {
                     continue;

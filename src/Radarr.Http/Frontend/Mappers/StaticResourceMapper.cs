@@ -30,14 +30,14 @@ namespace Radarr.Http.Frontend.Mappers
         {
             resourceUrl = resourceUrl.ToLowerInvariant();
 
-            if (resourceUrl.StartsWith("/content/images/icons/manifest") ||
-                resourceUrl.StartsWith("/content/images/icons/browserconfig"))
+            if (resourceUrl.StartsWith("/content/manifest") ||
+                resourceUrl.StartsWith("/content/browserconfig"))
             {
                 return false;
             }
 
             return resourceUrl.StartsWith("/content") ||
-                   (resourceUrl.EndsWith(".js") && !resourceUrl.EndsWith("initialize.js")) ||
+                   resourceUrl.EndsWith(".js") ||
                    resourceUrl.EndsWith(".map") ||
                    resourceUrl.EndsWith(".css") ||
                    (resourceUrl.EndsWith(".ico") && !resourceUrl.Equals("/favicon.ico")) ||

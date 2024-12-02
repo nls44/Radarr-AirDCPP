@@ -16,11 +16,12 @@ class AddIndexerItem extends Component {
 
   onIndexerSelect = () => {
     const {
-      implementation
+      implementation,
+      implementationName
     } = this.props;
 
-    this.props.onIndexerSelect({ implementation });
-  }
+    this.props.onIndexerSelect({ implementation, implementationName });
+  };
 
   //
   // Render
@@ -77,6 +78,7 @@ class AddIndexerItem extends Component {
                               key={preset.name}
                               name={preset.name}
                               implementation={implementation}
+                              implementationName={implementationName}
                               onPress={onIndexerSelect}
                             />
                           );

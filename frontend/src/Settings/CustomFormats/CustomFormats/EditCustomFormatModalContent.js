@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import Alert from 'Components/Alert';
 import Card from 'Components/Card';
 import FieldSet from 'Components/FieldSet';
 import Form from 'Components/Form/Form';
@@ -42,26 +43,26 @@ class EditCustomFormatModalContent extends Component {
 
   onAddSpecificationPress = () => {
     this.setState({ isAddSpecificationModalOpen: true });
-  }
+  };
 
   onAddSpecificationModalClose = ({ specificationSelected = false } = {}) => {
     this.setState({
       isAddSpecificationModalOpen: false,
       isEditSpecificationModalOpen: specificationSelected
     });
-  }
+  };
 
   onEditSpecificationModalClose = () => {
     this.setState({ isEditSpecificationModalOpen: false });
-  }
+  };
 
   onImportPress = () => {
     this.setState({ isImportCustomFormatModalOpen: true });
-  }
+  };
 
   onImportCustomFormatModalClose = () => {
     this.setState({ isImportCustomFormatModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -112,9 +113,9 @@ class EditCustomFormatModalContent extends Component {
 
             {
               !isFetching && !!error &&
-                <div>
-                  {translate('UnableToAddANewCustomFormatPleaseTryAgain')}
-                </div>
+                <Alert kind={kinds.DANGER}>
+                  {translate('AddCustomFormatError')}
+                </Alert>
             }
 
             {
@@ -150,6 +151,11 @@ class EditCustomFormatModalContent extends Component {
                   </Form>
 
                   <FieldSet legend={translate('Conditions')}>
+                    <Alert kind={kinds.INFO}>
+                      <div>
+                        {translate('CustomFormatsSettingsTriggerInfo')}
+                      </div>
+                    </Alert>
                     <div className={styles.customFormats}>
                       {
                         specifications.map((tag) => {
@@ -198,26 +204,25 @@ class EditCustomFormatModalContent extends Component {
           </div>
         </ModalBody>
         <ModalFooter>
-          {
-            id &&
-              <Button
-                className={styles.deleteButton}
-                kind={kinds.DANGER}
-                onPress={onDeleteCustomFormatPress}
-              >
-                {translate('Delete')}
-              </Button>
-          }
+          <div className={styles.rightButtons}>
+            {
+              id &&
+                <Button
+                  className={styles.deleteButton}
+                  kind={kinds.DANGER}
+                  onPress={onDeleteCustomFormatPress}
+                >
+                  {translate('Delete')}
+                </Button>
+            }
 
-          {
-            !id &&
-              <Button
-                className={styles.deleteButton}
-                onPress={this.onImportPress}
-              >
-                {translate('Import')}
-              </Button>
-          }
+            <Button
+              className={styles.deleteButton}
+              onPress={this.onImportPress}
+            >
+              {translate('Import')}
+            </Button>
+          </div>
 
           <Button
             onPress={onModalClose}

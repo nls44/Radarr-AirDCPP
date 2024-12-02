@@ -6,7 +6,6 @@ using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using NLog;
-using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Extras.Metadata.Files;
 using NzbDrone.Core.MediaCover;
@@ -18,15 +17,12 @@ namespace NzbDrone.Core.Extras.Metadata.Consumers.Wdtv
     public class WdtvMetadata : MetadataBase<WdtvMetadataSettings>
     {
         private readonly IMapCoversToLocal _mediaCoverService;
-        private readonly IDiskProvider _diskProvider;
         private readonly Logger _logger;
 
         public WdtvMetadata(IMapCoversToLocal mediaCoverService,
-                            IDiskProvider diskProvider,
                             Logger logger)
         {
             _mediaCoverService = mediaCoverService;
-            _diskProvider = diskProvider;
             _logger = logger;
         }
 
@@ -113,8 +109,8 @@ namespace NzbDrone.Core.Extras.Metadata.Consumers.Wdtv
                 var details = new XElement("details");
                 details.Add(new XElement("id", movie.Id));
                 details.Add(new XElement("title", movie.Title));
-                details.Add(new XElement("genre", string.Join(" / ", movie.Genres)));
-                details.Add(new XElement("overview", movie.Overview));
+                details.Add(new XElement("genre", string.Join(" / ", movie.MovieMetadata.Value.Genres)));
+                details.Add(new XElement("overview", movie.MovieMetadata.Value.Overview));
 
                 doc.Add(details);
                 doc.Save(xw);
@@ -135,8 +131,8 @@ namespace NzbDrone.Core.Extras.Metadata.Consumers.Wdtv
                 return new List<ImageFileResult>();
             }
 
-            //Because we only support one image, attempt to get the Poster type, then if that fails grab the first
-            var image = movie.Images.SingleOrDefault(c => c.CoverType == MediaCoverTypes.Poster) ?? movie.Images.FirstOrDefault();
+            // Because we only support one image, attempt to get the Poster type, then if that fails grab the first
+            var image = movie.MovieMetadata.Value.Images.SingleOrDefault(c => c.CoverType == MediaCoverTypes.Poster) ?? movie.MovieMetadata.Value.Images.FirstOrDefault();
             if (image == null)
             {
                 _logger.Trace("Failed to find suitable Movie image for movie {0}.", movie.Title);

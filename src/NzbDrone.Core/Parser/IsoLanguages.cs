@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Core.Languages;
+using NzbDrone.Core.Organizer;
 
 namespace NzbDrone.Core.Parser
 {
@@ -36,45 +38,81 @@ namespace NzbDrone.Core.Parser
                                                                new IsoLanguage("th", "", "tha", "Thai", Language.Thai),
                                                                new IsoLanguage("bg", "", "bul", "Bulgarian", Language.Bulgarian),
                                                                new IsoLanguage("ro", "", "ron", "Romanian", Language.Romanian),
-                                                               new IsoLanguage("pt", "br", "", "Portuguese (Brazil)", Language.PortugueseBR)
+                                                               new IsoLanguage("pt", "br", "", "Portuguese (Brazil)", Language.PortugueseBR),
+                                                               new IsoLanguage("ar", "", "ara", "Arabic", Language.Arabic),
+                                                               new IsoLanguage("uk", "", "ukr", "Ukrainian", Language.Ukrainian),
+                                                               new IsoLanguage("fa", "", "fas", "Persian", Language.Persian),
+                                                               new IsoLanguage("be", "", "ben", "Bengali", Language.Bengali),
+                                                               new IsoLanguage("lt", "", "lit", "Lithuanian", Language.Lithuanian),
+                                                               new IsoLanguage("sk", "", "slk", "Slovak", Language.Slovak),
+                                                               new IsoLanguage("lv", "", "lav", "Latvian", Language.Latvian),
+                                                               new IsoLanguage("es", "mx", "spa", "Spanish (Latino)", Language.SpanishLatino),
+                                                               new IsoLanguage("ca", "", "cat", "Catalan", Language.Catalan),
+                                                               new IsoLanguage("hr", "", "hrv", "Croatian", Language.Croatian),
+                                                               new IsoLanguage("sr", "", "srp", "Serbian", Language.Serbian),
+                                                               new IsoLanguage("bs", "", "bos", "Bosnian", Language.Bosnian),
+                                                               new IsoLanguage("et", "", "est", "Estonian", Language.Estonian),
+                                                               new IsoLanguage("ta", "", "tam", "Tamil", Language.Tamil),
+                                                               new IsoLanguage("id", "", "ind", "Indonesian", Language.Indonesian),
+                                                               new IsoLanguage("te", "", "tel", "Telugu", Language.Telugu),
+                                                               new IsoLanguage("mk", "", "mkd", "Macedonian", Language.Macedonian),
+                                                               new IsoLanguage("sl", "", "slv", "Slovenian", Language.Slovenian),
+                                                               new IsoLanguage("ml", "", "mal", "Malayalam", Language.Malayalam),
+                                                               new IsoLanguage("kn", "", "kan", "Kannada", Language.Kannada),
+                                                               new IsoLanguage("sq", "", "sqi", "Albanian", Language.Albanian),
+                                                               new IsoLanguage("af", "", "afr", "Afrikaans", Language.Afrikaans),
                                                            };
+
+        private static readonly Dictionary<string, Language> AlternateIsoCodeMappings = new ()
+        {
+            { "cn", Language.Chinese }
+        };
 
         public static IsoLanguage Find(string isoCode)
         {
             var isoArray = isoCode.Split('-');
-
             var langCode = isoArray[0].ToLower();
 
-            if (langCode.Length == 2)
+            if (AlternateIsoCodeMappings.TryGetValue(isoCode, out var alternateLanguage))
             {
-                //Lookup ISO639-1 code
+                return Get(alternateLanguage);
+            }
+            else if (langCode.Length == 2)
+            {
+                // Lookup ISO639-1 code
                 var isoLanguages = All.Where(l => l.TwoLetterCode == langCode).ToList();
 
                 if (isoArray.Length > 1)
                 {
                     isoLanguages = isoLanguages.Any(l => l.CountryCode == isoArray[1].ToLower()) ?
-                        isoLanguages.Where(l => l.CountryCode == isoArray[1].ToLower()).ToList() : isoLanguages.Where(l => string.IsNullOrEmpty(l.CountryCode)).ToList();
+                        isoLanguages.Where(l => l.CountryCode == isoArray[1].ToLower()).ToList() :
+                        isoLanguages.Where(l => string.IsNullOrEmpty(l.CountryCode)).ToList();
                 }
 
                 return isoLanguages.FirstOrDefault();
             }
             else if (langCode.Length == 3)
             {
-                //Lookup ISO639-2T code
+                // Lookup ISO639-2T code
+                if (FileNameBuilder.Iso639BTMap.TryGetValue(langCode, out var mapped))
+                {
+                    langCode = mapped;
+                }
+
                 return All.FirstOrDefault(l => l.ThreeLetterCode == langCode);
             }
 
             return null;
         }
 
-        public static IsoLanguage FindByName(string name)
-        {
-            return All.FirstOrDefault(l => l.EnglishName == name.Trim());
-        }
-
         public static IsoLanguage Get(Language language)
         {
             return All.FirstOrDefault(l => l.Language == language);
+        }
+
+        public static IsoLanguage FindByName(string name)
+        {
+            return All.FirstOrDefault(l => l.EnglishName.Equals(name.Trim(), StringComparison.InvariantCultureIgnoreCase));
         }
     }
 }

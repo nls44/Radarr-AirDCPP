@@ -4,11 +4,12 @@ using System.Linq;
 using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download;
+using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.MediaFiles.MovieImport.Aggregation;
 using NzbDrone.Core.Movies;
-using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.MediaFiles.MovieImport
@@ -16,8 +17,10 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
     public interface IMakeImportDecision
     {
         List<ImportDecision> GetImportDecisions(List<string> videoFiles, Movie movie);
+        List<ImportDecision> GetImportDecisions(List<string> videoFiles, Movie movie, bool filterExistingFiles);
         List<ImportDecision> GetImportDecisions(List<string> videoFiles, Movie movie, DownloadClientItem downloadClientItem, ParsedMovieInfo folderInfo, bool sceneSource);
         List<ImportDecision> GetImportDecisions(List<string> videoFiles, Movie movie, DownloadClientItem downloadClientItem, ParsedMovieInfo folderInfo, bool sceneSource, bool filterExistingFiles);
+        ImportDecision GetDecision(LocalMovie localMovie, DownloadClientItem downloadClientItem);
     }
 
     public class ImportDecisionMaker : IMakeImportDecision
@@ -27,7 +30,8 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
         private readonly IAggregationService _aggregationService;
         private readonly IDiskProvider _diskProvider;
         private readonly IDetectSample _detectSample;
-        private readonly IParsingService _parsingService;
+        private readonly ITrackedDownloadService _trackedDownloadService;
+        private readonly ICustomFormatCalculationService _formatCalculator;
         private readonly Logger _logger;
 
         public ImportDecisionMaker(IEnumerable<IImportDecisionEngineSpecification> specifications,
@@ -35,7 +39,8 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                                    IAggregationService aggregationService,
                                    IDiskProvider diskProvider,
                                    IDetectSample detectSample,
-                                   IParsingService parsingService,
+                                   ITrackedDownloadService trackedDownloadService,
+                                   ICustomFormatCalculationService formatCalculator,
                                    Logger logger)
         {
             _specifications = specifications;
@@ -43,13 +48,19 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             _aggregationService = aggregationService;
             _diskProvider = diskProvider;
             _detectSample = detectSample;
-            _parsingService = parsingService;
+            _trackedDownloadService = trackedDownloadService;
+            _formatCalculator = formatCalculator;
             _logger = logger;
         }
 
         public List<ImportDecision> GetImportDecisions(List<string> videoFiles, Movie movie)
         {
             return GetImportDecisions(videoFiles, movie, null, null, false);
+        }
+
+        public List<ImportDecision> GetImportDecisions(List<string> videoFiles, Movie movie, bool filterExistingFiles)
+        {
+            return GetImportDecisions(videoFiles, movie, null, null, false, filterExistingFiles);
         }
 
         public List<ImportDecision> GetImportDecisions(List<string> videoFiles, Movie movie, DownloadClientItem downloadClientItem, ParsedMovieInfo folderInfo, bool sceneSource)
@@ -68,10 +79,9 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             if (downloadClientItem != null)
             {
                 downloadClientItemInfo = Parser.Parser.ParseMovieTitle(downloadClientItem.Title);
-                downloadClientItemInfo = _parsingService.EnhanceMovieInfo(downloadClientItemInfo);
             }
 
-            var nonSampleVideoFileCount = GetNonSampleVideoFileCount(newFiles, movie);
+            var nonSampleVideoFileCount = GetNonSampleVideoFileCount(newFiles, movie.MovieMetadata);
 
             var decisions = new List<ImportDecision>();
 
@@ -81,10 +91,12 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                 {
                     Movie = movie,
                     DownloadClientMovieInfo = downloadClientItemInfo,
+                    DownloadItem = downloadClientItem,
                     FolderMovieInfo = folderInfo,
                     Path = file,
                     SceneSource = sceneSource,
-                    ExistingFile = movie.Path.IsParentPath(file)
+                    ExistingFile = movie.Path.IsParentPath(file),
+                    OtherVideoFiles = nonSampleVideoFileCount > 1
                 };
 
                 decisions.AddIfNotNull(GetDecision(localMovie, downloadClientItem, nonSampleVideoFileCount > 1));
@@ -93,23 +105,26 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             return decisions;
         }
 
+        public ImportDecision GetDecision(LocalMovie localMovie, DownloadClientItem downloadClientItem)
+        {
+            var reasons = _specifications.Select(c => EvaluateSpec(c, localMovie, downloadClientItem))
+                                         .Where(c => c != null);
+
+            return new ImportDecision(localMovie, reasons.ToArray());
+        }
+
         private ImportDecision GetDecision(LocalMovie localMovie, DownloadClientItem downloadClientItem, bool otherFiles)
         {
             ImportDecision decision = null;
 
-            var fileMovieInfo = Parser.Parser.ParseMoviePath(localMovie.Path);
-
-            if (fileMovieInfo != null)
-            {
-                fileMovieInfo = _parsingService.EnhanceMovieInfo(fileMovieInfo);
-            }
-
-            localMovie.FileMovieInfo = fileMovieInfo;
-            localMovie.Size = _diskProvider.GetFileSize(localMovie.Path);
-
             try
             {
-                _aggregationService.Augment(localMovie, downloadClientItem, otherFiles);
+                var fileMovieInfo = Parser.Parser.ParseMoviePath(localMovie.Path);
+
+                localMovie.FileMovieInfo = fileMovieInfo;
+                localMovie.Size = _diskProvider.GetFileSize(localMovie.Path);
+
+                _aggregationService.Augment(localMovie, downloadClientItem);
 
                 if (localMovie.Movie == null)
                 {
@@ -117,6 +132,19 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                 }
                 else
                 {
+                    if (downloadClientItem?.DownloadId.IsNotNullOrWhiteSpace() == true)
+                    {
+                        var trackedDownload = _trackedDownloadService.Find(downloadClientItem.DownloadId);
+
+                        if (trackedDownload?.RemoteMovie?.Release?.IndexerFlags != null)
+                        {
+                            localMovie.IndexerFlags = trackedDownload.RemoteMovie.Release.IndexerFlags;
+                        }
+                    }
+
+                    localMovie.CustomFormats = _formatCalculator.ParseCustomFormat(localMovie);
+                    localMovie.CustomFormatScore = localMovie.Movie.QualityProfile?.CalculateCustomFormatScore(localMovie.CustomFormats) ?? 0;
+
                     decision = GetDecision(localMovie, downloadClientItem);
                 }
             }
@@ -147,14 +175,6 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             return decision;
         }
 
-        private ImportDecision GetDecision(LocalMovie localMovie, DownloadClientItem downloadClientItem)
-        {
-            var reasons = _specifications.Select(c => EvaluateSpec(c, localMovie, downloadClientItem))
-                                         .Where(c => c != null);
-
-            return new ImportDecision(localMovie, reasons.ToArray());
-        }
-
         private Rejection EvaluateSpec(IImportDecisionEngineSpecification spec, LocalMovie localMovie, DownloadClientItem downloadClientItem)
         {
             try
@@ -180,7 +200,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             return null;
         }
 
-        private int GetNonSampleVideoFileCount(List<string> videoFiles, Movie movie)
+        private int GetNonSampleVideoFileCount(List<string> videoFiles, MovieMetadata movie)
         {
             return videoFiles.Count(file =>
             {

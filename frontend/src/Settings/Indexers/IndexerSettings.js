@@ -8,8 +8,8 @@ import { icons } from 'Helpers/Props';
 import SettingsToolbarConnector from 'Settings/SettingsToolbarConnector';
 import translate from 'Utilities/String/translate';
 import IndexersConnector from './Indexers/IndexersConnector';
+import ManageIndexersModal from './Indexers/Manage/ManageIndexersModal';
 import IndexerOptionsConnector from './Options/IndexerOptionsConnector';
-import RestrictionsConnector from './Restrictions/RestrictionsConnector';
 
 class IndexerSettings extends Component {
 
@@ -23,7 +23,8 @@ class IndexerSettings extends Component {
 
     this.state = {
       isSaving: false,
-      hasPendingChanges: false
+      hasPendingChanges: false,
+      isManageIndexersOpen: false
     };
   }
 
@@ -32,17 +33,25 @@ class IndexerSettings extends Component {
 
   onChildMounted = (saveCallback) => {
     this._saveCallback = saveCallback;
-  }
+  };
 
   onChildStateChange = (payload) => {
     this.setState(payload);
-  }
+  };
+
+  onManageIndexersPress = () => {
+    this.setState({ isManageIndexersOpen: true });
+  };
+
+  onManageIndexersModalClose = () => {
+    this.setState({ isManageIndexersOpen: false });
+  };
 
   onSavePress = () => {
     if (this._saveCallback) {
       this._saveCallback();
     }
-  }
+  };
 
   //
   // Render
@@ -55,7 +64,8 @@ class IndexerSettings extends Component {
 
     const {
       isSaving,
-      hasPendingChanges
+      hasPendingChanges,
+      isManageIndexersOpen
     } = this.state;
 
     return (
@@ -73,6 +83,12 @@ class IndexerSettings extends Component {
                 isSpinning={isTestingAll}
                 onPress={dispatchTestAllIndexers}
               />
+
+              <PageToolbarButton
+                label={translate('ManageIndexers')}
+                iconName={icons.MANAGE}
+                onPress={this.onManageIndexersPress}
+              />
             </Fragment>
           }
           onSavePress={this.onSavePress}
@@ -86,7 +102,10 @@ class IndexerSettings extends Component {
             onChildStateChange={this.onChildStateChange}
           />
 
-          <RestrictionsConnector />
+          <ManageIndexersModal
+            isOpen={isManageIndexersOpen}
+            onModalClose={this.onManageIndexersModalClose}
+          />
         </PageContentBody>
       </PageContent>
     );

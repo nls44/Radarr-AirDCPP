@@ -6,7 +6,6 @@ using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using NLog;
-using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Extras.Metadata.Files;
 using NzbDrone.Core.MediaCover;
@@ -18,20 +17,17 @@ namespace NzbDrone.Core.Extras.Metadata.Consumers.Roksbox
     public class RoksboxMetadata : MetadataBase<RoksboxMetadataSettings>
     {
         private readonly IMapCoversToLocal _mediaCoverService;
-        private readonly IDiskProvider _diskProvider;
         private readonly Logger _logger;
 
         public RoksboxMetadata(IMapCoversToLocal mediaCoverService,
-                            IDiskProvider diskProvider,
                             Logger logger)
         {
             _mediaCoverService = mediaCoverService;
-            _diskProvider = diskProvider;
             _logger = logger;
         }
 
-        //Re-enable when/if we store and use mpaa certification
-        //private static List<string> ValidCertification = new List<string> { "G", "NC-17", "PG", "PG-13", "R", "UR", "UNRATED", "NR", "TV-Y", "TV-Y7", "TV-Y7-FV", "TV-G", "TV-PG", "TV-14", "TV-MA" };
+        // Re-enable when/if we store and use mpaa certification
+        // private static List<string> ValidCertification = new List<string> { "G", "NC-17", "PG", "PG-13", "R", "UR", "UNRATED", "NR", "TV-Y", "TV-Y7", "TV-Y7-FV", "TV-G", "TV-PG", "TV-14", "TV-MA" };
         public override string Name => "Roksbox";
 
         public override string GetFilenameAfterMove(Movie movie, MovieFile movieFile, MetadataFile metadataFile)
@@ -84,7 +80,8 @@ namespace NzbDrone.Core.Extras.Metadata.Consumers.Roksbox
 
                 if (extension == ".jpg")
                 {
-                    if (Path.GetFileNameWithoutExtension(filename).Equals(parentdir.Name, StringComparison.InvariantCultureIgnoreCase))
+                    if (Path.GetFileNameWithoutExtension(filename).Equals(parentdir.Name, StringComparison.InvariantCultureIgnoreCase) &&
+                        !path.GetParentName().Equals("metadata", StringComparison.InvariantCultureIgnoreCase))
                     {
                         metadata.Type = MetadataType.MovieImage;
                         return metadata;
@@ -118,9 +115,9 @@ namespace NzbDrone.Core.Extras.Metadata.Consumers.Roksbox
                 var details = new XElement("video");
                 details.Add(new XElement("title", movie.Title));
 
-                details.Add(new XElement("genre", string.Join(" / ", movie.Genres)));
-                details.Add(new XElement("description", movie.Overview));
-                details.Add(new XElement("length", movie.Runtime));
+                details.Add(new XElement("genre", string.Join(" / ", movie.MovieMetadata.Value.Genres)));
+                details.Add(new XElement("description", movie.MovieMetadata.Value.Overview));
+                details.Add(new XElement("length", movie.MovieMetadata.Value.Runtime));
 
                 doc.Add(details);
                 doc.Save(xw);
@@ -139,7 +136,7 @@ namespace NzbDrone.Core.Extras.Metadata.Consumers.Roksbox
                 return new List<ImageFileResult>();
             }
 
-            var image = movie.Images.SingleOrDefault(c => c.CoverType == MediaCoverTypes.Poster) ?? movie.Images.FirstOrDefault();
+            var image = movie.MovieMetadata.Value.Images.SingleOrDefault(c => c.CoverType == MediaCoverTypes.Poster) ?? movie.MovieMetadata.Value.Images.FirstOrDefault();
             if (image == null)
             {
                 _logger.Trace("Failed to find suitable Movie image for movie {0}.", movie.Title);

@@ -30,9 +30,9 @@ export const defaultState = {
 
   defaults: {
     rootFolderPath: '',
-    monitor: 'true',
+    monitor: 'movieOnly',
     qualityProfileId: 0,
-    minimumAvailability: 'announced',
+    minimumAvailability: 'released',
     searchForMovie: true,
     tags: []
   }
@@ -88,6 +88,8 @@ export const actionHandlers = handleThunks({
     abortCurrentRequest = abortRequest;
 
     request.done((data) => {
+      data = data.map((movie) => ({ ...movie, internalId: movie.id, id: movie.tmdbId }));
+
       dispatch(batchActions([
         update({ section, data }),
 
@@ -116,17 +118,25 @@ export const actionHandlers = handleThunks({
     const tmdbId = payload.tmdbId;
     const items = getState().addMovie.items;
     const newMovie = getNewMovie(_.cloneDeep(_.find(items, { tmdbId })), payload);
+    newMovie.id = 0;
 
     const promise = createAjaxRequest({
       url: '/movie',
       method: 'POST',
+      dataType: 'json',
       contentType: 'application/json',
       data: JSON.stringify(newMovie)
     }).request;
 
     promise.done((data) => {
-      dispatch(batchActions([
+      const updatedItem = _.cloneDeep(data);
+      updatedItem.internalId = updatedItem.id;
+      updatedItem.id = updatedItem.tmdbId;
+      delete updatedItem.images;
+
+      const actions = [
         updateItem({ section: 'movies', ...data }),
+        updateItem({ section: 'addMovie', ...updatedItem }),
 
         set({
           section,
@@ -134,7 +144,21 @@ export const actionHandlers = handleThunks({
           isAdded: true,
           addError: null
         })
-      ]));
+      ];
+
+      if (!newMovie.collection) {
+        dispatch(batchActions(actions));
+        return;
+      }
+
+      const collectionToUpdate = getState().movieCollections.items.find((collection) => collection.tmdbId === newMovie.collection.tmdbId);
+
+      if (collectionToUpdate) {
+        const collectionData = { ...collectionToUpdate, missingMovies: Math.max(0, collectionToUpdate.missingMovies - 1 ) };
+        actions.push(updateItem({ section: 'movieCollections', ...collectionData }));
+      }
+
+      dispatch(batchActions(actions));
     });
 
     promise.fail((xhr) => {

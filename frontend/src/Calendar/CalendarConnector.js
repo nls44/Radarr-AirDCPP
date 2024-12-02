@@ -55,7 +55,7 @@ class CalendarConnector extends Component {
       gotoCalendarToday
     } = this.props;
 
-    registerPagePopulator(this.repopulate);
+    registerPagePopulator(this.repopulate, ['movieFileUpdated', 'movieFileDeleted']);
 
     if (useCurrentPage) {
       fetchCalendar();
@@ -119,43 +119,43 @@ class CalendarConnector extends Component {
 
     this.props.fetchQueueDetails({ time, view });
     this.props.fetchCalendar({ time, view });
-  }
+  };
 
   scheduleUpdate = () => {
     this.clearUpdateTimeout();
 
     this.updateTimeoutId = setTimeout(this.updateCalendar, UPDATE_DELAY);
-  }
+  };
 
   clearUpdateTimeout = () => {
     if (this.updateTimeoutId) {
       clearTimeout(this.updateTimeoutId);
     }
-  }
+  };
 
   updateCalendar = () => {
     this.props.gotoCalendarToday();
     this.scheduleUpdate();
-  }
+  };
 
   //
   // Listeners
 
   onCalendarViewChange = (view) => {
     this.props.setCalendarView({ view });
-  }
+  };
 
   onTodayPress = () => {
     this.props.gotoCalendarToday();
-  }
+  };
 
   onPreviousPress = () => {
     this.props.gotoCalendarPreviousRange();
-  }
+  };
 
   onNextPress = () => {
     this.props.gotoCalendarNextRange();
-  }
+  };
 
   //
   // Render

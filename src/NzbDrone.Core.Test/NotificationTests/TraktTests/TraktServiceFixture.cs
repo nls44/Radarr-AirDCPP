@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Moq;
 using NUnit.Framework;
@@ -13,10 +14,10 @@ using NzbDrone.Core.Test.Framework;
 namespace NzbDrone.Core.Test.NotificationTests
 {
     [TestFixture]
-    public class TraktServiceFixture : CoreTest<TraktService>
+    public class TraktServiceFixture : CoreTest<Trakt>
     {
         private DownloadMessage _downloadMessage;
-        private TraktSettings _traktSettings;
+        private NotificationDefinition _traktDefinition;
 
         [SetUp]
         public void Setup()
@@ -34,20 +35,27 @@ namespace NzbDrone.Core.Test.NotificationTests
                 }
             };
 
-            _traktSettings = new TraktSettings
+            _traktDefinition = new NotificationDefinition
             {
-                AccessToken = "",
-                RefreshToken = ""
+                Settings = new TraktSettings
+                {
+                    AccessToken = "",
+                    RefreshToken = "",
+                    Expires = DateTime.Now.AddDays(1)
+                }
             };
+
+            Subject.Definition = _traktDefinition;
         }
 
-        private void GiventValidMediaInfo(Quality quality, string audioChannels, string audioFormat, string scanType)
+        private void GiventValidMediaInfo(Quality quality, string audioChannels, string audioFormat, string scanType, HdrFormat hdrFormat = HdrFormat.None)
         {
             _downloadMessage.MovieFile.MediaInfo = new MediaInfoModel
             {
                 AudioChannelPositions = audioChannels,
                 AudioFormat = audioFormat,
-                ScanType = scanType
+                ScanType = scanType,
+                VideoHdrFormat = hdrFormat
             };
 
             _downloadMessage.MovieFile.Quality.Quality = quality;
@@ -56,7 +64,7 @@ namespace NzbDrone.Core.Test.NotificationTests
         [Test]
         public void should_add_collection_movie_if_null_mediainfo()
         {
-            Subject.AddMovieToCollection(_traktSettings, _downloadMessage.Movie, _downloadMessage.MovieFile);
+            Subject.OnDownload(_downloadMessage);
 
             Mocker.GetMock<ITraktProxy>()
                   .Verify(v => v.AddToCollection(It.IsAny<TraktCollectMoviesResource>(), It.IsAny<string>()), Times.Once());
@@ -65,32 +73,34 @@ namespace NzbDrone.Core.Test.NotificationTests
         [Test]
         public void should_add_collection_movie_if_valid_mediainfo()
         {
-            GiventValidMediaInfo(Quality.Bluray1080p, "3/2/0.1", "DTS", "Interlaced");
+            GiventValidMediaInfo(Quality.Bluray2160p, "5.1", "DTS", "Progressive", HdrFormat.DolbyVisionHdr10);
 
-            Subject.AddMovieToCollection(_traktSettings, _downloadMessage.Movie, _downloadMessage.MovieFile);
+            Subject.OnDownload(_downloadMessage);
 
             Mocker.GetMock<ITraktProxy>()
                   .Verify(v => v.AddToCollection(It.Is<TraktCollectMoviesResource>(t =>
                     t.Movies.First().Audio == "dts" &&
                     t.Movies.First().AudioChannels == "5.1" &&
-                    t.Movies.First().Resolution == "hd_1080i" &&
-                    t.Movies.First().MediaType == "bluray"),
+                    t.Movies.First().Resolution == "uhd_4k" &&
+                    t.Movies.First().MediaType == "bluray" &&
+                    t.Movies.First().Hdr == "hdr10"),
                   It.IsAny<string>()), Times.Once());
         }
 
         [Test]
         public void should_format_audio_channels_to_one_decimal_when_adding_collection_movie()
         {
-            GiventValidMediaInfo(Quality.Bluray1080p, "2/0/0", "DTS", "Interlaced");
+            GiventValidMediaInfo(Quality.Bluray2160p, "2.0", "DTS", "Progressive", HdrFormat.DolbyVisionHdr10);
 
-            Subject.AddMovieToCollection(_traktSettings, _downloadMessage.Movie, _downloadMessage.MovieFile);
+            Subject.OnDownload(_downloadMessage);
 
             Mocker.GetMock<ITraktProxy>()
                   .Verify(v => v.AddToCollection(It.Is<TraktCollectMoviesResource>(t =>
                     t.Movies.First().Audio == "dts" &&
                     t.Movies.First().AudioChannels == "2.0" &&
-                    t.Movies.First().Resolution == "hd_1080i" &&
-                    t.Movies.First().MediaType == "bluray"),
+                    t.Movies.First().Resolution == "uhd_4k" &&
+                    t.Movies.First().MediaType == "bluray" &&
+                    t.Movies.First().Hdr == "hdr10"),
                   It.IsAny<string>()), Times.Once());
         }
     }

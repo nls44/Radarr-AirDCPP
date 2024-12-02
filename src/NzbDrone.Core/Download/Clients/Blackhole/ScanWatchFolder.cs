@@ -23,15 +23,13 @@ namespace NzbDrone.Core.Download.Clients.Blackhole
         private readonly Logger _logger;
         private readonly IDiskProvider _diskProvider;
         private readonly IDiskScanService _diskScanService;
-        private readonly INamingConfigService _namingConfigService;
         private readonly ICached<Dictionary<string, WatchFolderItem>> _watchFolderItemCache;
 
-        public ScanWatchFolder(ICacheManager cacheManager, IDiskScanService diskScanService, INamingConfigService namingConfigService, IDiskProvider diskProvider, Logger logger)
+        public ScanWatchFolder(ICacheManager cacheManager, IDiskScanService diskScanService, IDiskProvider diskProvider, Logger logger)
         {
             _logger = logger;
             _diskProvider = diskProvider;
             _diskScanService = diskScanService;
-            _namingConfigService = namingConfigService;
             _watchFolderItemCache = cacheManager.GetCache<Dictionary<string, WatchFolderItem>>(GetType());
         }
 
@@ -71,7 +69,7 @@ namespace NzbDrone.Core.Download.Clients.Blackhole
 
                 if (PreCheckWatchItemExpiry(newWatchItem, oldWatchItem))
                 {
-                    var files = _diskProvider.GetFiles(folder, SearchOption.AllDirectories);
+                    var files = _diskProvider.GetFiles(folder, true);
 
                     newWatchItem.TotalSize = files.Select(_diskProvider.GetFileSize).Sum();
                     newWatchItem.Hash = GetHash(folder, files);
@@ -155,7 +153,7 @@ namespace NzbDrone.Core.Download.Clients.Blackhole
             }
         }
 
-        private string GetHash(string folder, string[] files)
+        private string GetHash(string folder, IEnumerable<string> files)
         {
             var data = new StringBuilder();
 

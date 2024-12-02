@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaFiles;
-using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Qualities;
 using Radarr.Api.V3.CustomFormats;
 using Radarr.Http.REST;
@@ -19,15 +19,17 @@ namespace Radarr.Api.V3.MovieFiles
         public long Size { get; set; }
         public DateTime DateAdded { get; set; }
         public string SceneName { get; set; }
-        public int IndexerFlags { get; set; }
-        public QualityModel Quality { get; set; }
-        public List<CustomFormatResource> CustomFormats { get; set; }
-        public MediaInfoResource MediaInfo { get; set; }
-        public string OriginalFilePath { get; set; }
-        public bool QualityCutoffNotMet { get; set; }
-        public List<Language> Languages { get; set; }
         public string ReleaseGroup { get; set; }
         public string Edition { get; set; }
+        public List<Language> Languages { get; set; }
+        public QualityModel Quality { get; set; }
+        public List<CustomFormatResource> CustomFormats { get; set; }
+        public int CustomFormatScore { get; set; }
+        public int? IndexerFlags { get; set; }
+        public MediaInfoResource MediaInfo { get; set; }
+
+        public string OriginalFilePath { get; set; }
+        public bool QualityCutoffNotMet { get; set; }
     }
 
     public static class MovieFileResourceMapper
@@ -46,7 +48,7 @@ namespace Radarr.Api.V3.MovieFiles
                 MovieId = model.MovieId,
                 RelativePath = model.RelativePath,
 
-                //Path
+                // Path
                 Size = model.Size,
                 DateAdded = model.DateAdded,
                 SceneName = model.SceneName,
@@ -60,14 +62,14 @@ namespace Radarr.Api.V3.MovieFiles
             };
         }
 
-        public static MovieFileResource ToResource(this MovieFile model, NzbDrone.Core.Movies.Movie movie, IUpgradableSpecification upgradableSpecification)
+        public static MovieFileResource ToResource(this MovieFile model, NzbDrone.Core.Movies.Movie movie, IUpgradableSpecification upgradableSpecification, ICustomFormatCalculationService formatCalculationService)
         {
             if (model == null)
             {
                 return null;
             }
 
-            return new MovieFileResource
+            var resource = new MovieFileResource
             {
                 Id = model.Id,
 
@@ -77,15 +79,27 @@ namespace Radarr.Api.V3.MovieFiles
                 Size = model.Size,
                 DateAdded = model.DateAdded,
                 SceneName = model.SceneName,
-                IndexerFlags = (int)model.IndexerFlags,
                 Quality = model.Quality,
                 Languages = model.Languages,
                 Edition = model.Edition,
                 ReleaseGroup = model.ReleaseGroup,
                 MediaInfo = model.MediaInfo.ToResource(model.SceneName),
-                QualityCutoffNotMet = upgradableSpecification?.QualityCutoffNotMet(movie.Profile, model.Quality) ?? false,
-                OriginalFilePath = model.OriginalFilePath
+                QualityCutoffNotMet = upgradableSpecification?.QualityCutoffNotMet(movie.QualityProfile, model.Quality) ?? false,
+                OriginalFilePath = model.OriginalFilePath,
+                IndexerFlags = (int)model.IndexerFlags
             };
+
+            if (formatCalculationService != null)
+            {
+                model.Movie = movie;
+                var customFormats = formatCalculationService?.ParseCustomFormat(model, model.Movie);
+                var customFormatScore = movie?.QualityProfile?.CalculateCustomFormatScore(customFormats) ?? 0;
+
+                resource.CustomFormats = customFormats.ToResource(false);
+                resource.CustomFormatScore = customFormatScore;
+            }
+
+            return resource;
         }
     }
 }

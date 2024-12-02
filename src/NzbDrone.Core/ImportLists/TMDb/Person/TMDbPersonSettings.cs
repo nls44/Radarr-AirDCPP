@@ -1,21 +1,42 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using FluentValidation;
 using NzbDrone.Core.Annotations;
+using NzbDrone.Core.Validation;
 
 namespace NzbDrone.Core.ImportLists.TMDb.Person
 {
     public class TMDbPersonSettingsValidator : TMDbSettingsBaseValidator<TMDbPersonSettings>
     {
         public TMDbPersonSettingsValidator()
-        : base()
         {
             RuleFor(c => c.PersonId).Matches(@"^[1-9][0-9]*$", RegexOptions.IgnoreCase);
+
+            RuleFor(c => c.PersonCast)
+                .Equal(true)
+                .Unless(c => c.PersonCastDirector || c.PersonCastProducer || c.PersonCastSound || c.PersonCastWriting)
+                .WithMessage("Must Select One Credit Type Option");
+            RuleFor(c => c.PersonCastDirector)
+                .Equal(true)
+                .Unless(c => c.PersonCast || c.PersonCastProducer || c.PersonCastSound || c.PersonCastWriting)
+                .WithMessage("Must Select One Credit Type Option");
+            RuleFor(c => c.PersonCastProducer)
+                .Equal(true)
+                .Unless(c => c.PersonCastDirector || c.PersonCast || c.PersonCastSound || c.PersonCastWriting)
+                .WithMessage("Must Select One Credit Type Option");
+            RuleFor(c => c.PersonCastSound)
+                .Equal(true)
+                .Unless(c => c.PersonCastDirector || c.PersonCastProducer || c.PersonCast || c.PersonCastWriting)
+                .WithMessage("Must Select One Credit Type Option");
+            RuleFor(c => c.PersonCastWriting)
+                .Equal(true)
+                .Unless(c => c.PersonCastDirector || c.PersonCastProducer || c.PersonCastSound || c.PersonCast)
+                .WithMessage("Must Select One Credit Type Option");
         }
     }
 
     public class TMDbPersonSettings : TMDbSettingsBase<TMDbPersonSettings>
     {
-        protected override AbstractValidator<TMDbPersonSettings> Validator => new TMDbPersonSettingsValidator();
+        private static readonly TMDbPersonSettingsValidator Validator = new ();
 
         public TMDbPersonSettings()
         {
@@ -39,5 +60,10 @@ namespace NzbDrone.Core.ImportLists.TMDb.Person
 
         [FieldDefinition(6, Label = "Person Writing Credits", HelpText = "Select if you want to include Writing credits", Type = FieldType.Checkbox)]
         public bool PersonCastWriting { get; set; }
+
+        public override NzbDroneValidationResult Validate()
+        {
+            return new NzbDroneValidationResult(Validator.Validate(this));
+        }
     }
 }

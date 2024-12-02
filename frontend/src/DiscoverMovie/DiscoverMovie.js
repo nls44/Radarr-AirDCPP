@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import Alert from 'Components/Alert';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
 import PageContent from 'Components/Page/PageContent';
 import PageContentBody from 'Components/Page/PageContentBody';
@@ -10,7 +11,7 @@ import PageToolbarButton from 'Components/Page/Toolbar/PageToolbarButton';
 import PageToolbarSection from 'Components/Page/Toolbar/PageToolbarSection';
 import PageToolbarSeparator from 'Components/Page/Toolbar/PageToolbarSeparator';
 import TableOptionsModalWrapper from 'Components/Table/TableOptions/TableOptionsModalWrapper';
-import { align, icons, sortDirections } from 'Helpers/Props';
+import { align, icons, kinds, sortDirections } from 'Helpers/Props';
 import styles from 'Movie/Index/MovieIndex.css';
 import hasDifferentItemsOrOrder from 'Utilities/Object/hasDifferentItemsOrOrder';
 import translate from 'Utilities/String/translate';
@@ -49,8 +50,9 @@ class DiscoverMovie extends Component {
   constructor(props, context) {
     super(props, context);
 
+    this.scrollerRef = React.createRef();
+
     this.state = {
-      scroller: null,
       jumpBarItems: { order: [] },
       jumpToCharacter: null,
       isPosterOptionsModalOpen: false,
@@ -73,8 +75,18 @@ class DiscoverMovie extends Component {
     const {
       items,
       sortKey,
-      sortDirection
+      sortDirection,
+      includeRecommendations,
+      includeTrending,
+      includePopular
     } = this.props;
+
+    if (includeRecommendations !== prevProps.includeRecommendations ||
+      includeTrending !== prevProps.includeTrending ||
+      includePopular !== prevProps.includePopular
+    ) {
+      this.props.dispatchFetchListMovies();
+    }
 
     if (sortKey !== prevProps.sortKey ||
         sortDirection !== prevProps.sortDirection ||
@@ -92,16 +104,12 @@ class DiscoverMovie extends Component {
   //
   // Control
 
-  setScrollerRef = (ref) => {
-    this.setState({ scroller: ref });
-  }
-
   getSelectedIds = () => {
     if (this.state.allUnselected) {
       return [];
     }
     return getSelectedIds(this.state.selectedState);
-  }
+  };
 
   setSelectedState() {
     const {
@@ -187,49 +195,49 @@ class DiscoverMovie extends Component {
 
   onPosterOptionsPress = () => {
     this.setState({ isPosterOptionsModalOpen: true });
-  }
+  };
 
   onPosterOptionsModalClose = () => {
     this.setState({ isPosterOptionsModalOpen: false });
-  }
+  };
 
   onOverviewOptionsPress = () => {
     this.setState({ isOverviewOptionsModalOpen: true });
-  }
+  };
 
   onOverviewOptionsModalClose = () => {
     this.setState({ isOverviewOptionsModalOpen: false });
-  }
+  };
 
   onJumpBarItemPress = (jumpToCharacter) => {
     this.setState({ jumpToCharacter });
-  }
+  };
 
   onSelectAllChange = ({ value }) => {
     this.setState(selectAll(this.state.selectedState, value));
-  }
+  };
 
   onSelectAllPress = () => {
     this.onSelectAllChange({ value: !this.state.allSelected });
-  }
+  };
 
   onImportListSyncPress = () => {
     this.props.onImportListSyncPress();
-  }
+  };
 
   onSelectedChange = ({ id, value, shiftKey = false }) => {
     this.setState((state) => {
       return toggleSelected(state, this.props.items, id, value, shiftKey, 'tmdbId');
     });
-  }
+  };
 
   onAddMoviesPress = ({ addOptions }) => {
     this.props.onAddMoviesPress({ ids: this.getSelectedIds(), addOptions });
-  }
+  };
 
   onExcludeMoviesPress = () => {
     this.props.onExcludeMoviesPress({ ids: this.getSelectedIds() });
-  }
+  };
 
   //
   // Render
@@ -258,7 +266,6 @@ class DiscoverMovie extends Component {
     } = this.props;
 
     const {
-      scroller,
       jumpBarItems,
       jumpToCharacter,
       isPosterOptionsModalOpen,
@@ -271,7 +278,7 @@ class DiscoverMovie extends Component {
     const selectedMovieIds = this.getSelectedIds();
 
     const ViewComponent = getViewComponent(view);
-    const isLoaded = !!(!error && isPopulated && items.length && scroller);
+    const isLoaded = !!(!error && isPopulated && items.length && this.scrollerRef.current);
     const hasNoMovie = !totalItems;
 
     return (
@@ -332,10 +339,7 @@ class DiscoverMovie extends Component {
                 null
             }
 
-            {
-              (view === 'posters' || view === 'overview') &&
-                <PageToolbarSeparator />
-            }
+            <PageToolbarSeparator />
 
             <DiscoverMovieViewMenu
               view={view}
@@ -362,10 +366,9 @@ class DiscoverMovie extends Component {
 
         <div className={styles.pageContentBodyWrapper}>
           <PageContentBody
-            registerScroller={this.setScrollerRef}
+            ref={this.scrollerRef}
             className={styles.contentBody}
             innerClassName={styles[`${view}InnerContentBody`]}
-            onScroll={onScroll}
           >
             {
               isFetching && !isPopulated &&
@@ -374,16 +377,16 @@ class DiscoverMovie extends Component {
 
             {
               !isFetching && !!error &&
-                <div>
+                <Alert kind={kinds.DANGER}>
                   {translate('UnableToLoadMovies')}
-                </div>
+                </Alert>
             }
 
             {
               isLoaded &&
                 <div className={styles.contentBodyContainer}>
                   <ViewComponent
-                    scroller={scroller}
+                    scroller={this.scrollerRef.current}
                     items={items}
                     filters={filters}
                     sortKey={sortKey}
@@ -450,6 +453,9 @@ DiscoverMovie.propTypes = {
   sortKey: PropTypes.string,
   sortDirection: PropTypes.oneOf(sortDirections.all),
   view: PropTypes.string.isRequired,
+  includeRecommendations: PropTypes.bool.isRequired,
+  includeTrending: PropTypes.bool.isRequired,
+  includePopular: PropTypes.bool.isRequired,
   isSyncingLists: PropTypes.bool.isRequired,
   isSmallScreen: PropTypes.bool.isRequired,
   onSortSelect: PropTypes.func.isRequired,
@@ -458,7 +464,8 @@ DiscoverMovie.propTypes = {
   onScroll: PropTypes.func.isRequired,
   onAddMoviesPress: PropTypes.func.isRequired,
   onExcludeMoviesPress: PropTypes.func.isRequired,
-  onImportListSyncPress: PropTypes.func.isRequired
+  onImportListSyncPress: PropTypes.func.isRequired,
+  dispatchFetchListMovies: PropTypes.func.isRequired
 };
 
 export default DiscoverMovie;

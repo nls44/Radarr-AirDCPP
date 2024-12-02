@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Xml.Linq;
 using NLog;
@@ -9,7 +9,9 @@ using NUnit.Framework;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Processes;
+using NzbDrone.Common.Serializer;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.Datastore;
 using RestSharp;
 
 namespace NzbDrone.Test.Common
@@ -22,31 +24,29 @@ namespace NzbDrone.Test.Common
 
         public string AppData { get; private set; }
         public string ApiKey { get; private set; }
+        public PostgresOptions PostgresOptions { get; private set; }
         public int Port { get; private set; }
 
-        public NzbDroneRunner(Logger logger, int port = 7878)
+        public NzbDroneRunner(Logger logger, PostgresOptions postgresOptions, int port = 7878)
         {
             _processProvider = new ProcessProvider(logger);
             _restClient = new RestClient($"http://localhost:{port}/api/v3");
 
+            PostgresOptions = postgresOptions;
             Port = port;
         }
 
-        public void Start()
+        public void Start(bool enableAuth = false)
         {
             AppData = Path.Combine(TestContext.CurrentContext.TestDirectory, "_intg_" + TestBase.GetUID());
             Directory.CreateDirectory(AppData);
 
-            GenerateConfigFile();
+            GenerateConfigFile(enableAuth);
 
             string consoleExe;
             if (OsInfo.IsWindows)
             {
                 consoleExe = "Radarr.Console.exe";
-            }
-            else if (PlatformInfo.IsMono)
-            {
-                consoleExe = "Radarr.exe";
             }
             else
             {
@@ -55,8 +55,7 @@ namespace NzbDrone.Test.Common
 
             if (BuildInfo.IsDebug)
             {
-                var frameworkFolder = PlatformInfo.IsNetCore ? "netcoreapp3.1" : "net462";
-                Start(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "_output", frameworkFolder, consoleExe));
+                Start(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "_output", "net6.0", consoleExe));
             }
             else
             {
@@ -137,9 +136,23 @@ namespace NzbDrone.Test.Common
 
         private void Start(string outputRadarrConsoleExe)
         {
+            StringDictionary envVars = new ();
+            if (PostgresOptions?.Host != null)
+            {
+                envVars.Add("Radarr__Postgres__Host", PostgresOptions.Host);
+                envVars.Add("Radarr__Postgres__Port", PostgresOptions.Port.ToString());
+                envVars.Add("Radarr__Postgres__User", PostgresOptions.User);
+                envVars.Add("Radarr__Postgres__Password", PostgresOptions.Password);
+                envVars.Add("Radarr__Postgres__MainDb", PostgresOptions.MainDb);
+                envVars.Add("Radarr__Postgres__LogDb", PostgresOptions.LogDb);
+
+                TestContext.Progress.WriteLine("Using env vars:\n{0}", envVars.ToJson());
+            }
+
             TestContext.Progress.WriteLine("Starting instance from {0} on port {1}", outputRadarrConsoleExe, Port);
+
             var args = "-nobrowser -nosingleinstancecheck -data=\"" + AppData + "\"";
-            _nzbDroneProcess = _processProvider.Start(outputRadarrConsoleExe, args, null, OnOutputDataReceived, OnOutputDataReceived);
+            _nzbDroneProcess = _processProvider.Start(outputRadarrConsoleExe, args, envVars, OnOutputDataReceived, OnOutputDataReceived);
         }
 
         private void OnOutputDataReceived(string data)
@@ -152,7 +165,7 @@ namespace NzbDrone.Test.Common
             }
         }
 
-        private void GenerateConfigFile()
+        private void GenerateConfigFile(bool enableAuth)
         {
             var configFile = Path.Combine(AppData, "config.xml");
 
@@ -165,6 +178,8 @@ namespace NzbDrone.Test.Common
                              new XElement(nameof(ConfigFileProvider.ApiKey), apiKey),
                              new XElement(nameof(ConfigFileProvider.LogLevel), "trace"),
                              new XElement(nameof(ConfigFileProvider.AnalyticsEnabled), false),
+                             new XElement(nameof(ConfigFileProvider.AuthenticationMethod), enableAuth ? "Forms" : "None"),
+                             new XElement(nameof(ConfigFileProvider.AuthenticationRequired), "DisabledForLocalAddresses"),
                              new XElement(nameof(ConfigFileProvider.Port), Port)));
 
             var data = xDoc.ToString();

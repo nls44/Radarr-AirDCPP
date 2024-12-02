@@ -1,23 +1,25 @@
+function getStatusStyle(hasFile, downloading, isMonitored, isAvailable) {
+  if (downloading) {
+    return 'queue';
+  }
 
-function getStatusStyle(hasFile, downloading, isAvailable, isMonitored) {
-
-  if (hasFile) {
+  if (hasFile && isMonitored) {
     return 'downloaded';
   }
 
-  if (downloading) {
-    return 'downloading';
-  }
-
-  if (!isMonitored) {
+  if (hasFile && !isMonitored) {
     return 'unmonitored';
   }
 
-  if (isAvailable && !hasFile) {
-    return 'missing';
+  if (isAvailable && isMonitored) {
+    return 'missingMonitored';
   }
 
-  return 'unreleased';
+  if (!isMonitored) {
+    return 'missingUnmonitored';
+  }
+
+  return 'continuing';
 }
 
 export default getStatusStyle;

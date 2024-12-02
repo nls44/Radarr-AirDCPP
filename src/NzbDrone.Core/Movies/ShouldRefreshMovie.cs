@@ -5,7 +5,7 @@ namespace NzbDrone.Core.Movies
 {
     public interface ICheckIfMovieShouldBeRefreshed
     {
-        bool ShouldRefresh(Movie movie);
+        bool ShouldRefresh(MovieMetadata movie);
     }
 
     public class ShouldRefreshMovie : ICheckIfMovieShouldBeRefreshed
@@ -17,9 +17,14 @@ namespace NzbDrone.Core.Movies
             _logger = logger;
         }
 
-        public bool ShouldRefresh(Movie movie)
+        public bool ShouldRefresh(MovieMetadata movie)
         {
-            //return false;
+            if (movie == null)
+            {
+                _logger.Warn("Movie metadata does not exist, should not be refreshed.");
+                return false;
+            }
+
             if (movie.LastInfoSync < DateTime.UtcNow.AddDays(-180))
             {
                 _logger.Trace("Movie {0} last updated more than 180 days ago, should refresh.", movie.Title);

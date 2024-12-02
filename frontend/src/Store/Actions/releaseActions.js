@@ -1,6 +1,7 @@
 import { createAction } from 'redux-actions';
 import { filterBuilderTypes, filterBuilderValueTypes, filterTypePredicates, filterTypes, sortDirections } from 'Helpers/Props';
 import { createThunk, handleThunks } from 'Store/thunks';
+import sortByProp from 'Utilities/Array/sortByProp';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import translate from 'Utilities/String/translate';
 import createFetchHandler from './Creators/createFetchHandler';
@@ -42,7 +43,7 @@ export const defaultState = {
         return 10000;
       }
 
-      return item.languages[0].id;
+      return item.languages[0]?.id ?? 0;
     },
 
     indexerFlags: function(item, direction) {
@@ -71,7 +72,7 @@ export const defaultState = {
   filters: [
     {
       key: 'all',
-      label: translate('All'),
+      label: () => translate('All'),
       filters: []
     }
   ],
@@ -90,6 +91,14 @@ export const defaultState = {
 
       // Default to false
       return false;
+    },
+
+    languages: function(item, filterValue, type) {
+      const predicate = filterTypePredicates[type];
+
+      const languages = item.languages.map((language) => language.name);
+
+      return predicate(languages, filterValue);
     },
 
     peers: function(item, value, type) {
@@ -131,50 +140,75 @@ export const defaultState = {
   filterBuilderProps: [
     {
       name: 'title',
-      label: translate('Title'),
+      label: () => translate('Title'),
       type: filterBuilderTypes.STRING
     },
     {
       name: 'age',
-      label: translate('Age'),
+      label: () => translate('Age'),
       type: filterBuilderTypes.NUMBER
     },
     {
       name: 'protocol',
-      label: translate('Protocol'),
+      label: () => translate('Protocol'),
       type: filterBuilderTypes.EXACT,
       valueType: filterBuilderValueTypes.PROTOCOL
     },
     {
       name: 'indexerId',
-      label: translate('Indexer'),
+      label: () => translate('Indexer'),
       type: filterBuilderTypes.EXACT,
       valueType: filterBuilderValueTypes.INDEXER
     },
     {
       name: 'size',
-      label: translate('Size'),
-      type: filterBuilderTypes.NUMBER
+      label: () => translate('Size'),
+      type: filterBuilderTypes.NUMBER,
+      valueType: filterBuilderValueTypes.BYTES
     },
     {
       name: 'seeders',
-      label: translate('Seeders'),
+      label: () => translate('Seeders'),
       type: filterBuilderTypes.NUMBER
     },
     {
       name: 'peers',
-      label: translate('Peers'),
+      label: () => translate('Peers'),
       type: filterBuilderTypes.NUMBER
     },
     {
       name: 'quality',
-      label: translate('Quality'),
+      label: () => translate('Quality'),
       type: filterBuilderTypes.EXACT,
       valueType: filterBuilderValueTypes.QUALITY
     },
     {
+      name: 'languages',
+      label: () => translate('Languages'),
+      type: filterBuilderTypes.ARRAY,
+      optionsSelector: function(items) {
+        const genreList = items.reduce((acc, release) => {
+          release.languages.forEach((language) => {
+            acc.push({
+              id: language.name,
+              name: language.name
+            });
+          });
+
+          return acc;
+        }, []);
+
+        return genreList.sort(sortByProp('name'));
+      }
+    },
+    {
+      name: 'customFormatScore',
+      label: () => translate('CustomFormatScore'),
+      type: filterBuilderTypes.NUMBER
+    },
+    {
       name: 'rejectionCount',
-      label: translate('RejectionCount'),
+      label: () => translate('RejectionCount'),
       type: filterBuilderTypes.NUMBER
     }
   ],
@@ -239,6 +273,7 @@ export const actionHandlers = handleThunks({
     const promise = createAjaxRequest({
       url: '/release',
       method: 'POST',
+      dataType: 'json',
       contentType: 'application/json',
       data: JSON.stringify(payload)
     }).request;
@@ -271,7 +306,12 @@ export const actionHandlers = handleThunks({
 export const reducers = createHandleActions({
 
   [CLEAR_RELEASES]: (state) => {
-    return Object.assign({}, state, defaultState);
+    const {
+      selectedFilterKey,
+      ...otherDefaultState
+    } = defaultState;
+
+    return Object.assign({}, state, otherDefaultState);
   },
 
   [UPDATE_RELEASE]: (state, { payload }) => {

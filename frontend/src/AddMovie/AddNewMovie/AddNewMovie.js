@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import Alert from 'Components/Alert';
 import TextInput from 'Components/Form/TextInput';
 import Icon from 'Components/Icon';
 import Button from 'Components/Link/Button';
@@ -67,12 +68,12 @@ class AddNewMovie extends Component {
         this.props.onClearMovieLookup();
       }
     });
-  }
+  };
 
   onClearMovieLookupPress = () => {
     this.setState({ term: '' });
     this.props.onClearMovieLookup();
-  }
+  };
 
   //
   // Render
@@ -81,7 +82,8 @@ class AddNewMovie extends Component {
     const {
       error,
       items,
-      hasExistingMovies
+      hasExistingMovies,
+      colorImpairedMode
     } = this.props;
 
     const term = this.state.term;
@@ -102,7 +104,7 @@ class AddNewMovie extends Component {
               className={styles.searchInput}
               name="movieLookup"
               value={term}
-              placeholder="eg. The Dark Knight, tmdb:155, imdb:tt0468569"
+              placeholder="e.g. The Dark Knight, tmdb:155, imdb:tt0468569"
               autoFocus={true}
               onChange={this.onSearchInputChange}
             />
@@ -129,7 +131,14 @@ class AddNewMovie extends Component {
                 <div className={styles.helpText}>
                   {translate('FailedLoadingSearchResults')}
                 </div>
-                <div>{getErrorMessage(error)}</div>
+
+                <Alert kind={kinds.DANGER}>{getErrorMessage(error)}</Alert>
+
+                <div>
+                  <Link to="https://wiki.servarr.com/radarr/troubleshooting#invalid-response-received-from-tmdb">
+                    {translate('WhySearchesCouldBeFailing')}
+                  </Link>
+                </div>
               </div> : null
           }
 
@@ -141,6 +150,7 @@ class AddNewMovie extends Component {
                     return (
                       <AddNewMovieSearchResultConnector
                         key={item.tmdbId}
+                        colorImpairedMode={colorImpairedMode}
                         {...item}
                       />
                     );
@@ -153,13 +163,13 @@ class AddNewMovie extends Component {
             !isFetching && !error && !items.length && !!term &&
               <div className={styles.message}>
                 <div className={styles.noResults}>
-                  {translate('CouldNotFindResults', [term])}
+                  {translate('CouldNotFindResults', { term })}
                 </div>
                 <div>
                   {translate('YouCanAlsoSearch')}
                 </div>
                 <div>
-                  <Link to="https://wiki.servarr.com/Radarr_FAQ#Why_cant_I_add_a_new_movie_to_Radarr">
+                  <Link to="https://wiki.servarr.com/radarr/faq#why-can-i-not-add-a-new-movie-to-radarr">
                     {translate('CantFindMovie')}
                   </Link>
                 </div>
@@ -213,7 +223,8 @@ AddNewMovie.propTypes = {
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
   hasExistingMovies: PropTypes.bool.isRequired,
   onMovieLookupChange: PropTypes.func.isRequired,
-  onClearMovieLookup: PropTypes.func.isRequired
+  onClearMovieLookup: PropTypes.func.isRequired,
+  colorImpairedMode: PropTypes.bool.isRequired
 };
 
 export default AddNewMovie;

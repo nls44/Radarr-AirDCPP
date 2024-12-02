@@ -3,6 +3,8 @@ using System.IO;
 using FluentValidation.Results;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Localization;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 
 namespace NzbDrone.Core.Notifications.Synology
@@ -10,10 +12,12 @@ namespace NzbDrone.Core.Notifications.Synology
     public class SynologyIndexer : NotificationBase<SynologyIndexerSettings>
     {
         private readonly ISynologyIndexerProxy _indexerProxy;
+        private readonly ILocalizationService _localizationService;
 
-        public SynologyIndexer(ISynologyIndexerProxy indexerProxy)
+        public SynologyIndexer(ISynologyIndexerProxy indexerProxy, ILocalizationService localizationService)
         {
             _indexerProxy = indexerProxy;
+            _localizationService = localizationService;
         }
 
         public override string Link => "https://www.synology.com";
@@ -25,7 +29,7 @@ namespace NzbDrone.Core.Notifications.Synology
             {
                 foreach (var oldFile in message.OldMovieFiles)
                 {
-                    var fullPath = Path.Combine(message.Movie.Path, oldFile.RelativePath);
+                    var fullPath = Path.Combine(message.Movie.Path, oldFile.MovieFile.RelativePath);
 
                     _indexerProxy.DeleteFile(fullPath);
                 }
@@ -38,11 +42,31 @@ namespace NzbDrone.Core.Notifications.Synology
             }
         }
 
-        public override void OnMovieRename(Movie movie)
+        public override void OnMovieRename(Movie movie, List<RenamedMovieFile> renamedFiles)
         {
             if (Settings.UpdateLibrary)
             {
                 _indexerProxy.UpdateFolder(movie.Path);
+            }
+        }
+
+        public override void OnMovieFileDelete(MovieFileDeleteMessage deleteMessage)
+        {
+            if (Settings.UpdateLibrary)
+            {
+                var fullPath = Path.Combine(deleteMessage.Movie.Path, deleteMessage.MovieFile.RelativePath);
+                _indexerProxy.DeleteFile(fullPath);
+            }
+        }
+
+        public override void OnMovieDelete(MovieDeleteMessage deleteMessage)
+        {
+            if (deleteMessage.DeletedFiles)
+            {
+                if (Settings.UpdateLibrary)
+                {
+                    _indexerProxy.DeleteFolder(deleteMessage.Movie.Path);
+                }
             }
         }
 
@@ -59,12 +83,12 @@ namespace NzbDrone.Core.Notifications.Synology
         {
             if (!OsInfo.IsLinux)
             {
-                return new ValidationFailure(null, "Must be a Synology");
+                return new ValidationFailure(string.Empty, _localizationService.GetLocalizedString("NotificationsSynologyValidationInvalidOs"));
             }
 
             if (!_indexerProxy.Test())
             {
-                return new ValidationFailure(null, "Not a Synology or synoindex not available");
+                return new ValidationFailure(string.Empty, _localizationService.GetLocalizedString("NotificationsSynologyValidationTestFailed"));
             }
 
             return null;

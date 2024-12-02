@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using NLog;
 using NzbDrone.Common.Http;
 
@@ -11,10 +11,6 @@ namespace NzbDrone.Core.ImportLists.TMDb.Person
         public IHttpRequestBuilderFactory RequestBuilder { get; set; }
         public Logger Logger { get; set; }
 
-        public TMDbPersonRequestGenerator()
-        {
-        }
-
         public virtual ImportListPageableRequestChain GetMovies()
         {
             var pageableRequests = new ImportListPageableRequestChain();
@@ -26,16 +22,15 @@ namespace NzbDrone.Core.ImportLists.TMDb.Person
 
         private IEnumerable<ImportListRequest> GetMoviesRequest()
         {
-            Logger.Info($"Importing TMDb movies from person: {Settings.PersonId}");
+            Logger.Info("Importing TMDb movies from person: {0}", Settings.PersonId);
 
             var requestBuilder = RequestBuilder.Create()
-                                               .SetSegment("api", "3")
-                                               .SetSegment("route", "person")
-                                               .SetSegment("id", Settings.PersonId)
-                                               .SetSegment("secondaryRoute", "/movie_credits");
+                .SetSegment("api", "3")
+                .SetSegment("route", "person")
+                .SetSegment("id", Settings.PersonId)
+                .SetSegment("secondaryRoute", "/movie_credits");
 
-            yield return new ImportListRequest(requestBuilder.Accept(HttpAccept.Json)
-                                                            .Build());
+            yield return new ImportListRequest(requestBuilder.Accept(HttpAccept.Json).Build());
         }
     }
 }

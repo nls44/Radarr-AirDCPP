@@ -14,7 +14,8 @@ namespace NzbDrone.Core.Download.TrackedDownloads
     public class DownloadMonitoringService : IExecute<RefreshMonitoredDownloadsCommand>,
                                              IExecute<CheckForFinishedDownloadCommand>,
                                              IHandle<MovieGrabbedEvent>,
-                                             IHandle<MovieImportedEvent>,
+                                             IHandle<MovieFileImportedEvent>,
+                                             IHandle<ManualInteractionRequiredEvent>,
                                              IHandle<DownloadsProcessedEvent>,
                                              IHandle<TrackedDownloadsRemovedEvent>
     {
@@ -54,7 +55,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
         private void QueueRefresh()
         {
-            _manageCommandQueue.Push(new RefreshMonitoredDownloadsCommand());
+            _manageCommandQueue.Push(new RefreshMonitoredDownloadsCommand(), CommandPriority.High);
         }
 
         private void Refresh()
@@ -75,7 +76,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
                 _trackedDownloadService.UpdateTrackable(trackedDownloads);
                 _eventAggregator.PublishEvent(new TrackedDownloadRefreshedEvent(trackedDownloads));
-                _manageCommandQueue.Push(new ProcessMonitoredDownloadsCommand());
+                _manageCommandQueue.Push(new ProcessMonitoredDownloadsCommand(), CommandPriority.High);
             }
             finally
             {
@@ -112,24 +113,26 @@ namespace NzbDrone.Core.Download.TrackedDownloads
 
         private TrackedDownload ProcessClientItem(IDownloadClient downloadClient, DownloadClientItem downloadItem)
         {
+            TrackedDownload trackedDownload = null;
+
             try
             {
-                var trackedDownload = _trackedDownloadService.TrackDownload((DownloadClientDefinition)downloadClient.Definition, downloadItem);
+                trackedDownload =
+                    _trackedDownloadService.TrackDownload((DownloadClientDefinition)downloadClient.Definition,
+                        downloadItem);
 
-                if (trackedDownload != null && trackedDownload.State == TrackedDownloadState.Downloading)
+                if (trackedDownload is { State: TrackedDownloadState.Downloading or TrackedDownloadState.ImportBlocked })
                 {
                     _failedDownloadService.Check(trackedDownload);
                     _completedDownloadService.Check(trackedDownload);
                 }
-
-                return trackedDownload;
             }
             catch (Exception e)
             {
                 _logger.Error(e, "Couldn't process tracked download {0}", downloadItem.Title);
             }
 
-            return null;
+            return trackedDownload;
         }
 
         private bool DownloadIsTrackable(TrackedDownload trackedDownload)
@@ -167,7 +170,12 @@ namespace NzbDrone.Core.Download.TrackedDownloads
             _refreshDebounce.Execute();
         }
 
-        public void Handle(MovieImportedEvent message)
+        public void Handle(ManualInteractionRequiredEvent message)
+        {
+            _refreshDebounce.Execute();
+        }
+
+        public void Handle(MovieFileImportedEvent message)
         {
             _refreshDebounce.Execute();
         }

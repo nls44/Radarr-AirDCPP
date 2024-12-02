@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -12,6 +12,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
 using NzbDrone.Common.Instrumentation;
 using NzbDrone.Core.Indexers.Exceptions;
+using NzbDrone.Core.Languages;
 using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.Indexers
@@ -84,7 +85,7 @@ namespace NzbDrone.Core.Indexers
 
             if (!PostProcess(indexerResponse, items, releases))
             {
-                return new List<ReleaseInfo>();
+                return Array.Empty<ReleaseInfo>();
             }
 
             return releases;
@@ -122,7 +123,8 @@ namespace NzbDrone.Core.Indexers
 
         protected virtual bool PreProcess(IndexerResponse indexerResponse)
         {
-            if (indexerResponse.HttpResponse.StatusCode != HttpStatusCode.OK)
+            // Server Down HTTP Errors are handled in HTTPIndexerBase so ignore them here
+            if (indexerResponse.HttpResponse.StatusCode != HttpStatusCode.OK && !indexerResponse.HttpResponse.HasHttpServerError)
             {
                 throw new IndexerException(indexerResponse, "Indexer API call resulted in an unexpected StatusCode [{0}]", indexerResponse.HttpResponse.StatusCode);
             }
@@ -160,14 +162,15 @@ namespace NzbDrone.Core.Indexers
             releaseInfo.DownloadUrl = GetDownloadUrl(item);
             releaseInfo.InfoUrl = GetInfoUrl(item);
             releaseInfo.CommentUrl = GetCommentUrl(item);
+            releaseInfo.Languages = GetLanguages(item);
 
             try
             {
                 releaseInfo.Size = GetSize(item);
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                throw new SizeParsingException("Unable to parse size from: {0}", releaseInfo.Title);
+                throw new SizeParsingException("Unable to parse size from: {0}", e, releaseInfo.Title);
             }
 
             return releaseInfo;
@@ -226,6 +229,11 @@ namespace NzbDrone.Core.Indexers
             return ParseUrl((string)item.Element("comments"));
         }
 
+        protected virtual List<Language> GetLanguages(XElement item)
+        {
+            return new List<Language>();
+        }
+
         protected virtual long GetSize(XElement item)
         {
             if (UseEnclosureLength)
@@ -256,26 +264,26 @@ namespace NzbDrone.Core.Indexers
         protected virtual RssEnclosure[] GetEnclosures(XElement item)
         {
             var enclosures = item.Elements("enclosure")
-                                 .Select(v =>
-                                 {
-                                     try
-                                     {
-                                         return new RssEnclosure
-                                         {
-                                             Url = v.Attribute("url").Value,
-                                             Type = v.Attribute("type").Value,
-                                             Length = (long)v.Attribute("length")
-                                         };
-                                     }
-                                     catch (Exception e)
-                                     {
-                                         _logger.Warn(e, "Failed to get enclosure for: {0}", item.Title());
-                                     }
+                .Select(v =>
+                {
+                    try
+                    {
+                        return new RssEnclosure
+                        {
+                            Url = v.Attribute("url")?.Value,
+                            Type = v.Attribute("type")?.Value,
+                            Length = v.Attribute("length")?.Value?.ParseInt64() ?? 0
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warn(ex, "Failed to get enclosure for: {0}", item.Title());
+                    }
 
-                                     return null;
-                                 })
-                                 .Where(v => v != null)
-                                 .ToArray();
+                    return null;
+                })
+                .Where(v => v != null)
+                .ToArray();
 
             return enclosures;
         }

@@ -29,15 +29,15 @@ class QualityProfiles extends Component {
   onCloneQualityProfilePress = (id) => {
     this.props.onCloneQualityProfilePress(id);
     this.setState({ isQualityProfileModalOpen: true });
-  }
+  };
 
   onEditQualityProfilePress = () => {
     this.setState({ isQualityProfileModalOpen: true });
-  }
+  };
 
   onModalClose = () => {
     this.setState({ isQualityProfileModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -54,8 +54,8 @@ class QualityProfiles extends Component {
     return (
       <FieldSet legend={translate('QualityProfiles')}>
         <PageSectionContent
-          errorMessage={translate('UnableToLoadQualityProfiles')}
-          {...otherProps}c={true}
+          errorMessage={translate('QualityProfilesLoadError')}
+          {...otherProps}
         >
           <div className={styles.qualityProfiles}>
             {

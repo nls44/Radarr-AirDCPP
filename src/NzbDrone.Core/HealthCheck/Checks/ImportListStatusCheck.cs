@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.ImportLists;
@@ -27,7 +28,7 @@ namespace NzbDrone.Core.HealthCheck.Checks
             var backOffProviders = enabledProviders.Join(_providerStatusService.GetBlockedProviders(),
                     i => i.Definition.Id,
                     s => s.ProviderId,
-                    (i, s) => new { Provider = i, Status = s })
+                    (i, s) => new { ImportList = i, Status = s })
                 .ToList();
 
             if (backOffProviders.Empty())
@@ -37,10 +38,16 @@ namespace NzbDrone.Core.HealthCheck.Checks
 
             if (backOffProviders.Count == enabledProviders.Count)
             {
-                return new HealthCheck(GetType(), HealthCheckResult.Error, _localizationService.GetLocalizedString("ImportListStatusCheckAllClientMessage"), "#lists_are_unavailable_due_to_failures");
+                return new HealthCheck(GetType(), HealthCheckResult.Error, _localizationService.GetLocalizedString("ImportListStatusCheckAllClientMessage"), "#lists-are-unavailable-due-to-failures");
             }
 
-            return new HealthCheck(GetType(), HealthCheckResult.Warning, string.Format(_localizationService.GetLocalizedString("ImportListStatusCheckSingleClientMessage"), string.Join(", ", backOffProviders.Select(v => v.Provider.Definition.Name))), "#lists_are_unavailable_due_to_failures");
+            return new HealthCheck(GetType(),
+                HealthCheckResult.Warning,
+                _localizationService.GetLocalizedString("ImportListStatusCheckSingleClientMessage", new Dictionary<string, object>
+                {
+                    { "importListNames", string.Join(", ", backOffProviders.Select(v => v.ImportList.Definition.Name)) }
+                }),
+                "#import-lists-are-unavailable-due-to-failures");
         }
     }
 }

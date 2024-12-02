@@ -7,6 +7,7 @@ using NzbDrone.Common.Cache;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
 using NzbDrone.Common.Serializer;
+using NzbDrone.Core.Indexers.Exceptions;
 
 namespace NzbDrone.Core.Indexers.Newznab
 {
@@ -73,6 +74,13 @@ namespace NzbDrone.Core.Indexers.Newznab
                 _logger.Debug(ex, "Failed to parse newznab api capabilities for {0}", indexerSettings.BaseUrl);
                 throw;
             }
+            catch (ApiKeyException ex)
+            {
+                ex.WithData(response, 128 * 1024);
+                _logger.Trace("Unexpected Response content ({0} bytes): {1}", response.ResponseData.Length, response.Content);
+                _logger.Debug(ex, "Failed to parse newznab api capabilities for {0}, invalid API key", indexerSettings.BaseUrl);
+                throw;
+            }
             catch (Exception ex)
             {
                 ex.WithData(response, 128 * 1024);
@@ -118,9 +126,14 @@ namespace NzbDrone.Core.Indexers.Newznab
                 {
                     capabilities.SupportedSearchParameters = null;
                 }
-                else if (xmlBasicSearch.Attribute("supportedParams") != null)
+                else
                 {
-                    capabilities.SupportedSearchParameters = xmlBasicSearch.Attribute("supportedParams").Value.Split(',');
+                    if (xmlBasicSearch.Attribute("supportedParams") != null)
+                    {
+                        capabilities.SupportedSearchParameters = xmlBasicSearch.Attribute("supportedParams").Value.Split(',');
+                    }
+
+                    capabilities.TextSearchEngine = xmlBasicSearch.Attribute("searchEngine")?.Value ?? capabilities.TextSearchEngine;
                 }
 
                 var xmlMovieSearch = xmlSearching.Element("movie-search");
@@ -128,10 +141,15 @@ namespace NzbDrone.Core.Indexers.Newznab
                 {
                     capabilities.SupportedMovieSearchParameters = null;
                 }
-                else if (xmlMovieSearch.Attribute("supportedParams") != null)
+                else
                 {
-                    capabilities.SupportedMovieSearchParameters = xmlMovieSearch.Attribute("supportedParams").Value.Split(',');
-                    capabilities.SupportsAggregateIdSearch = true;
+                    if (xmlMovieSearch.Attribute("supportedParams") != null)
+                    {
+                        capabilities.SupportedMovieSearchParameters = xmlMovieSearch.Attribute("supportedParams").Value.Split(',');
+                        capabilities.SupportsAggregateIdSearch = true;
+                    }
+
+                    capabilities.MovieTextSearchEngine = xmlMovieSearch.Attribute("searchEngine")?.Value ?? capabilities.MovieTextSearchEngine;
                 }
             }
 

@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import Alert from 'Components/Alert';
 import Form from 'Components/Form/Form';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputGroup from 'Components/Form/FormInputGroup';
@@ -11,7 +12,7 @@ import ModalBody from 'Components/Modal/ModalBody';
 import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
-import { inputTypes, sizes } from 'Helpers/Props';
+import { inputTypes, kinds, sizes } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import styles from './ImportCustomFormatModalContent.css';
 
@@ -42,13 +43,13 @@ class ImportCustomFormatModalContent extends Component {
 
   onChange = (event) => {
     this.setState({ json: event.value });
-  }
+  };
 
   onImportPress = () => {
     this.setState({ isSpinning: true });
     // this is a bodge as we need to register a isSpinning: true to get the spinner button to update
     this._importTimeout = setTimeout(this.doImport, 250);
-  }
+  };
 
   doImport = () => {
     const parseError = this.props.onImportPress(this.state.json);
@@ -60,7 +61,7 @@ class ImportCustomFormatModalContent extends Component {
     if (!parseError) {
       this.props.onModalClose();
     }
-  }
+  };
 
   //
   // Render
@@ -95,9 +96,9 @@ class ImportCustomFormatModalContent extends Component {
 
             {
               !isFetching && !!error &&
-                <div>
-                  {translate('UnableToLoadCustomFormats')}
-                </div>
+                <Alert kind={kinds.DANGER}>
+                  {translate('CustomFormatsLoadError')}
+                </Alert>
             }
 
             {
@@ -105,7 +106,7 @@ class ImportCustomFormatModalContent extends Component {
                 <Form>
                   <FormGroup size={sizes.MEDIUM}>
                     <FormLabel>
-                      {translate('CustomFormatJSON')}
+                      {translate('CustomFormatJson')}
                     </FormLabel>
                     <FormInputGroup
                       key={0}

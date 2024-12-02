@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import Alert from 'Components/Alert';
 import Form from 'Components/Form/Form';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputGroup from 'Components/Form/FormInputGroup';
@@ -47,15 +48,15 @@ class FileEditModalContent extends Component {
 
   onQualityChange = ({ value }) => {
     this.setState({ qualityId: parseInt(value) });
-  }
+  };
 
   onInputChange = ({ name, value }) => {
     this.setState({ [name]: value });
-  }
+  };
 
   onSaveInputs = () => {
     this.props.onSaveInputs(this.state);
-  }
+  };
 
   //
   // Render
@@ -109,9 +110,9 @@ class FileEditModalContent extends Component {
 
           {
             !isFetching && !!error &&
-              <div>
-                {translate('UnableToLoadQualities')}
-              </div>
+              <Alert kind={kinds.DANGER}>
+                {translate('QualitiesLoadError')}
+              </Alert>
           }
 
           {
@@ -155,7 +156,7 @@ class FileEditModalContent extends Component {
                   <FormLabel>{translate('Languages')}</FormLabel>
 
                   <FormInputGroup
-                    type={inputTypes.SELECT}
+                    type={inputTypes.LANGUAGE_SELECT}
                     name="languageIds"
                     value={languageIds}
                     values={languageOptions}

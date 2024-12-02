@@ -6,7 +6,7 @@ using Radarr.Http.REST;
 
 namespace Radarr.Api.V3
 {
-    public class ProviderResource : RestResource
+    public class ProviderResource<T> : RestResource
     {
         public string Name { get; set; }
         public List<Field> Fields { get; set; }
@@ -17,11 +17,11 @@ namespace Radarr.Api.V3
         public ProviderMessage Message { get; set; }
         public HashSet<int> Tags { get; set; }
 
-        public List<ProviderResource> Presets { get; set; }
+        public List<T> Presets { get; set; }
     }
 
     public class ProviderResourceMapper<TProviderResource, TProviderDefinition>
-        where TProviderResource : ProviderResource, new()
+        where TProviderResource : ProviderResource<TProviderResource>, new()
         where TProviderDefinition : ProviderDefinition, new()
     {
         public virtual TProviderResource ToResource(TProviderDefinition definition)
@@ -38,13 +38,13 @@ namespace Radarr.Api.V3
                 Tags = definition.Tags,
                 Fields = SchemaBuilder.ToSchema(definition.Settings),
 
-                //Radarr_Supported_{0} are custom build redirect pages; if passing a new var, create a new redirect
-                InfoLink = string.Format("https://wiki.servarr.com/Radarr_Supported_{0}",
+                // radarr/supported is an disambiguation page. the # should be a header on the page with appropriate details/link
+                InfoLink = string.Format("https://wiki.servarr.com/radarr/supported#{0}",
                     definition.Implementation.ToLower())
             };
         }
 
-        public virtual TProviderDefinition ToModel(TProviderResource resource)
+        public virtual TProviderDefinition ToModel(TProviderResource resource, TProviderDefinition existingDefinition)
         {
             if (resource == null)
             {
@@ -64,7 +64,7 @@ namespace Radarr.Api.V3
             };
 
             var configContract = ReflectionExtensions.CoreAssembly.FindTypeByName(definition.ConfigContract);
-            definition.Settings = (IProviderConfig)SchemaBuilder.ReadFromSchema(resource.Fields, configContract);
+            definition.Settings = (IProviderConfig)SchemaBuilder.ReadFromSchema(resource.Fields, configContract, existingDefinition?.Settings);
 
             return definition;
         }

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -12,12 +11,13 @@ using NLog.Config;
 using NLog.Targets;
 using NUnit.Framework;
 using NzbDrone.Common.EnvironmentInfo;
+using NzbDrone.Common.Processes;
 using NzbDrone.Core.Movies.Commands;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Integration.Test.Client;
 using NzbDrone.SignalR;
 using NzbDrone.Test.Common.Categories;
-using Radarr.Api.V3.Blacklist;
+using Radarr.Api.V3.Blocklist;
 using Radarr.Api.V3.Config;
 using Radarr.Api.V3.DownloadClient;
 using Radarr.Api.V3.History;
@@ -25,6 +25,7 @@ using Radarr.Api.V3.MovieFiles;
 using Radarr.Api.V3.Movies;
 using Radarr.Api.V3.Profiles.Quality;
 using Radarr.Api.V3.RootFolders;
+using Radarr.Api.V3.System.Tasks;
 using Radarr.Api.V3.Tags;
 using RestSharp;
 
@@ -35,8 +36,9 @@ namespace NzbDrone.Integration.Test
     {
         protected RestClient RestClient { get; private set; }
 
-        public ClientBase<BlacklistResource> Blacklist;
+        public ClientBase<BlocklistResource> Blocklist;
         public CommandClient Commands;
+        public ClientBase<TaskResource> Tasks;
         public DownloadClientClient DownloadClients;
         public ClientBase<HistoryResource> History;
         public ClientBase<HostConfigResource> HostConfig;
@@ -44,13 +46,14 @@ namespace NzbDrone.Integration.Test
         public LogsClient Logs;
         public ClientBase<NamingConfigResource> NamingConfig;
         public NotificationClient Notifications;
-        public ClientBase<QualityProfileResource> Profiles;
+        public ClientBase<QualityProfileResource> QualityProfiles;
         public ReleaseClient Releases;
         public ClientBase<RootFolderResource> RootFolders;
         public MovieClient Movies;
         public ClientBase<TagResource> Tags;
         public ClientBase<MovieResource> WantedMissing;
         public ClientBase<MovieResource> WantedCutoffUnmet;
+        public QueueClient Queue;
 
         private List<SignalRMessage> _signalRReceived;
 
@@ -96,8 +99,9 @@ namespace NzbDrone.Integration.Test
             RestClient.AddDefaultHeader("Authentication", ApiKey);
             RestClient.AddDefaultHeader("X-Api-Key", ApiKey);
 
-            Blacklist = new ClientBase<BlacklistResource>(RestClient, ApiKey);
+            Blocklist = new ClientBase<BlocklistResource>(RestClient, ApiKey);
             Commands = new CommandClient(RestClient, ApiKey);
+            Tasks = new ClientBase<TaskResource>(RestClient, ApiKey, "system/task");
             DownloadClients = new DownloadClientClient(RestClient, ApiKey);
             History = new ClientBase<HistoryResource>(RestClient, ApiKey);
             HostConfig = new ClientBase<HostConfigResource>(RestClient, ApiKey, "config/host");
@@ -105,13 +109,14 @@ namespace NzbDrone.Integration.Test
             Logs = new LogsClient(RestClient, ApiKey);
             NamingConfig = new ClientBase<NamingConfigResource>(RestClient, ApiKey, "config/naming");
             Notifications = new NotificationClient(RestClient, ApiKey);
-            Profiles = new ClientBase<QualityProfileResource>(RestClient, ApiKey);
+            QualityProfiles = new ClientBase<QualityProfileResource>(RestClient, ApiKey);
             Releases = new ReleaseClient(RestClient, ApiKey);
             RootFolders = new ClientBase<RootFolderResource>(RestClient, ApiKey);
             Movies = new MovieClient(RestClient, ApiKey);
             Tags = new ClientBase<TagResource>(RestClient, ApiKey);
             WantedMissing = new ClientBase<MovieResource>(RestClient, ApiKey, "wanted/missing");
             WantedCutoffUnmet = new ClientBase<MovieResource>(RestClient, ApiKey, "wanted/cutoff");
+            Queue = new QueueClient(RestClient, ApiKey);
         }
 
         [OneTimeTearDown]
@@ -123,7 +128,7 @@ namespace NzbDrone.Integration.Test
         [SetUp]
         public void IntegrationSetUp()
         {
-            TempDirectory = Path.Combine(TestContext.CurrentContext.TestDirectory, "_test_" + Process.GetCurrentProcess().Id + "_" + DateTime.UtcNow.Ticks);
+            TempDirectory = Path.Combine(TestContext.CurrentContext.TestDirectory, "_test_" + ProcessProvider.GetCurrentProcessId() + "_" + DateTime.UtcNow.Ticks);
 
             // Wait for things to get quiet, otherwise the previous test might influence the current one.
             Commands.WaitAll();
@@ -149,22 +154,6 @@ namespace NzbDrone.Integration.Test
                 catch
                 {
                 }
-            }
-        }
-
-        protected void IgnoreOnMonoVersions(params string[] version_strings)
-        {
-            if (!PlatformInfo.IsMono)
-            {
-                return;
-            }
-
-            var current = PlatformInfo.GetVersion();
-            var versions = version_strings.Select(x => new Version(x)).ToList();
-
-            if (versions.Any(x => x.Major == current.Major && x.Minor == current.Minor))
-            {
-                throw new IgnoreException($"Ignored on mono {PlatformInfo.GetVersion()}");
             }
         }
 
@@ -302,7 +291,7 @@ namespace NzbDrone.Integration.Test
 
                 var sourcePath = Path.Combine(TestContext.CurrentContext.TestDirectory, "ApiTests", "Files", "H264_sample.mp4");
 
-                //File.Copy(sourcePath, path);
+                // File.Copy(sourcePath, path);
                 File.WriteAllText(path, "Fake Movie");
 
                 Commands.PostAndWait(new RefreshMovieCommand(new List<int> { movie.Id }));
@@ -316,14 +305,26 @@ namespace NzbDrone.Integration.Test
             return result.MovieFile;
         }
 
-        public QualityProfileResource EnsureProfileCutoff(int profileId, Quality cutoff)
+        public QualityProfileResource EnsureQualityProfileCutoff(int profileId, Quality cutoff, bool upgradeAllowed)
         {
-            var profile = Profiles.Get(profileId);
+            var needsUpdate = false;
+            var profile = QualityProfiles.Get(profileId);
 
             if (profile.Cutoff != cutoff.Id)
             {
                 profile.Cutoff = cutoff.Id;
-                profile = Profiles.Put(profile);
+                needsUpdate = true;
+            }
+
+            if (profile.UpgradeAllowed != upgradeAllowed)
+            {
+                profile.UpgradeAllowed = upgradeAllowed;
+                needsUpdate = true;
+            }
+
+            if (needsUpdate)
+            {
+                profile = QualityProfiles.Put(profile);
             }
 
             return profile;

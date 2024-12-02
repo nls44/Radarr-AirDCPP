@@ -30,18 +30,18 @@ class DownloadClients extends Component {
 
   onAddDownloadClientPress = () => {
     this.setState({ isAddDownloadClientModalOpen: true });
-  }
+  };
 
   onAddDownloadClientModalClose = ({ downloadClientSelected = false } = {}) => {
     this.setState({
       isAddDownloadClientModalOpen: false,
       isEditDownloadClientModalOpen: downloadClientSelected
     });
-  }
+  };
 
   onEditDownloadClientModalClose = () => {
     this.setState({ isEditDownloadClientModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -50,6 +50,7 @@ class DownloadClients extends Component {
     const {
       items,
       onConfirmDeleteDownloadClient,
+      tagList,
       ...otherProps
     } = this.props;
 
@@ -61,7 +62,7 @@ class DownloadClients extends Component {
     return (
       <FieldSet legend={translate('DownloadClients')}>
         <PageSectionContent
-          errorMessage={translate('UnableToLoadDownloadClients')}
+          errorMessage={translate('DownloadClientsLoadError')}
           {...otherProps}
         >
           <div className={styles.downloadClients}>
@@ -71,6 +72,7 @@ class DownloadClients extends Component {
                   <DownloadClient
                     key={item.id}
                     {...item}
+                    tagList={tagList}
                     onConfirmDeleteDownloadClient={onConfirmDeleteDownloadClient}
                   />
                 );
@@ -109,6 +111,7 @@ DownloadClients.propTypes = {
   isFetching: PropTypes.bool.isRequired,
   error: PropTypes.object,
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
+  tagList: PropTypes.arrayOf(PropTypes.object).isRequired,
   onConfirmDeleteDownloadClient: PropTypes.func.isRequired
 };
 

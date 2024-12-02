@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.EnvironmentInfo;
@@ -39,7 +40,7 @@ namespace NzbDrone.Core.HealthCheck.Checks
             var startupFolder = _appFolderInfo.StartUpFolder;
             var uiFolder = Path.Combine(startupFolder, "UI");
 
-            if ((OsInfo.IsWindows || _configFileProvider.UpdateAutomatically) &&
+            if (_configFileProvider.UpdateAutomatically &&
                 _configFileProvider.UpdateMechanism == UpdateMechanism.BuiltIn &&
                 !_osInfo.IsDocker)
             {
@@ -47,32 +48,57 @@ namespace NzbDrone.Core.HealthCheck.Checks
                 {
                     return new HealthCheck(GetType(),
                         HealthCheckResult.Error,
-                        string.Format(_localizationService.GetLocalizedString("UpdateCheckStartupTranslocationMessage"), startupFolder),
-                        "#cannot_install_update_because_startup_folder_is_in_an_app_translocation_folder.");
+                        _localizationService.GetLocalizedString(
+                            "UpdateCheckStartupTranslocationMessage",
+                            new Dictionary<string, object>
+                            {
+                                { "startupFolder", startupFolder }
+                            }),
+                        "#cannot-install-update-because-startup-folder-is-in-an-app-translocation-folder.");
                 }
 
                 if (!_diskProvider.FolderWritable(startupFolder))
                 {
                     return new HealthCheck(GetType(),
                         HealthCheckResult.Error,
-                        string.Format(_localizationService.GetLocalizedString("UpdateCheckStartupNotWritableMessage"), startupFolder, Environment.UserName),
-                        "#cannot_install_update_because_startup_folder_is_not_writable_by_the_user");
+                        _localizationService.GetLocalizedString(
+                            "UpdateCheckStartupNotWritableMessage",
+                            new Dictionary<string, object>
+                            {
+                                { "startupFolder", startupFolder },
+                                { "userName", Environment.UserName }
+                            }),
+                        "#cannot-install-update-because-startup-folder-is-not-writable-by-the-user");
                 }
 
                 if (!_diskProvider.FolderWritable(uiFolder))
                 {
                     return new HealthCheck(GetType(),
                         HealthCheckResult.Error,
-                        string.Format(_localizationService.GetLocalizedString("UpdateCheckUINotWritableMessage"), uiFolder, Environment.UserName),
-                        "#cannot_install_update_because_ui_folder_is_not_writable_by_the_user");
+                        _localizationService.GetLocalizedString(
+                            "UpdateCheckUINotWritableMessage",
+                            new Dictionary<string, object>
+                            {
+                                { "uiFolder", uiFolder },
+                                { "userName", Environment.UserName }
+                            }),
+                        "#cannot-install-update-because-ui-folder-is-not-writable-by-the-user");
                 }
             }
 
             if (BuildInfo.BuildDateTime < DateTime.UtcNow.AddDays(-14))
             {
-                if (_checkUpdateService.AvailableUpdate() != null)
+                var latestAvailable = _checkUpdateService.AvailableUpdate();
+
+                if (latestAvailable != null)
                 {
-                    return new HealthCheck(GetType(), HealthCheckResult.Warning, "New update is available");
+                    return new HealthCheck(GetType(),
+                        HealthCheckResult.Warning,
+                        _localizationService.GetLocalizedString("UpdateAvailableHealthCheckMessage", new Dictionary<string, object>
+                        {
+                            { "version", $"v{latestAvailable.Version}" }
+                        }),
+                        "#new-update-is-available");
                 }
             }
 

@@ -28,26 +28,26 @@ class RemotePathMapping extends Component {
 
   onEditRemotePathMappingPress = () => {
     this.setState({ isEditRemotePathMappingModalOpen: true });
-  }
+  };
 
   onEditRemotePathMappingModalClose = () => {
     this.setState({ isEditRemotePathMappingModalOpen: false });
-  }
+  };
 
   onDeleteRemotePathMappingPress = () => {
     this.setState({
       isEditRemotePathMappingModalOpen: false,
       isDeleteRemotePathMappingModalOpen: true
     });
-  }
+  };
 
   onDeleteRemotePathMappingModalClose = () => {
     this.setState({ isDeleteRemotePathMappingModalOpen: false });
-  }
+  };
 
   onConfirmDeleteRemotePathMapping = () => {
     this.props.onConfirmDeleteRemotePathMapping(this.props.id);
-  }
+  };
 
   //
   // Render
@@ -88,8 +88,8 @@ class RemotePathMapping extends Component {
         <ConfirmModal
           isOpen={this.state.isDeleteRemotePathMappingModalOpen}
           kind={kinds.DANGER}
-          title={translate('DeleteDelayProfile')}
-          message={translate('AreYouSureYouWantToDeleteThisRemotePathMapping')}
+          title={translate('DeleteRemotePathMapping')}
+          message={translate('DeleteRemotePathMappingMessageText')}
           confirmLabel={translate('Delete')}
           onConfirm={this.onConfirmDeleteRemotePathMapping}
           onCancel={this.onDeleteRemotePathMappingModalClose}

@@ -30,18 +30,18 @@ class Notifications extends Component {
 
   onAddNotificationPress = () => {
     this.setState({ isAddNotificationModalOpen: true });
-  }
+  };
 
   onAddNotificationModalClose = ({ notificationSelected = false } = {}) => {
     this.setState({
       isAddNotificationModalOpen: false,
       isEditNotificationModalOpen: notificationSelected
     });
-  }
+  };
 
   onEditNotificationModalClose = () => {
     this.setState({ isEditNotificationModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -49,6 +49,7 @@ class Notifications extends Component {
   render() {
     const {
       items,
+      tagList,
       onConfirmDeleteNotification,
       ...otherProps
     } = this.props;
@@ -61,7 +62,7 @@ class Notifications extends Component {
     return (
       <FieldSet legend={translate('Connections')}>
         <PageSectionContent
-          errorMessage={translate('UnableToLoadNotifications')}
+          errorMessage={translate('NotificationsLoadError')}
           {...otherProps}
         >
           <div className={styles.notifications}>
@@ -71,6 +72,7 @@ class Notifications extends Component {
                   <Notification
                     key={item.id}
                     {...item}
+                    tagList={tagList}
                     onConfirmDeleteNotification={onConfirmDeleteNotification}
                   />
                 );
@@ -109,6 +111,7 @@ Notifications.propTypes = {
   isFetching: PropTypes.bool.isRequired,
   error: PropTypes.object,
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
+  tagList: PropTypes.arrayOf(PropTypes.object).isRequired,
   onConfirmDeleteNotification: PropTypes.func.isRequired
 };
 

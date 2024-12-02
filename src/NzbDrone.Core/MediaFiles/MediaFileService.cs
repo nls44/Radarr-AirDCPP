@@ -16,10 +16,12 @@ namespace NzbDrone.Core.MediaFiles
         void Update(List<MovieFile> movieFile);
         void Delete(MovieFile movieFile, DeleteMediaFileReason reason);
         List<MovieFile> GetFilesByMovie(int movieId);
+        List<MovieFile> GetFilesByMovies(IEnumerable<int> movieIds);
         List<MovieFile> GetFilesWithoutMediaInfo();
         List<string> FilterExistingFiles(List<string> files, Movie movie);
         MovieFile GetMovie(int id);
         List<MovieFile> GetMovies(IEnumerable<int> ids);
+        List<MovieFile> GetFilesWithRelativePath(int movieIds, string relativePath);
     }
 
     public class MediaFileService : IMediaFileService, IHandleAsync<MoviesDeletedEvent>
@@ -62,7 +64,7 @@ namespace NzbDrone.Core.MediaFiles
 
         public void Delete(MovieFile movieFile, DeleteMediaFileReason reason)
         {
-            //Little hack so we have the movie attached for the event consumers
+            // Little hack so we have the movie attached for the event consumers
             if (movieFile.Movie == null)
             {
                 movieFile.Movie = _movieRepository.Get(movieFile.MovieId);
@@ -77,6 +79,11 @@ namespace NzbDrone.Core.MediaFiles
         public List<MovieFile> GetFilesByMovie(int movieId)
         {
             return _mediaFileRepository.GetFilesByMovie(movieId);
+        }
+
+        public List<MovieFile> GetFilesByMovies(IEnumerable<int> movieIds)
+        {
+            return _mediaFileRepository.GetFilesByMovies(movieIds);
         }
 
         public List<MovieFile> GetFilesWithoutMediaInfo()
@@ -106,9 +113,26 @@ namespace NzbDrone.Core.MediaFiles
             return _mediaFileRepository.Get(id);
         }
 
+        public List<MovieFile> GetFilesWithRelativePath(int movieId, string relativePath)
+        {
+            return _mediaFileRepository.GetFilesWithRelativePath(movieId, relativePath);
+        }
+
         public void HandleAsync(MoviesDeletedEvent message)
         {
             _mediaFileRepository.DeleteForMovies(message.Movies.Select(m => m.Id).ToList());
+        }
+
+        public static List<string> FilterExistingFiles(List<string> files, List<MovieFile> movieFiles, Movie movie)
+        {
+            var seriesFilePaths = movieFiles.Select(f => Path.Combine(movie.Path, f.RelativePath)).ToList();
+
+            if (!seriesFilePaths.Any())
+            {
+                return files;
+            }
+
+            return files.Except(seriesFilePaths, PathEqualityComparer.Instance).ToList();
         }
     }
 }

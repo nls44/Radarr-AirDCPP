@@ -37,7 +37,6 @@ namespace NzbDrone.Core.Test.Download
 
             _trackedDownload = Builder<TrackedDownload>.CreateNew()
                     .With(c => c.State = TrackedDownloadState.Downloading)
-                    .With(c => c.ImportItem = completed)
                     .With(c => c.DownloadItem = completed)
                     .With(c => c.RemoteMovie = remoteMovie)
                     .Build();
@@ -61,6 +60,10 @@ namespace NzbDrone.Core.Test.Download
             Mocker.GetMock<IHistoryService>()
                   .Setup(s => s.FindByDownloadId(It.IsAny<string>()))
                   .Returns(new List<MovieHistory>());
+
+            Mocker.GetMock<IProvideImportItemService>()
+                  .Setup(s => s.ProvideImportItem(It.IsAny<DownloadClientItem>(), It.IsAny<DownloadClientItem>()))
+                  .Returns<DownloadClientItem, DownloadClientItem>((i, p) => i);
         }
 
         private RemoteMovie BuildRemoteMovie()
@@ -135,7 +138,7 @@ namespace NzbDrone.Core.Test.Download
                                        new LocalMovie { Path = @"C:\TestPath\Droned.1998.mkv" }, new Rejection("Rejected!")), "Test Failure")
                            });
 
-            _trackedDownload.RemoteMovie.Movie = null;
+            _trackedDownload.RemoteMovie.Movie = new Movie();
 
             Subject.Import(_trackedDownload);
 
@@ -204,7 +207,7 @@ namespace NzbDrone.Core.Test.Download
             Mocker.GetMock<IEventAggregator>()
                   .Verify(v => v.PublishEvent(It.IsAny<DownloadCompletedEvent>()), Times.Never());
 
-            _trackedDownload.State.Should().Be(TrackedDownloadState.ImportPending);
+            _trackedDownload.State.Should().Be(TrackedDownloadState.ImportBlocked);
         }
 
         private void AssertImported()

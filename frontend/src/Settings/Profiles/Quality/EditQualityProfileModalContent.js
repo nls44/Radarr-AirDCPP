@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import Alert from 'Components/Alert';
 import Form from 'Components/Form/Form';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputGroup from 'Components/Form/FormInputGroup';
@@ -79,20 +80,20 @@ class EditQualityProfileModalContent extends Component {
     if (height > this.state.headerHeight) {
       this.setState({ headerHeight: height });
     }
-  }
+  };
 
   onBodyMeasure = ({ height }) => {
 
     if (height > this.state.bodyHeight) {
       this.setState({ bodyHeight: height });
     }
-  }
+  };
 
   onFooterMeasure = ({ height }) => {
     if (height > this.state.footerHeight) {
       this.setState({ footerHeight: height });
     }
-  }
+  };
 
   //
   // Render
@@ -124,6 +125,7 @@ class EditQualityProfileModalContent extends Component {
       upgradeAllowed,
       cutoff,
       minFormatScore,
+      minUpgradeFormatScore,
       cutoffFormatScore,
       language,
       items,
@@ -157,9 +159,9 @@ class EditQualityProfileModalContent extends Component {
 
               {
                 !isFetching && !!error &&
-                  <div>
-                    {translate('UnableToAddANewQualityProfilePleaseTryAgain')}
-                  </div>
+                  <Alert kind={kinds.DANGER}>
+                    {translate('AddQualityProfileError')}
+                  </Alert>
               }
 
               {
@@ -191,7 +193,7 @@ class EditQualityProfileModalContent extends Component {
                             type={inputTypes.CHECK}
                             name="upgradeAllowed"
                             {...upgradeAllowed}
-                            helpText={translate('UpgradeAllowedHelpText')}
+                            helpText={translate('UpgradesAllowedHelpText')}
                             onChange={onInputChange}
                           />
                         </FormGroup>
@@ -200,7 +202,7 @@ class EditQualityProfileModalContent extends Component {
                           upgradeAllowed.value &&
                             <FormGroup size={sizes.EXTRA_SMALL}>
                               <FormLabel size={sizes.SMALL}>
-                                {translate('UpgradeUntilQuality')}
+                                {translate('UpgradeUntil')}
                               </FormLabel>
 
                               <FormInputGroup
@@ -208,7 +210,7 @@ class EditQualityProfileModalContent extends Component {
                                 name="cutoff"
                                 {...cutoff}
                                 values={qualities}
-                                helpText={translate('CutoffHelpText')}
+                                helpText={translate('UpgradeUntilMovieHelpText')}
                                 onChange={onCutoffChange}
                               />
                             </FormGroup>
@@ -225,7 +227,7 @@ class EditQualityProfileModalContent extends Component {
                                 type={inputTypes.NUMBER}
                                 name="minFormatScore"
                                 {...minFormatScore}
-                                helpText={translate('MinFormatScoreHelpText')}
+                                helpText={translate('MinimumCustomFormatScoreHelpText')}
                                 onChange={onInputChange}
                               />
                             </FormGroup>
@@ -242,10 +244,29 @@ class EditQualityProfileModalContent extends Component {
                                 type={inputTypes.NUMBER}
                                 name="cutoffFormatScore"
                                 {...cutoffFormatScore}
-                                helpText={translate('CutoffFormatScoreHelpText')}
+                                helpText={translate('UpgradeUntilCustomFormatScoreMovieHelpText')}
                                 onChange={onInputChange}
                               />
                             </FormGroup>
+                        }
+
+                        {
+                          upgradeAllowed.value && formatItems.value.length > 0 ?
+                            <FormGroup size={sizes.EXTRA_SMALL}>
+                              <FormLabel size={sizes.SMALL}>
+                                {translate('MinimumCustomFormatScoreIncrement')}
+                              </FormLabel>
+
+                              <FormInputGroup
+                                type={inputTypes.NUMBER}
+                                name="minUpgradeFormatScore"
+                                min={1}
+                                {...minUpgradeFormatScore}
+                                helpText={translate('MinimumCustomFormatScoreIncrementHelpText')}
+                                onChange={onInputChange}
+                              />
+                            </FormGroup> :
+                            null
                         }
 
                         <FormGroup size={sizes.EXTRA_SMALL}>
@@ -254,7 +275,7 @@ class EditQualityProfileModalContent extends Component {
                           </FormLabel>
 
                           <FormInputGroup
-                            type={inputTypes.SELECT}
+                            type={inputTypes.LANGUAGE_SELECT}
                             name="language"
                             values={languages}
                             value={languageId}
@@ -264,7 +285,7 @@ class EditQualityProfileModalContent extends Component {
                         </FormGroup>
 
                         <div className={styles.formatItemLarge}>
-                          {getCustomFormatRender(formatItems, ...otherProps)}
+                          {getCustomFormatRender(formatItems, otherProps)}
                         </div>
                       </div>
 
@@ -301,7 +322,7 @@ class EditQualityProfileModalContent extends Component {
                   className={styles.deleteButtonContainer}
                   title={
                     isInUse ?
-                      translate('QualityProfileInUse') :
+                      translate('QualityProfileInUseMovieListCollection') :
                       undefined
                   }
                 >

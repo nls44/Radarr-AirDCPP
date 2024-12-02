@@ -1,3 +1,4 @@
+using System;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Parser.Model;
 
@@ -14,11 +15,13 @@ namespace NzbDrone.Core.Download.TrackedDownloads
         public TrackedDownloadStatusMessage[] StatusMessages { get; private set; }
         public DownloadProtocol Protocol { get; set; }
         public string Indexer { get; set; }
+        public DateTime? Added { get; set; }
         public bool IsTrackable { get; set; }
+        public bool HasNotifiedManualInteractionRequired { get; set; }
 
         public TrackedDownload()
         {
-            StatusMessages = System.Array.Empty<TrackedDownloadStatusMessage>();
+            StatusMessages = Array.Empty<TrackedDownloadStatusMessage>();
         }
 
         public void Warn(string message, params object[] args)
@@ -37,6 +40,7 @@ namespace NzbDrone.Core.Download.TrackedDownloads
     public enum TrackedDownloadState
     {
         Downloading,
+        ImportBlocked,
         ImportPending,
         Importing,
         Imported,

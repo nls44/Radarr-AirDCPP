@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Threading.Tasks;
 using FluentValidation.Results;
 using NLog;
 using NzbDrone.Common.Extensions;
@@ -38,21 +40,21 @@ namespace NzbDrone.Core.Indexers
             _httpClient = httpClient;
         }
 
-        public override IList<ReleaseInfo> FetchRecent()
+        public override Task<IList<ReleaseInfo>> FetchRecent()
         {
             if (!SupportsRss)
             {
-                return new List<ReleaseInfo>();
+                return Task.FromResult<IList<ReleaseInfo>>(Array.Empty<ReleaseInfo>());
             }
 
             return FetchReleases(g => g.GetRecentRequests(), true);
         }
 
-        public override IList<ReleaseInfo> Fetch(MovieSearchCriteria searchCriteria)
+        public override Task<IList<ReleaseInfo>> Fetch(MovieSearchCriteria searchCriteria)
         {
             if (!SupportsSearch)
             {
-                return new List<ReleaseInfo>();
+                return Task.FromResult<IList<ReleaseInfo>>(Array.Empty<ReleaseInfo>());
             }
 
             return FetchReleases(g => g.GetSearchRequests(searchCriteria));
@@ -62,7 +64,7 @@ namespace NzbDrone.Core.Indexers
         {
             var generator = GetRequestGenerator();
 
-            //A func ensures cookies are always updated to the latest. This way, the first page could update the cookies and then can be reused by the second page.
+            // A func ensures cookies are always updated to the latest. This way, the first page could update the cookies and then can be reused by the second page.
             generator.GetCookies = () =>
             {
                 var cookies = _indexerStatusService.GetIndexerCookies(Definition.Id);
@@ -85,10 +87,16 @@ namespace NzbDrone.Core.Indexers
             return requests;
         }
 
-        protected virtual IList<ReleaseInfo> FetchReleases(Func<IIndexerRequestGenerator, IndexerPageableRequestChain> pageableRequestChainSelector, bool isRecent = false)
+        public override HttpRequest GetDownloadRequest(string link)
+        {
+            return new HttpRequest(link);
+        }
+
+        protected virtual async Task<IList<ReleaseInfo>> FetchReleases(Func<IIndexerRequestGenerator, IndexerPageableRequestChain> pageableRequestChainSelector, bool isRecent = false)
         {
             var releases = new List<ReleaseInfo>();
             var url = string.Empty;
+            var minimumBackoff = TimeSpan.FromHours(1);
 
             try
             {
@@ -108,7 +116,7 @@ namespace NzbDrone.Core.Indexers
                     lastReleaseInfo = _indexerStatusService.GetLastRssSyncReleaseInfo(Definition.Id);
                 }
 
-                for (int i = 0; i < pageableRequestChain.Tiers; i++)
+                for (var i = 0; i < pageableRequestChain.Tiers; i++)
                 {
                     var pageableRequests = pageableRequestChain.GetTier(i);
 
@@ -120,7 +128,7 @@ namespace NzbDrone.Core.Indexers
                         {
                             url = request.Url.FullUri;
 
-                            var page = FetchPage(request, parser);
+                            var page = await FetchPage(request, parser);
 
                             pagedReleases.AddRange(page);
 
@@ -185,8 +193,7 @@ namespace NzbDrone.Core.Indexers
             }
             catch (WebException webException)
             {
-                if (webException.Status == WebExceptionStatus.NameResolutionFailure ||
-                    webException.Status == WebExceptionStatus.ConnectFailure)
+                if (webException.Status is WebExceptionStatus.NameResolutionFailure or WebExceptionStatus.ConnectFailure)
                 {
                     _indexerStatusService.RecordConnectionFailure(Definition.Id);
                 }
@@ -196,7 +203,7 @@ namespace NzbDrone.Core.Indexers
                 }
 
                 if (webException.Message.Contains("502") || webException.Message.Contains("503") ||
-                    webException.Message.Contains("timed out"))
+                    webException.Message.Contains("504") || webException.Message.Contains("timed out"))
                 {
                     _logger.Warn("{0} server is currently unavailable. {1} {2}", this, url, webException.Message);
                 }
@@ -207,26 +214,29 @@ namespace NzbDrone.Core.Indexers
             }
             catch (TooManyRequestsException ex)
             {
-                if (ex.RetryAfter != TimeSpan.Zero)
-                {
-                    _indexerStatusService.RecordFailure(Definition.Id, ex.RetryAfter);
-                }
-                else
-                {
-                    _indexerStatusService.RecordFailure(Definition.Id, TimeSpan.FromHours(1));
-                }
+                var retryTime = ex.RetryAfter != TimeSpan.Zero ? ex.RetryAfter : minimumBackoff;
+                _indexerStatusService.RecordFailure(Definition.Id, retryTime);
 
-                _logger.Warn("API Request Limit reached for {0}", this);
+                _logger.Warn("API Request Limit reached for {0}. Disabled for {1}", this, retryTime);
             }
             catch (HttpException ex)
             {
                 _indexerStatusService.RecordFailure(Definition.Id);
-                _logger.Warn("{0} {1}", this, ex.Message);
+                if (ex.Response.HasHttpServerError)
+                {
+                    _logger.Warn("Unable to connect to {0} at [{1}]. Indexer's server is unavailable. Try again later. {2}", this, url, ex.Message);
+                }
+                else
+                {
+                    _logger.Warn("{0} {1}", this, ex.Message);
+                }
             }
-            catch (RequestLimitReachedException)
+            catch (RequestLimitReachedException ex)
             {
-                _indexerStatusService.RecordFailure(Definition.Id, TimeSpan.FromHours(1));
-                _logger.Warn("API Request Limit reached for {0}", this);
+                var retryTime = ex.RetryAfter != TimeSpan.Zero ? ex.RetryAfter : minimumBackoff;
+                _indexerStatusService.RecordFailure(Definition.Id, retryTime);
+
+                _logger.Warn("API Request Limit reached for {0}. Disabled for {1}", this, retryTime);
             }
             catch (ApiKeyException)
             {
@@ -246,6 +256,11 @@ namespace NzbDrone.Core.Indexers
                     _logger.Error(ex, "CAPTCHA token required for {0}, check indexer settings.", this);
                 }
             }
+            catch (TaskCanceledException ex)
+            {
+                _indexerStatusService.RecordFailure(Definition.Id);
+                _logger.Warn(ex, "Unable to connect to indexer, possibly due to a timeout. {0}", url);
+            }
             catch (IndexerException ex)
             {
                 _indexerStatusService.RecordFailure(Definition.Id);
@@ -263,8 +278,17 @@ namespace NzbDrone.Core.Indexers
 
         protected virtual bool IsValidRelease(ReleaseInfo release)
         {
+            if (release.Title.IsNullOrWhiteSpace())
+            {
+                _logger.Trace("Invalid Release: '{0}' from indexer: {1}. No title provided.", release.InfoUrl, Definition.Name);
+
+                return false;
+            }
+
             if (release.DownloadUrl.IsNullOrWhiteSpace())
             {
+                _logger.Trace("Invalid Release: '{0}' from indexer: {1}. No Download URL provided.", release.Title, Definition.Name);
+
                 return false;
             }
 
@@ -276,9 +300,9 @@ namespace NzbDrone.Core.Indexers
             return PageSize != 0 && page.Count >= PageSize;
         }
 
-        protected virtual IList<ReleaseInfo> FetchPage(IndexerRequest request, IParseIndexerResponse parser)
+        protected virtual async Task<IList<ReleaseInfo>> FetchPage(IndexerRequest request, IParseIndexerResponse parser)
         {
-            var response = FetchIndexerResponse(request);
+            var response = await FetchIndexerResponse(request);
 
             try
             {
@@ -292,7 +316,7 @@ namespace NzbDrone.Core.Indexers
             }
         }
 
-        protected virtual IndexerResponse FetchIndexerResponse(IndexerRequest request)
+        protected virtual async Task<IndexerResponse> FetchIndexerResponse(IndexerRequest request)
         {
             _logger.Debug("Downloading Feed " + request.HttpRequest.ToString(false));
 
@@ -301,17 +325,21 @@ namespace NzbDrone.Core.Indexers
                 request.HttpRequest.RateLimit = RateLimit;
             }
 
+            request.HttpRequest.RateLimitKey = Definition.Id.ToString();
+
             request.HttpRequest.AllowAutoRedirect = true;
 
-            return new IndexerResponse(request, _httpClient.Execute(request.HttpRequest));
+            var response = await _httpClient.ExecuteAsync(request.HttpRequest);
+
+            return new IndexerResponse(request, response);
         }
 
-        protected override void Test(List<ValidationFailure> failures)
+        protected override async Task Test(List<ValidationFailure> failures)
         {
-            failures.AddIfNotNull(TestConnection());
+            failures.AddIfNotNull(await TestConnection());
         }
 
-        protected virtual ValidationFailure TestConnection()
+        protected virtual async Task<ValidationFailure> TestConnection()
         {
             try
             {
@@ -328,11 +356,11 @@ namespace NzbDrone.Core.Indexers
                     return new ValidationFailure(string.Empty, "No rss feed query available. This may be an issue with the indexer or your indexer category settings.");
                 }
 
-                var releases = FetchPage(firstRequest, parser);
+                var releases = await FetchPage(firstRequest, parser);
 
                 if (releases.Empty())
                 {
-                    return new ValidationFailure(string.Empty, "Query successful, but no results were returned from your indexer. This may be an issue with the indexer or your indexer category settings.");
+                    return new ValidationFailure(string.Empty, "Query successful, but no results in the configured categories were returned from your indexer. This may be an issue with the indexer or your indexer category settings.");
                 }
             }
             catch (ApiKeyException ex)
@@ -344,6 +372,8 @@ namespace NzbDrone.Core.Indexers
             catch (RequestLimitReachedException ex)
             {
                 _logger.Warn("Request limit reached: " + ex.Message);
+
+                return new ValidationFailure(string.Empty, "Request limit reached: " + ex.Message);
             }
             catch (CloudFlareCaptchaException ex)
             {
@@ -376,18 +406,52 @@ namespace NzbDrone.Core.Indexers
                     _logger.Warn(ex, "Indexer does not support the query");
                     return new ValidationFailure(string.Empty, "Indexer does not support the current query. Check if the categories and or searching for movies are supported. Check the log for more details.");
                 }
-                else
-                {
-                    _logger.Warn(ex, "Unable to connect to indexer");
 
-                    return new ValidationFailure(string.Empty, "Unable to connect to indexer, check the log for more details");
+                _logger.Warn(ex, "Unable to connect to indexer");
+                if (ex.Response.HasHttpServerError)
+                {
+                    return new ValidationFailure(string.Empty, "Unable to connect to indexer, indexer's server is unavailable. Try again later. " + ex.Message);
+                }
+
+                if (ex.Response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
+                {
+                    return new ValidationFailure(string.Empty, "Unable to connect to indexer, invalid credentials. " + ex.Message);
+                }
+
+                return new ValidationFailure(string.Empty, "Unable to connect to indexer, check the log above the ValidationFailure for more details. " + ex.Message);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.Warn(ex, "Unable to connect to indexer");
+
+                return new ValidationFailure(string.Empty, "Unable to connect to indexer, please check your DNS settings and ensure IPv6 is working or disabled. " + ex.Message);
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger.Warn(ex, "Unable to connect to indexer");
+
+                return new ValidationFailure(string.Empty, "Unable to connect to indexer, possibly due to a timeout. Try again or check your network settings. " + ex.Message);
+            }
+            catch (WebException webException)
+            {
+                _logger.Warn("Unable to connect to indexer.");
+
+                if (webException.Status is WebExceptionStatus.NameResolutionFailure or WebExceptionStatus.ConnectFailure)
+                {
+                    return new ValidationFailure(string.Empty, "Unable to connect to indexer connection failure. Check your connection to the indexer's server and DNS." + webException.Message);
+                }
+
+                if (webException.Message.Contains("502") || webException.Message.Contains("503") ||
+                    webException.Message.Contains("504") || webException.Message.Contains("timed out"))
+                {
+                    return new ValidationFailure(string.Empty, "Unable to connect to indexer, indexer's server is unavailable. Try again later. " + webException.Message);
                 }
             }
             catch (Exception ex)
             {
                 _logger.Warn(ex, "Unable to connect to indexer");
 
-                return new ValidationFailure(string.Empty, "Unable to connect to indexer, check the log for more details");
+                return new ValidationFailure(string.Empty, $"Unable to connect to indexer: {ex.Message}. Check the log surrounding this error for details");
             }
 
             return null;

@@ -17,15 +17,15 @@ function getDelay(enabled, delay) {
   }
 
   if (!delay) {
-    return 'No Delay';
+    return translate('NoDelay');
   }
 
   if (delay === 1) {
-    return '1 Minute';
+    return translate('OneMinute');
   }
 
   // TODO: use better units of time than just minutes
-  return `${delay} Minutes`;
+  return translate('DelayMinutes', { delay });
 }
 
 class DelayProfile extends Component {
@@ -47,26 +47,26 @@ class DelayProfile extends Component {
 
   onEditDelayProfilePress = () => {
     this.setState({ isEditDelayProfileModalOpen: true });
-  }
+  };
 
   onEditDelayProfileModalClose = () => {
     this.setState({ isEditDelayProfileModalOpen: false });
-  }
+  };
 
   onDeleteDelayProfilePress = () => {
     this.setState({
       isEditDelayProfileModalOpen: false,
       isDeleteDelayProfileModalOpen: true
     });
-  }
+  };
 
   onDeleteDelayProfileModalClose = () => {
     this.setState({ isDeleteDelayProfileModalOpen: false });
-  }
+  };
 
   onConfirmDeleteDelayProfile = () => {
     this.props.onConfirmDeleteDelayProfile(this.props.id);
-  }
+  };
 
   //
   // Render
@@ -85,7 +85,7 @@ class DelayProfile extends Component {
       connectDragSource
     } = this.props;
 
-    let preferred = titleCase(preferredProtocol);
+    let preferred = titleCase(translate('PreferProtocol', { preferredProtocol }));
 
     if (!enableUsenet) {
       preferred = translate('OnlyTorrent');
@@ -141,7 +141,7 @@ class DelayProfile extends Component {
           isOpen={this.state.isDeleteDelayProfileModalOpen}
           kind={kinds.DANGER}
           title={translate('DeleteDelayProfile')}
-          message={translate('AreYouSureYouWantToDeleteThisDelayProfile')}
+          message={translate('DeleteDelayProfileMessageText')}
           confirmLabel={translate('Delete')}
           onConfirm={this.onConfirmDeleteDelayProfile}
           onCancel={this.onDeleteDelayProfileModalClose}

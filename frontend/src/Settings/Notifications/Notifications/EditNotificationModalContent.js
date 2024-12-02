@@ -14,6 +14,7 @@ import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
 import { inputTypes, kinds } from 'Helpers/Props';
+import AdvancedSettingsButton from 'Settings/AdvancedSettingsButton';
 import translate from 'Utilities/String/translate';
 import NotificationEventItems from './NotificationEventItems';
 import styles from './EditNotificationModalContent.css';
@@ -32,6 +33,7 @@ function EditNotificationModalContent(props) {
     onModalClose,
     onSavePress,
     onTestPress,
+    onAdvancedSettingsPress,
     onDeleteNotificationPress,
     ...otherProps
   } = props;
@@ -48,7 +50,7 @@ function EditNotificationModalContent(props) {
   return (
     <ModalContent onModalClose={onModalClose}>
       <ModalHeader>
-        {`${id ? translate('Edit') : translate('Add')} ${translate('Connection')} - ${implementationName}`}
+        {id ? translate('EditConnectionImplementation', { implementationName }) : translate('AddConnectionImplementation', { implementationName })}
       </ModalHeader>
 
       <ModalBody>
@@ -59,9 +61,9 @@ function EditNotificationModalContent(props) {
 
         {
           !isFetching && !!error &&
-            <div>
-              {translate('UnableToAddANewNotificationPleaseTryAgain')}
-            </div>
+            <Alert kind={kinds.DANGER}>
+              {translate('AddNotificationError')}
+            </Alert>
         }
 
         {
@@ -99,7 +101,7 @@ function EditNotificationModalContent(props) {
                 <FormInputGroup
                   type={inputTypes.TAG}
                   name="tags"
-                  helpText={translate('TagsHelpText')}
+                  helpText={translate('NotificationsTagsMovieHelpText')}
                   {...tags}
                   onChange={onInputChange}
                 />
@@ -135,6 +137,12 @@ function EditNotificationModalContent(props) {
               {translate('Delete')}
             </Button>
         }
+
+        <AdvancedSettingsButton
+          advancedSettings={advancedSettings}
+          onAdvancedSettingsPress={onAdvancedSettingsPress}
+          showLabel={false}
+        />
 
         <SpinnerErrorButton
           isSpinning={isTesting}
@@ -175,6 +183,7 @@ EditNotificationModalContent.propTypes = {
   onModalClose: PropTypes.func.isRequired,
   onSavePress: PropTypes.func.isRequired,
   onTestPress: PropTypes.func.isRequired,
+  onAdvancedSettingsPress: PropTypes.func.isRequired,
   onDeleteNotificationPress: PropTypes.func
 };
 

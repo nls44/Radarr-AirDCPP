@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using NLog;
-using NzbDrone.Common.EnvironmentInfo;
 
 namespace NzbDrone.Common.Instrumentation
 {
@@ -17,6 +16,12 @@ namespace NzbDrone.Common.Instrumentation
         private static void HandleTaskException(object sender, UnobservedTaskExceptionEventArgs e)
         {
             var exception = e.Exception;
+
+            if (exception.InnerException is ObjectDisposedException disposedException && disposedException.ObjectName == "System.Net.HttpListenerRequest")
+            {
+                // We don't care about web connections
+                return;
+            }
 
             Console.WriteLine("Task Error: {0}", exception);
             Logger.Error(exception, "Task Error");
@@ -36,16 +41,6 @@ namespace NzbDrone.Common.Instrumentation
             {
                 Logger.Warn("SignalR Heartbeat interrupted");
                 return;
-            }
-
-            if (PlatformInfo.IsMono)
-            {
-                if ((exception is TypeInitializationException && exception.InnerException is DllNotFoundException) ||
-                    exception is DllNotFoundException)
-                {
-                    Logger.Debug(exception, "Minor Fail: " + exception.Message);
-                    return;
-                }
             }
 
             Console.WriteLine("EPIC FAIL: {0}", exception);

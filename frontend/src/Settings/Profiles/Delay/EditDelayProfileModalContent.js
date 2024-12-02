@@ -17,6 +17,33 @@ import { boolSettingShape, numberSettingShape, tagSettingShape } from 'Helpers/P
 import translate from 'Utilities/String/translate';
 import styles from './EditDelayProfileModalContent.css';
 
+const protocolOptions = [
+  {
+    key: 'preferUsenet',
+    get value() {
+      return translate('PreferUsenet');
+    }
+  },
+  {
+    key: 'preferTorrent',
+    get value() {
+      return translate('PreferTorrent');
+    }
+  },
+  {
+    key: 'onlyUsenet',
+    get value() {
+      return translate('OnlyUsenet');
+    }
+  },
+  {
+    key: 'onlyTorrent',
+    get value() {
+      return translate('OnlyTorrent');
+    }
+  }
+];
+
 function EditDelayProfileModalContent(props) {
   const {
     id,
@@ -26,7 +53,6 @@ function EditDelayProfileModalContent(props) {
     saveError,
     item,
     protocol,
-    protocolOptions,
     onInputChange,
     onProtocolChange,
     onSavePress,
@@ -40,6 +66,9 @@ function EditDelayProfileModalContent(props) {
     enableTorrent,
     usenetDelay,
     torrentDelay,
+    bypassIfHighestQuality,
+    bypassIfAboveCustomFormatScore,
+    minimumCustomFormatScore,
     tags
   } = item;
 
@@ -51,22 +80,24 @@ function EditDelayProfileModalContent(props) {
 
       <ModalBody>
         {
-          isFetching &&
-            <LoadingIndicator />
+          isFetching ?
+            <LoadingIndicator /> :
+            null
         }
 
         {
-          !isFetching && !!error &&
-            <div>
-              {translate('UnableToAddANewQualityProfilePleaseTryAgain')}
-            </div>
+          !isFetching && !!error ?
+            <Alert kind={kinds.DANGER}>
+              {translate('AddDelayProfileError')}
+            </Alert> :
+            null
         }
 
         {
-          !isFetching && !error &&
+          !isFetching && !error ?
             <Form {...otherProps}>
               <FormGroup>
-                <FormLabel>{translate('Protocol')}</FormLabel>
+                <FormLabel>{translate('PreferredProtocol')}</FormLabel>
 
                 <FormInputGroup
                   type={inputTypes.SELECT}
@@ -79,7 +110,7 @@ function EditDelayProfileModalContent(props) {
               </FormGroup>
 
               {
-                enableUsenet.value &&
+                enableUsenet.value ?
                   <FormGroup>
                     <FormLabel>{translate('UsenetDelay')}</FormLabel>
 
@@ -91,11 +122,12 @@ function EditDelayProfileModalContent(props) {
                       helpText={translate('UsenetDelayHelpText')}
                       onChange={onInputChange}
                     />
-                  </FormGroup>
+                  </FormGroup> :
+                  null
               }
 
               {
-                enableTorrent.value &&
+                enableTorrent.value ?
                   <FormGroup>
                     <FormLabel>{translate('TorrentDelay')}</FormLabel>
 
@@ -107,13 +139,54 @@ function EditDelayProfileModalContent(props) {
                       helpText={translate('TorrentDelayHelpText')}
                       onChange={onInputChange}
                     />
-                  </FormGroup>
+                  </FormGroup> :
+                  null
+              }
+
+              <FormGroup>
+                <FormLabel>{translate('BypassDelayIfHighestQuality')}</FormLabel>
+
+                <FormInputGroup
+                  type={inputTypes.CHECK}
+                  name="bypassIfHighestQuality"
+                  {...bypassIfHighestQuality}
+                  helpText={translate('BypassDelayIfHighestQualityHelpText')}
+                  onChange={onInputChange}
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <FormLabel>{translate('BypassDelayIfAboveCustomFormatScore')}</FormLabel>
+
+                <FormInputGroup
+                  type={inputTypes.CHECK}
+                  name="bypassIfAboveCustomFormatScore"
+                  {...bypassIfAboveCustomFormatScore}
+                  helpText={translate('BypassDelayIfAboveCustomFormatScoreHelpText')}
+                  onChange={onInputChange}
+                />
+              </FormGroup>
+
+              {
+                bypassIfAboveCustomFormatScore.value ?
+                  <FormGroup>
+                    <FormLabel>{translate('BypassDelayIfAboveCustomFormatScoreMinimumScore')}</FormLabel>
+
+                    <FormInputGroup
+                      type={inputTypes.NUMBER}
+                      name="minimumCustomFormatScore"
+                      {...minimumCustomFormatScore}
+                      helpText={translate('BypassDelayIfAboveCustomFormatScoreMinimumScoreHelpText')}
+                      onChange={onInputChange}
+                    />
+                  </FormGroup> :
+                  null
               }
 
               {
                 id === 1 ?
                   <Alert>
-                    {translate('DefaultDelayProfile')}
+                    {translate('DefaultDelayProfileMovie')}
                   </Alert> :
 
                   <FormGroup>
@@ -123,24 +196,26 @@ function EditDelayProfileModalContent(props) {
                       type={inputTypes.TAG}
                       name="tags"
                       {...tags}
-                      helpText={translate('TagsHelpText')}
+                      helpText={translate('DelayProfileMovieTagsHelpText')}
                       onChange={onInputChange}
                     />
                   </FormGroup>
               }
-            </Form>
+            </Form> :
+            null
         }
       </ModalBody>
       <ModalFooter>
         {
-          id && id > 1 &&
+          id && id > 1 ?
             <Button
               className={styles.deleteButton}
               kind={kinds.DANGER}
               onPress={onDeleteDelayProfilePress}
             >
               {translate('Delete')}
-            </Button>
+            </Button> :
+            null
         }
 
         <Button
@@ -166,6 +241,9 @@ const delayProfileShape = {
   enableTorrent: PropTypes.shape(boolSettingShape).isRequired,
   usenetDelay: PropTypes.shape(numberSettingShape).isRequired,
   torrentDelay: PropTypes.shape(numberSettingShape).isRequired,
+  bypassIfHighestQuality: PropTypes.shape(boolSettingShape).isRequired,
+  bypassIfAboveCustomFormatScore: PropTypes.shape(boolSettingShape).isRequired,
+  minimumCustomFormatScore: PropTypes.shape(numberSettingShape).isRequired,
   order: PropTypes.shape(numberSettingShape),
   tags: PropTypes.shape(tagSettingShape).isRequired
 };
@@ -178,7 +256,6 @@ EditDelayProfileModalContent.propTypes = {
   saveError: PropTypes.object,
   item: PropTypes.shape(delayProfileShape).isRequired,
   protocol: PropTypes.string.isRequired,
-  protocolOptions: PropTypes.arrayOf(PropTypes.object).isRequired,
   onInputChange: PropTypes.func.isRequired,
   onProtocolChange: PropTypes.func.isRequired,
   onSavePress: PropTypes.func.isRequired,

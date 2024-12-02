@@ -8,10 +8,10 @@ using System.Threading;
 using NLog;
 using NLog.Common;
 using NLog.Targets;
+using Npgsql;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
 using Sentry;
-using Sentry.Protocol;
 
 namespace NzbDrone.Common.Instrumentation.Sentry
 {
@@ -34,6 +34,14 @@ namespace NzbDrone.Common.Instrumentation.Sentry
             SQLiteErrorCode.Auth
         };
 
+        private static readonly HashSet<string> FilteredPostgresErrorCodes = new HashSet<string>
+        {
+            PostgresErrorCodes.OutOfMemory,
+            PostgresErrorCodes.TooManyConnections,
+            PostgresErrorCodes.DiskFull,
+            PostgresErrorCodes.ProgramLimitExceeded
+        };
+
         // use string and not Type so we don't need a reference to the project
         // where these are defined
         private static readonly HashSet<string> FilteredExceptionTypeNames = new HashSet<string>
@@ -44,8 +52,11 @@ namespace NzbDrone.Common.Instrumentation.Sentry
             // Filter out people stuck in boot loops
             "CorruptDatabaseException",
 
-            // This also filters some people in boot loops
-            "TinyIoCResolutionException"
+            // Filter SingleInstance Termination Exceptions
+            "TerminateApplicationException",
+
+            // User config issue, root folder missing, etc.
+            "DirectoryNotFoundException"
         };
 
         public static readonly List<string> FilteredExceptionMessages = new List<string>
@@ -95,27 +106,41 @@ namespace NzbDrone.Common.Instrumentation.Sentry
         public bool FilterEvents { get; set; }
         public bool SentryEnabled { get; set; }
 
-        public SentryTarget(string dsn)
+        public SentryTarget(string dsn, IAppFolderInfo appFolderInfo)
         {
             _sdk = SentrySdk.Init(o =>
                                   {
-                                      o.Dsn = new Dsn(dsn);
+                                      o.Dsn = dsn;
                                       o.AttachStacktrace = true;
                                       o.MaxBreadcrumbs = 200;
-                                      o.SendDefaultPii = false;
-                                      o.Debug = false;
-                                      o.DiagnosticsLevel = SentryLevel.Debug;
-                                      o.Release = BuildInfo.Release;
-                                      if (PlatformInfo.IsMono)
-                                      {
-                                          // Mono 6.0 broke GzipStream.WriteAsync
-                                          // TODO: Check specific version
-                                          o.RequestBodyCompressionLevel = System.IO.Compression.CompressionLevel.NoCompression;
-                                      }
-
-                                      o.BeforeSend = x => SentryCleanser.CleanseEvent(x);
-                                      o.BeforeBreadcrumb = x => SentryCleanser.CleanseBreadcrumb(x);
+                                      o.Release = $"{BuildInfo.AppName}@{BuildInfo.Release}";
+                                      o.SetBeforeSend(x => SentryCleanser.CleanseEvent(x));
+                                      o.SetBeforeBreadcrumb(x => SentryCleanser.CleanseBreadcrumb(x));
                                       o.Environment = BuildInfo.Branch;
+
+                                      // Crash free run statistics (sends a ping for healthy and for crashes sessions)
+                                      o.AutoSessionTracking = true;
+
+                                      // Caches files in the event device is offline
+                                      // Sentry creates a 'sentry' sub directory, no need to concat here
+                                      o.CacheDirectoryPath = appFolderInfo.GetAppDataPath();
+
+                                      // default environment is production
+                                      if (!RuntimeInfo.IsProduction)
+                                      {
+                                          if (RuntimeInfo.IsDevelopment)
+                                          {
+                                              o.Environment = "development";
+                                          }
+                                          else if (RuntimeInfo.IsTesting)
+                                          {
+                                              o.Environment = "testing";
+                                          }
+                                          else
+                                          {
+                                              o.Environment = "other";
+                                          }
+                                      }
                                   });
 
             InitializeScope();
@@ -123,7 +148,7 @@ namespace NzbDrone.Common.Instrumentation.Sentry
             _debounce = new SentryDebounce();
 
             // initialize to true and reconfigure later
-            // Otherwise it will default to false and any errors occuring
+            // Otherwise it will default to false and any errors occurring
             // before config file gets read will not be filtered
             FilterEvents = true;
             SentryEnabled = true;
@@ -133,7 +158,7 @@ namespace NzbDrone.Common.Instrumentation.Sentry
         {
             SentrySdk.ConfigureScope(scope =>
             {
-                scope.User = new User
+                scope.User = new SentryUser
                 {
                     Id = HashUtil.AnonymousToken()
                 };
@@ -146,6 +171,7 @@ namespace NzbDrone.Common.Instrumentation.Sentry
 
                 scope.SetTag("culture", Thread.CurrentThread.CurrentCulture.Name);
                 scope.SetTag("branch", BuildInfo.Branch);
+                scope.SetTag("runtime_identifier", System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier);
             });
         }
 
@@ -154,14 +180,6 @@ namespace NzbDrone.Common.Instrumentation.Sentry
             SentrySdk.ConfigureScope(scope =>
             {
                 scope.SetTag("is_docker", $"{osInfo.IsDocker}");
-
-                if (osInfo.Name != null && PlatformInfo.IsMono)
-                {
-                    // Sentry auto-detection of non-Windows platforms isn't that accurate on certain devices.
-                    scope.Contexts.OperatingSystem.Name = osInfo.Name.FirstCharToUpper();
-                    scope.Contexts.OperatingSystem.RawDescription = osInfo.FullName;
-                    scope.Contexts.OperatingSystem.Version = osInfo.Version.ToString();
-                }
             });
         }
 
@@ -217,7 +235,11 @@ namespace NzbDrone.Common.Instrumentation.Sentry
             if (ex != null)
             {
                 fingerPrint.Add(ex.GetType().FullName);
-                fingerPrint.Add(ex.TargetSite.ToString());
+                if (ex.TargetSite != null)
+                {
+                    fingerPrint.Add(ex.TargetSite.ToString());
+                }
+
                 if (ex.InnerException != null)
                 {
                     fingerPrint.Add(ex.InnerException.GetType().FullName);
@@ -242,21 +264,61 @@ namespace NzbDrone.Common.Instrumentation.Sentry
             {
                 if (FilterEvents)
                 {
-                    var sqlEx = logEvent.Exception as SQLiteException;
-                    if (sqlEx != null && FilteredSQLiteErrors.Contains(sqlEx.ResultCode))
+                    var exceptions = new List<Exception>();
+
+                    var aggEx = logEvent.Exception as AggregateException;
+
+                    if (aggEx != null && aggEx.InnerExceptions.Count > 0)
                     {
-                        return false;
+                        exceptions.AddRange(aggEx.InnerExceptions);
+                    }
+                    else
+                    {
+                        exceptions.Add(logEvent.Exception);
                     }
 
-                    if (FilteredExceptionTypeNames.Contains(logEvent.Exception.GetType().Name))
+                    // If any are sentry then send to sentry
+                    foreach (var ex in exceptions)
                     {
-                        return false;
+                        var isSentry = true;
+
+                        var sqlEx = ex as SQLiteException;
+                        if (sqlEx != null && FilteredSQLiteErrors.Contains(sqlEx.ResultCode))
+                        {
+                            isSentry = false;
+                        }
+
+                        var pgEx = logEvent.Exception as PostgresException;
+                        if (pgEx != null && FilteredPostgresErrorCodes.Contains(pgEx.SqlState))
+                        {
+                            return false;
+                        }
+
+                        // We don't care about transient network and timeout errors
+                        var npgEx = logEvent.Exception as NpgsqlException;
+                        if (npgEx != null && npgEx.IsTransient)
+                        {
+                            return false;
+                        }
+
+                        if (FilteredExceptionTypeNames.Contains(ex.GetType().Name))
+                        {
+                            isSentry = false;
+                        }
+
+                        if (FilteredExceptionMessages.Any(x => ex.Message.Contains(x)))
+                        {
+                            isSentry = false;
+                        }
+
+                        if (isSentry)
+                        {
+                            return true;
+                        }
                     }
 
-                    if (FilteredExceptionMessages.Any(x => logEvent.Exception.Message.Contains(x)))
-                    {
-                        return false;
-                    }
+                    // The exception or aggregate exception children were not sentry exceptions
+                    return false;
                 }
 
                 return true;
@@ -299,12 +361,20 @@ namespace NzbDrone.Common.Instrumentation.Sentry
                     }
                 }
 
+                var level = LoggingLevelMap[logEvent.Level];
                 var sentryEvent = new SentryEvent(logEvent.Exception)
                 {
-                    Level = LoggingLevelMap[logEvent.Level],
+                    Level = level,
                     Logger = logEvent.LoggerName,
                     Message = logEvent.FormattedMessage
                 };
+
+                if (level is SentryLevel.Fatal && logEvent.Exception is not null)
+                {
+                    // Usages of 'fatal' here indicates the process will crash. In Sentry this is represented with
+                    // the 'unhandled' exception flag
+                    logEvent.Exception.SetSentryMechanism("Logger.Fatal", "Logger.Fatal was called", false);
+                }
 
                 sentryEvent.SetExtras(extras);
                 sentryEvent.SetFingerprint(fingerPrint);

@@ -8,7 +8,7 @@ namespace NzbDrone.Common.Http
 {
     public class HttpUri : IEquatable<HttpUri>
     {
-        private static readonly Regex RegexUri = new Regex(@"^(?:(?<scheme>[a-z]+):)?(?://(?<host>[-_A-Z0-9.]+)(?::(?<port>[0-9]{1,5}))?)?(?<path>(?:(?:(?<=^)|/+)[^/?#\r\n]+)+/*|/+)?(?:\?(?<query>[^#\r\n]*))?(?:\#(?<fragment>.*))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex RegexUri = new Regex(@"^(?:(?<scheme>[a-z]+):)?(?://(?<host>[-_A-Z0-9.]+|\[[[A-F0-9:]+\])(?::(?<port>[0-9]{1,5}))?)?(?<path>(?:(?:(?<=^)|/+)[^/?#\r\n]+)+/*|/+)?(?:\?(?<query>[^#\r\n]*))?(?:\#(?<fragment>.*))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private readonly string _uri;
         public string FullUri => _uri;
@@ -22,7 +22,7 @@ namespace NzbDrone.Common.Http
 
         public HttpUri(string scheme, string host, int? port, string path, string query, string fragment)
         {
-            StringBuilder builder = new StringBuilder();
+            var builder = new StringBuilder();
 
             if (scheme.IsNotNullOrWhiteSpace())
             {
@@ -70,6 +70,8 @@ namespace NzbDrone.Common.Http
 
         private void Parse()
         {
+            var parseSuccess = Uri.TryCreate(_uri, UriKind.RelativeOrAbsolute, out var uri);
+
             var match = RegexUri.Match(_uri);
 
             var scheme = match.Groups["scheme"];
@@ -79,7 +81,7 @@ namespace NzbDrone.Common.Http
             var query = match.Groups["query"];
             var fragment = match.Groups["fragment"];
 
-            if (!match.Success || (scheme.Success && !host.Success && path.Success))
+            if (!parseSuccess || (scheme.Success && !host.Success && path.Success))
             {
                 throw new ArgumentException("Uri didn't match expected pattern: " + _uri);
             }
@@ -168,7 +170,7 @@ namespace NzbDrone.Common.Http
 
             if (baseSlashIndex >= 0)
             {
-                return basePath.Substring(0, baseSlashIndex) + "/" + relativePath;
+                return $"{basePath.AsSpan(0, baseSlashIndex)}/{relativePath}";
             }
 
             return relativePath;

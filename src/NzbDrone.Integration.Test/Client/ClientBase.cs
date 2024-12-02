@@ -51,7 +51,7 @@ namespace NzbDrone.Integration.Test.Client
                 throw response.ErrorException;
             }
 
-            AssertDisableCache(response.Headers);
+            AssertDisableCache(response);
 
             response.ErrorMessage.Should().BeNullOrWhiteSpace();
 
@@ -68,13 +68,14 @@ namespace NzbDrone.Integration.Test.Client
             return Json.Deserialize<T>(content);
         }
 
-        private static void AssertDisableCache(IList<Parameter> headers)
+        private static void AssertDisableCache(IRestResponse response)
         {
             // cache control header gets reordered on net core
-            ((string)headers.Single(c => c.Name == "Cache-Control").Value).Split(',').Select(x => x.Trim())
-                .Should().BeEquivalentTo("no-store, must-revalidate, no-cache, max-age=0".Split(',').Select(x => x.Trim()));
+            var headers = response.Headers;
+            ((string)headers.SingleOrDefault(c => c.Name == "Cache-Control")?.Value ?? string.Empty).Split(',').Select(x => x.Trim())
+                .Should().BeEquivalentTo("no-store, no-cache".Split(',').Select(x => x.Trim()));
             headers.Single(c => c.Name == "Pragma").Value.Should().Be("no-cache");
-            headers.Single(c => c.Name == "Expires").Value.Should().Be("0");
+            headers.Single(c => c.Name == "Expires").Value.Should().Be("-1");
         }
     }
 
@@ -86,13 +87,22 @@ namespace NzbDrone.Integration.Test.Client
         {
         }
 
-        public List<TResource> All()
+        public List<TResource> All(Dictionary<string, object> queryParams = null)
         {
             var request = BuildRequest();
+
+            if (queryParams != null)
+            {
+                foreach (var param in queryParams)
+                {
+                    request.AddParameter(param.Key, param.Value);
+                }
+            }
+
             return Get<List<TResource>>(request);
         }
 
-        public PagingResource<TResource> GetPaged(int pageNumber, int pageSize, string sortKey, string sortDir, string filterKey = null, string filterValue = null)
+        public PagingResource<TResource> GetPaged(int pageNumber, int pageSize, string sortKey, string sortDir, string filterKey = null, object filterValue = null)
         {
             var request = BuildRequest();
             request.AddParameter("page", pageNumber);
@@ -102,8 +112,7 @@ namespace NzbDrone.Integration.Test.Client
 
             if (filterKey != null && filterValue != null)
             {
-                request.AddParameter("filterKey", filterKey);
-                request.AddParameter("filterValue", filterValue);
+                request.AddParameter(filterKey, filterValue);
             }
 
             return Get<PagingResource<TResource>>(request);

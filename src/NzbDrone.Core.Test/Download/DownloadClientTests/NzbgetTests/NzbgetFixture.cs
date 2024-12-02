@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using FizzWare.NBuilder;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
@@ -20,6 +22,7 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.NzbgetTests
         private NzbgetHistoryItem _failed;
         private NzbgetHistoryItem _completed;
         private Dictionary<string, string> _configItems;
+        private DownloadClientItem _downloadClientItem;
 
         [SetUp]
         public void Setup()
@@ -73,6 +76,12 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.NzbgetTests
                 DeleteStatus = "NONE",
                 MarkStatus = "NONE"
             };
+
+            _downloadClientItem = Builder<DownloadClientItem>
+                                  .CreateNew()
+                                  .With(d => d.DownloadId = "_Droned.S01E01.Pilot.1080p.WEB-DL-DRONE_0")
+                                  .With(d => d.OutputPath = new OsPath("/remote/mount/tv/Droned.S01E01.Pilot.1080p.WEB-DL-DRONE".AsOsAgnostic()))
+                                  .Build();
 
             Mocker.GetMock<INzbgetProxy>()
                 .Setup(s => s.GetGlobalStatus(It.IsAny<NzbgetSettings>()))
@@ -155,7 +164,7 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.NzbgetTests
                 .Setup(v => v.FolderExists(It.IsAny<string>()))
                 .Returns(true);
 
-            Subject.RemoveItem("id", true);
+            Subject.RemoveItem(_downloadClientItem, true);
 
             Mocker.GetMock<IDiskProvider>()
                 .Verify(v => v.DeleteFolder(It.IsAny<string>(), true), Times.Once());
@@ -331,13 +340,13 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.NzbgetTests
         }
 
         [Test]
-        public void Download_should_return_unique_id()
+        public async Task Download_should_return_unique_id()
         {
             GivenSuccessfulDownload();
 
             var remoteMovie = CreateRemoteMovie();
 
-            var id = Subject.Download(remoteMovie);
+            var id = await Subject.Download(remoteMovie, CreateIndexer());
 
             id.Should().NotBeNullOrEmpty();
         }
@@ -349,7 +358,7 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.NzbgetTests
 
             var remoteMovie = CreateRemoteMovie();
 
-            Assert.Throws<DownloadClientRejectedReleaseException>(() => Subject.Download(remoteMovie));
+            Assert.ThrowsAsync<DownloadClientRejectedReleaseException>(async () => await Subject.Download(remoteMovie, CreateIndexer()));
         }
 
         [Test]
@@ -422,6 +431,31 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.NzbgetTests
             GivenHistory(_completed);
 
             Subject.GetItems().First().OutputPath.Should().Be(_completed.DestDir);
+        }
+
+        [Test]
+        public void should_report_deletestatus_manual_with_markstatus_bad_as_failed()
+        {
+            _completed.DeleteStatus = "MANUAL";
+            _completed.MarkStatus = "BAD";
+
+            GivenQueue(null);
+            GivenHistory(_completed);
+
+            var result = Subject.GetItems().Single();
+
+            result.Status.Should().Be(DownloadItemStatus.Failed);
+        }
+
+        [Test]
+        public void should_ignore_deletestatus_manual_without_markstatus()
+        {
+            _completed.DeleteStatus = "MANUAL";
+
+            GivenQueue(null);
+            GivenHistory(_completed);
+
+            Subject.GetItems().Should().BeEmpty();
         }
 
         [Test]

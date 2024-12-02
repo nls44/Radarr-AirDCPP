@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Languages;
@@ -30,11 +31,13 @@ namespace Radarr.Api.V3.Indexers
         public string ReleaseHash { get; set; }
         public string Title { get; set; }
         public bool SceneSource { get; set; }
-        public string MovieTitle { get; set; }
+        public List<string> MovieTitles { get; set; }
         public List<Language> Languages { get; set; }
+        public int? MappedMovieId { get; set; }
         public bool Approved { get; set; }
         public bool TemporarilyRejected { get; set; }
         public bool Rejected { get; set; }
+        public int TmdbId { get; set; }
         public int ImdbId { get; set; }
         public IEnumerable<string> Rejections { get; set; }
         public DateTime PublishDate { get; set; }
@@ -43,7 +46,6 @@ namespace Radarr.Api.V3.Indexers
         public string InfoUrl { get; set; }
         public bool DownloadAllowed { get; set; }
         public int ReleaseWeight { get; set; }
-        public IEnumerable<string> IndexerFlags { get; set; }
         public string Edition { get; set; }
 
         public string MagnetUrl { get; set; }
@@ -51,10 +53,20 @@ namespace Radarr.Api.V3.Indexers
         public int? Seeders { get; set; }
         public int? Leechers { get; set; }
         public DownloadProtocol Protocol { get; set; }
+        public dynamic IndexerFlags { get; set; }
 
         // Sent when queuing an unknown release
-        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public int? MovieId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public int? DownloadClientId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public string DownloadClient { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool? ShouldOverride { get; set; }
     }
 
     public static class ReleaseResourceMapper
@@ -65,17 +77,17 @@ namespace Radarr.Api.V3.Indexers
             var parsedMovieInfo = model.RemoteMovie.ParsedMovieInfo;
             var remoteMovie = model.RemoteMovie;
             var torrentInfo = (model.RemoteMovie.Release as TorrentInfo) ?? new TorrentInfo();
-            var indexerFlags = torrentInfo.IndexerFlags.ToString().Split(new string[] { ", " }, StringSplitOptions.None).Where(x => x != "0");
+            var indexerFlags = torrentInfo.IndexerFlags.ToString().Split(new[] { ", " }, StringSplitOptions.None).Where(x => x != "0");
 
             // TODO: Clean this mess up. don't mix data from multiple classes, use sub-resources instead? (Got a huge Deja Vu, didn't we talk about this already once?)
             return new ReleaseResource
             {
                 Guid = releaseInfo.Guid,
                 Quality = parsedMovieInfo.Quality,
-                CustomFormats = remoteMovie.CustomFormats.ToResource(),
+                CustomFormats = remoteMovie.CustomFormats.ToResource(false),
                 CustomFormatScore = remoteMovie.CustomFormatScore,
 
-                //QualityWeight
+                // QualityWeight
                 Age = releaseInfo.Age,
                 AgeHours = releaseInfo.AgeHours,
                 AgeMinutes = releaseInfo.AgeMinutes,
@@ -85,11 +97,13 @@ namespace Radarr.Api.V3.Indexers
                 ReleaseGroup = parsedMovieInfo.ReleaseGroup,
                 ReleaseHash = parsedMovieInfo.ReleaseHash,
                 Title = releaseInfo.Title,
-                MovieTitle = parsedMovieInfo.MovieTitle,
-                Languages = parsedMovieInfo.Languages,
+                MovieTitles = parsedMovieInfo.MovieTitles,
+                Languages = remoteMovie.Languages,
+                MappedMovieId = remoteMovie.Movie?.Id,
                 Approved = model.Approved,
                 TemporarilyRejected = model.TemporarilyRejected,
                 Rejected = model.Rejected,
+                TmdbId = releaseInfo.TmdbId,
                 ImdbId = releaseInfo.ImdbId,
                 Rejections = model.Rejections.Select(r => r.Reason).ToList(),
                 PublishDate = releaseInfo.PublishDate,
@@ -99,7 +113,7 @@ namespace Radarr.Api.V3.Indexers
                 DownloadAllowed = remoteMovie.DownloadAllowed,
                 Edition = parsedMovieInfo.Edition,
 
-                //ReleaseWeight
+                // ReleaseWeight
                 MagnetUrl = torrentInfo.MagnetUrl,
                 InfoHash = torrentInfo.InfoHash,
                 Seeders = torrentInfo.Seeders,
@@ -122,6 +136,11 @@ namespace Radarr.Api.V3.Indexers
                     Seeders = resource.Seeders,
                     Peers = (resource.Seeders.HasValue && resource.Leechers.HasValue) ? (resource.Seeders + resource.Leechers) : null
                 };
+
+                if (resource.IndexerFlags is JsonElement { ValueKind: JsonValueKind.Number } indexerFlags)
+                {
+                    model.IndexerFlags = (IndexerFlags)indexerFlags.GetInt32();
+                }
             }
             else
             {
@@ -137,6 +156,7 @@ namespace Radarr.Api.V3.Indexers
             model.IndexerId = resource.IndexerId;
             model.Indexer = resource.Indexer;
             model.DownloadProtocol = resource.Protocol;
+            model.TmdbId = resource.TmdbId;
             model.ImdbId = resource.ImdbId;
             model.PublishDate = resource.PublishDate.ToUniversalTime();
 

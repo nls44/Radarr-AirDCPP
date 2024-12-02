@@ -1,46 +1,102 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 using FluentValidation.Results;
 using NLog;
 using NzbDrone.Common.Disk;
+using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.Blocklisting;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.Download.Clients.Flood.Models;
+using NzbDrone.Core.Localization;
 using NzbDrone.Core.MediaFiles.TorrentInfo;
-using NzbDrone.Core.Organizer;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.RemotePathMappings;
+using NzbDrone.Core.ThingiProvider;
 
 namespace NzbDrone.Core.Download.Clients.Flood
 {
     public class Flood : TorrentClientBase<FloodSettings>
     {
         private readonly IFloodProxy _proxy;
+        private readonly IDownloadSeedConfigProvider _downloadSeedConfigProvider;
 
         public Flood(IFloodProxy proxy,
+                        IDownloadSeedConfigProvider downloadSeedConfigProvider,
                         ITorrentFileInfoReader torrentFileInfoReader,
                         IHttpClient httpClient,
                         IConfigService configService,
-                        INamingConfigService namingConfigService,
                         IDiskProvider diskProvider,
                         IRemotePathMappingService remotePathMappingService,
+                        ILocalizationService localizationService,
+                        IBlocklistService blocklistService,
                         Logger logger)
-            : base(torrentFileInfoReader, httpClient, configService, namingConfigService, diskProvider, remotePathMappingService, logger)
+            : base(torrentFileInfoReader, httpClient, configService, diskProvider, remotePathMappingService, localizationService, blocklistService, logger)
         {
             _proxy = proxy;
+            _downloadSeedConfigProvider = downloadSeedConfigProvider;
+        }
+
+        private static IEnumerable<string> HandleTags(RemoteMovie remoteMovie, FloodSettings settings)
+        {
+            var result = new HashSet<string>();
+
+            if (settings.Tags.Any())
+            {
+                result.UnionWith(settings.Tags);
+            }
+
+            if (settings.AdditionalTags.Any())
+            {
+                foreach (var additionalTag in settings.AdditionalTags)
+                {
+                    switch (additionalTag)
+                    {
+                        case (int)AdditionalTags.Collection:
+                            result.Add(remoteMovie.Movie.MovieMetadata.Value.CollectionTitle);
+                            break;
+                        case (int)AdditionalTags.Quality:
+                            result.Add(remoteMovie.ParsedMovieInfo.Quality.Quality.ToString());
+                            break;
+                        case (int)AdditionalTags.Languages:
+                            result.UnionWith(remoteMovie.Languages.ConvertAll(language => language.ToString()));
+                            break;
+                        case (int)AdditionalTags.ReleaseGroup:
+                            result.Add(remoteMovie.ParsedMovieInfo.ReleaseGroup);
+                            break;
+                        case (int)AdditionalTags.Year:
+                            result.Add(remoteMovie.Movie.Year.ToString());
+                            break;
+                        case (int)AdditionalTags.Indexer:
+                            result.Add(remoteMovie.Release.Indexer);
+                            break;
+                        case (int)AdditionalTags.Studio:
+                            result.Add(remoteMovie.Movie.MovieMetadata.Value.Studio);
+                            break;
+                        default:
+                            throw new DownloadClientException("Unexpected additional tag ID");
+                    }
+                }
+            }
+
+            return result.Where(t => t.IsNotNullOrWhiteSpace());
         }
 
         public override string Name => "Flood";
+        public override ProviderMessage Message => new ProviderMessage(_localizationService.GetLocalizedString("DownloadClientFloodSettingsRemovalInfo"), ProviderMessageType.Info);
 
-        protected override string AddFromTorrentFile(RemoteMovie remoteEpisode, string hash, string filename, byte[] fileContent)
+        protected override string AddFromTorrentFile(RemoteMovie remoteMovie, string hash, string filename, byte[] fileContent)
         {
-            _proxy.AddTorrentByFile(Convert.ToBase64String(fileContent), Settings);
+            _proxy.AddTorrentByFile(Convert.ToBase64String(fileContent), HandleTags(remoteMovie, Settings), Settings);
 
             return hash;
         }
 
-        protected override string AddFromMagnetLink(RemoteMovie remoteEpisode, string hash, string magnetLink)
+        protected override string AddFromMagnetLink(RemoteMovie remoteMovie, string hash, string magnetLink)
         {
-            _proxy.AddTorrentByUrl(magnetLink, Settings);
+            _proxy.AddTorrentByUrl(magnetLink, HandleTags(remoteMovie, Settings), Settings);
 
             return hash;
         }
@@ -53,39 +109,71 @@ namespace NzbDrone.Core.Download.Clients.Flood
 
             foreach (var torrent in list)
             {
-                var infoHash = torrent.Key.ToLower();
                 var properties = torrent.Value;
+
+                if (!Settings.Tags.All(tag => properties.Tags.Contains(tag)))
+                {
+                    continue;
+                }
+
                 var item = new DownloadClientItem
                 {
-                    DownloadClientInfo = DownloadClientItemClientInfo.FromDownloadClient(this),
-                    DownloadId = infoHash,
+                    DownloadClientInfo = DownloadClientItemClientInfo.FromDownloadClient(this, false),
+                    DownloadId = torrent.Key,
                     Title = properties.Name,
-                    OutputPath = new OsPath(properties.Directory),
+                    OutputPath = _remotePathMappingService.RemapRemoteToLocal(Settings.Host, new OsPath(properties.Directory)),
                     Category = properties.Tags.Count > 0 ? properties.Tags[0] : null,
                     RemainingSize = properties.SizeBytes - properties.BytesDone,
-                    RemainingTime = TimeSpan.FromSeconds(properties.Eta),
                     TotalSize = properties.SizeBytes,
                     SeedRatio = properties.Ratio,
                     Message = properties.Message,
-                    CanBeRemoved = true,
-                    CanMoveFiles = true,
+                    CanMoveFiles = false,
+                    CanBeRemoved = false,
                 };
 
-                if (properties.Status.Contains("error"))
+                if (properties.Eta > 0)
                 {
-                    item.Status = DownloadItemStatus.Warning;
+                    item.RemainingTime = TimeSpan.FromSeconds(properties.Eta);
                 }
-                else if (properties.Status.Contains("seeding") || properties.Status.Contains("complete"))
+
+                if (properties.Status.Contains("seeding") || properties.Status.Contains("complete"))
                 {
                     item.Status = DownloadItemStatus.Completed;
+                }
+                else if (properties.Status.Contains("stopped"))
+                {
+                    item.Status = DownloadItemStatus.Paused;
+                }
+                else if (properties.Status.Contains("error"))
+                {
+                    item.Status = DownloadItemStatus.Warning;
                 }
                 else if (properties.Status.Contains("downloading"))
                 {
                     item.Status = DownloadItemStatus.Downloading;
                 }
-                else if (properties.Status.Contains("stopped"))
+
+                if (item.DownloadClientInfo.RemoveCompletedDownloads && item.Status == DownloadItemStatus.Completed)
                 {
-                    item.Status = DownloadItemStatus.Paused;
+                    // Grab cached seedConfig
+                    var seedConfig = _downloadSeedConfigProvider.GetSeedConfiguration(item.DownloadId);
+
+                    if (seedConfig != null)
+                    {
+                        if (item.SeedRatio >= seedConfig.Ratio)
+                        {
+                            // Check if seed ratio reached
+                            item.CanMoveFiles = item.CanBeRemoved = true;
+                        }
+                        else if (properties.DateFinished is > 0)
+                        {
+                            // Check if seed time reached
+                            if ((DateTimeOffset.Now - DateTimeOffset.FromUnixTimeSeconds((long)properties.DateFinished)) >= seedConfig.SeedTime)
+                            {
+                                item.CanMoveFiles = item.CanBeRemoved = true;
+                            }
+                        }
+                    }
                 }
 
                 items.Add(item);
@@ -94,16 +182,73 @@ namespace NzbDrone.Core.Download.Clients.Flood
             return items;
         }
 
-        public override void RemoveItem(string downloadId, bool deleteData)
+        public override DownloadClientItem GetImportItem(DownloadClientItem item, DownloadClientItem previousImportAttempt)
         {
-            _proxy.DeleteTorrent(downloadId, deleteData, Settings);
+            var result = item.Clone();
+
+            var contentPaths = _proxy.GetTorrentContentPaths(item.DownloadId, Settings);
+
+            if (contentPaths.Count < 1)
+            {
+                throw new DownloadClientUnavailableException($"Failed to fetch list of contents of torrent: {item.DownloadId}");
+            }
+
+            if (contentPaths.Count == 1)
+            {
+                // For single-file torrent, OutputPath should be the path of file.
+                result.OutputPath = item.OutputPath + new OsPath(contentPaths[0]);
+            }
+            else
+            {
+                // For multi-file torrent, OutputPath should be the path of base directory of torrent.
+                var baseDirectoryPaths = contentPaths.ConvertAll(path =>
+                    path.Split(new char[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries)[0]);
+
+                // Check first segment (directory) of paths of contents. If all contents share the same directory, use that directory.
+                if (baseDirectoryPaths.TrueForAll(path => path == baseDirectoryPaths[0]))
+                {
+                    result.OutputPath = item.OutputPath + new OsPath(baseDirectoryPaths[0]);
+                }
+
+                // Otherwise, OutputPath is already the base directory.
+            }
+
+            return result;
+        }
+
+        public override void MarkItemAsImported(DownloadClientItem downloadClientItem)
+        {
+            if (Settings.PostImportTags.Any())
+            {
+                var list = _proxy.GetTorrents(Settings);
+
+                if (list.ContainsKey(downloadClientItem.DownloadId))
+                {
+                    _proxy.SetTorrentsTags(downloadClientItem.DownloadId,
+                        list[downloadClientItem.DownloadId].Tags.Concat(Settings.PostImportTags).ToImmutableHashSet(),
+                        Settings);
+                }
+            }
+        }
+
+        public override void RemoveItem(DownloadClientItem item, bool deleteData)
+        {
+            _proxy.DeleteTorrent(item.DownloadId, deleteData, Settings);
         }
 
         public override DownloadClientInfo GetStatus()
         {
+            var destDir = _proxy.GetClientSettings(Settings).DirectoryDefault;
+
+            if (Settings.Destination.IsNotNullOrWhiteSpace())
+            {
+                destDir = Settings.Destination;
+            }
+
             return new DownloadClientInfo
             {
-                IsLocalhost = true,
+                IsLocalhost = Settings.Host == "127.0.0.1" || Settings.Host == "::1" || Settings.Host == "localhost",
+                OutputRootFolders = new List<OsPath> { _remotePathMappingService.RemapRemoteToLocal(Settings.Host, new OsPath(destDir)) }
             };
         }
 
@@ -119,7 +264,7 @@ namespace NzbDrone.Core.Download.Clients.Flood
             }
             catch (Exception ex)
             {
-                failures.Add(new ValidationFailure("URL", ex.Message));
+                failures.Add(new ValidationFailure("Host", ex.Message));
             }
         }
     }

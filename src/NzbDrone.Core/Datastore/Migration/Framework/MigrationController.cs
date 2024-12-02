@@ -1,18 +1,20 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Reflection;
 using FluentMigrator.Runner;
+using FluentMigrator.Runner.Generators;
 using FluentMigrator.Runner.Initialization;
 using FluentMigrator.Runner.Processors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NLog;
+using NLog.Extensions.Logging;
 
 namespace NzbDrone.Core.Datastore.Migration.Framework
 {
     public interface IMigrationController
     {
-        void Migrate(string connectionString, MigrationContext migrationContext);
+        void Migrate(string connectionString, MigrationContext migrationContext, DatabaseType databaseType);
     }
 
     public class MigrationController : IMigrationController
@@ -27,25 +29,39 @@ namespace NzbDrone.Core.Datastore.Migration.Framework
             _migrationLoggerProvider = migrationLoggerProvider;
         }
 
-        public void Migrate(string connectionString, MigrationContext migrationContext)
+        public void Migrate(string connectionString, MigrationContext migrationContext, DatabaseType databaseType)
         {
             var sw = Stopwatch.StartNew();
 
             _logger.Info("*** Migrating {0} ***", connectionString);
 
-            var serviceProvider = new ServiceCollection()
-                .AddLogging(lb => lb.AddProvider(_migrationLoggerProvider))
+            ServiceProvider serviceProvider;
+
+            var db = databaseType == DatabaseType.SQLite ? "sqlite" : "postgres";
+
+            serviceProvider = new ServiceCollection()
+                .AddLogging(b => b.AddNLog())
                 .AddFluentMigratorCore()
+                .Configure<RunnerOptions>(cfg => cfg.IncludeUntaggedMaintenances = true)
                 .ConfigureRunner(
                     builder => builder
+                    .AddPostgres()
                     .AddNzbDroneSQLite()
                     .WithGlobalConnectionString(connectionString)
-                    .WithMigrationsIn(Assembly.GetExecutingAssembly()))
+                    .ScanIn(Assembly.GetExecutingAssembly()).For.All())
                 .Configure<TypeFilterOptions>(opt => opt.Namespace = "NzbDrone.Core.Datastore.Migration")
                 .Configure<ProcessorOptions>(opt =>
                 {
                     opt.PreviewOnly = false;
-                    opt.Timeout = TimeSpan.FromSeconds(60);
+                    opt.Timeout = TimeSpan.FromMinutes(5);
+                })
+                .Configure<SelectingProcessorAccessorOptions>(cfg =>
+                {
+                    cfg.ProcessorId = db;
+                })
+                .Configure<SelectingGeneratorAccessorOptions>(cfg =>
+                {
+                    cfg.GeneratorId = db;
                 })
                 .BuildServiceProvider();
 

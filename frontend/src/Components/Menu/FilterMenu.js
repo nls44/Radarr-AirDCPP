@@ -25,11 +25,11 @@ class FilterMenu extends Component {
 
   onCustomFiltersPress = () => {
     this.setState({ isFilterModalOpen: true });
-  }
+  };
 
   onFiltersModalClose = () => {
     this.setState({ isFilterModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -60,7 +60,7 @@ class FilterMenu extends Component {
             iconName={icons.FILTER}
             text={translate('Filter')}
             isDisabled={isDisabled}
-            indicator={selectedFilterKey !== 'all'}
+            showIndicator={selectedFilterKey !== 'all'}
           />
 
           <FilterMenuContent

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Dapper;
 using FluentMigrator;
 using NzbDrone.Core.Datastore.Migration.Framework;
@@ -18,7 +19,7 @@ namespace NzbDrone.Core.Datastore.Migration
             _serializerSettings = new JsonSerializerOptions
             {
                 AllowTrailingCommas = true,
-                IgnoreNullValues = false,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
                 PropertyNameCaseInsensitive = true,
                 DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -33,7 +34,7 @@ namespace NzbDrone.Core.Datastore.Migration
 
         private void ChangeEmailAddressType(IDbConnection conn, IDbTransaction tran)
         {
-            var rows = conn.Query<ProviderDefinition166>($"SELECT Id, Settings FROM Notifications WHERE Implementation = 'Email'");
+            var rows = conn.Query<ProviderDefinition166>($"SELECT \"Id\", \"Settings\" FROM \"Notifications\" WHERE \"Implementation\" = 'Email'");
 
             var corrected = new List<ProviderDefinition166>();
 
@@ -61,7 +62,7 @@ namespace NzbDrone.Core.Datastore.Migration
                 });
             }
 
-            var updateSql = "UPDATE Notifications SET Settings = @Settings WHERE Id = @Id";
+            var updateSql = "UPDATE \"Notifications\" SET \"Settings\" = @Settings WHERE \"Id\" = @Id";
             conn.Execute(updateSql, corrected, transaction: tran);
         }
 

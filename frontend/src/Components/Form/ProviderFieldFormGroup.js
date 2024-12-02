@@ -14,6 +14,8 @@ function getType({ type, selectOptionsProviderAction }) {
       return inputTypes.CHECK;
     case 'device':
       return inputTypes.DEVICE;
+    case 'keyValueList':
+      return inputTypes.KEY_VALUE_LIST;
     case 'password':
       return inputTypes.PASSWORD;
     case 'number':
@@ -27,6 +29,8 @@ function getType({ type, selectOptionsProviderAction }) {
         return inputTypes.DYNAMIC_SELECT;
       }
       return inputTypes.SELECT;
+    case 'movieTag':
+      return inputTypes.MOVIE_TAG;
     case 'tag':
       return inputTypes.TEXT_TAG;
     case 'tagSelect':
@@ -35,6 +39,10 @@ function getType({ type, selectOptionsProviderAction }) {
       return inputTypes.TEXT;
     case 'oAuth':
       return inputTypes.OAUTH;
+    case 'rootFolder':
+      return inputTypes.ROOT_FOLDER_SELECT;
+    case 'qualityProfile':
+      return inputTypes.QUALITY_PROFILE_SELECT;
     default:
       return inputTypes.TEXT;
   }
@@ -49,6 +57,7 @@ function getSelectValues(selectOptions) {
     result.push({
       key: option.value,
       value: option.name,
+      dividerAfter: option.dividerAfter,
       hint: option.hint
     });
 
@@ -62,7 +71,9 @@ function ProviderFieldFormGroup(props) {
     name,
     label,
     helpText,
+    helpTextWarning,
     helpLink,
+    placeholder,
     value,
     type,
     advanced,
@@ -94,7 +105,9 @@ function ProviderFieldFormGroup(props) {
         name={name}
         label={label}
         helpText={helpText}
+        helpTextWarning={helpTextWarning}
         helpLink={helpLink}
+        placeholder={placeholder}
         value={value}
         values={getSelectValues(selectOptions)}
         errors={errors}
@@ -119,7 +132,9 @@ ProviderFieldFormGroup.propTypes = {
   name: PropTypes.string.isRequired,
   label: PropTypes.string.isRequired,
   helpText: PropTypes.string,
+  helpTextWarning: PropTypes.string,
   helpLink: PropTypes.string,
+  placeholder: PropTypes.string,
   value: PropTypes.any,
   type: PropTypes.string.isRequired,
   advanced: PropTypes.bool.isRequired,

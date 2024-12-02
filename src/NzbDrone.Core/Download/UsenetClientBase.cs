@@ -1,10 +1,12 @@
 using System.Net;
+using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Indexers;
+using NzbDrone.Core.Localization;
 using NzbDrone.Core.Organizer;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.RemotePathMappings;
@@ -20,12 +22,12 @@ namespace NzbDrone.Core.Download
 
         protected UsenetClientBase(IHttpClient httpClient,
                                    IConfigService configService,
-                                   INamingConfigService namingConfigService,
                                    IDiskProvider diskProvider,
                                    IRemotePathMappingService remotePathMappingService,
                                    IValidateNzbs nzbValidationService,
-                                   Logger logger)
-            : base(configService, namingConfigService, diskProvider, remotePathMappingService, logger)
+                                   Logger logger,
+                                   ILocalizationService localizationService)
+            : base(configService, diskProvider, remotePathMappingService, logger, localizationService)
         {
             _httpClient = httpClient;
             _nzbValidationService = nzbValidationService;
@@ -35,7 +37,7 @@ namespace NzbDrone.Core.Download
 
         protected abstract string AddFromNzbFile(RemoteMovie remoteMovie, string filename, byte[] fileContents);
 
-        public override string Download(RemoteMovie remoteMovie)
+        public override async Task<string> Download(RemoteMovie remoteMovie, IIndexer indexer)
         {
             var url = remoteMovie.Release.DownloadUrl;
             var filename = FileNameBuilder.CleanFileName(remoteMovie.Release.Title) + ".nzb";
@@ -44,7 +46,14 @@ namespace NzbDrone.Core.Download
 
             try
             {
-                nzbData = _httpClient.Get(new HttpRequest(url)).ResponseData;
+                var request = indexer?.GetDownloadRequest(url) ?? new HttpRequest(url);
+                request.RateLimitKey = remoteMovie?.Release?.IndexerId.ToString();
+
+                var response = await RetryStrategy
+                    .ExecuteAsync(static async (state, _) => await state._httpClient.GetAsync(state.request), (_httpClient, request))
+                    .ConfigureAwait(false);
+
+                nzbData = response.ResponseData;
 
                 _logger.Debug("Downloaded nzb for movie '{0}' finished ({1} bytes from {2})", remoteMovie.Release.Title, nzbData.Length, url);
             }

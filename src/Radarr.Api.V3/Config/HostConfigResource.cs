@@ -15,16 +15,21 @@ namespace Radarr.Api.V3.Config
         public bool EnableSsl { get; set; }
         public bool LaunchBrowser { get; set; }
         public AuthenticationType AuthenticationMethod { get; set; }
+        public AuthenticationRequiredType AuthenticationRequired { get; set; }
         public bool AnalyticsEnabled { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
+        public string PasswordConfirmation { get; set; }
         public string LogLevel { get; set; }
+        public int LogSizeLimit { get; set; }
         public string ConsoleLogLevel { get; set; }
         public string Branch { get; set; }
         public string ApiKey { get; set; }
         public string SslCertPath { get; set; }
         public string SslCertPassword { get; set; }
         public string UrlBase { get; set; }
+        public string InstanceName { get; set; }
+        public string ApplicationUrl { get; set; }
         public bool UpdateAutomatically { get; set; }
         public UpdateMechanism UpdateMechanism { get; set; }
         public string UpdateScriptPath { get; set; }
@@ -55,17 +60,20 @@ namespace Radarr.Api.V3.Config
                 EnableSsl = model.EnableSsl,
                 LaunchBrowser = model.LaunchBrowser,
                 AuthenticationMethod = model.AuthenticationMethod,
+                AuthenticationRequired = model.AuthenticationRequired,
                 AnalyticsEnabled = model.AnalyticsEnabled,
 
-                //Username
-                //Password
+                // Username
+                // Password
                 LogLevel = model.LogLevel,
+                LogSizeLimit = model.LogSizeLimit,
                 ConsoleLogLevel = model.ConsoleLogLevel,
                 Branch = model.Branch,
                 ApiKey = model.ApiKey,
                 SslCertPath = model.SslCertPath,
                 SslCertPassword = model.SslCertPassword,
                 UrlBase = model.UrlBase,
+                InstanceName = model.InstanceName,
                 UpdateAutomatically = model.UpdateAutomatically,
                 UpdateMechanism = model.UpdateMechanism,
                 UpdateScriptPath = model.UpdateScriptPath,
@@ -80,7 +88,8 @@ namespace Radarr.Api.V3.Config
                 CertificateValidation = configService.CertificateValidation,
                 BackupFolder = configService.BackupFolder,
                 BackupInterval = configService.BackupInterval,
-                BackupRetention = configService.BackupRetention
+                BackupRetention = configService.BackupRetention,
+                ApplicationUrl = configService.ApplicationUrl
             };
         }
     }

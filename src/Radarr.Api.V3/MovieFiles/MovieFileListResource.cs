@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using NzbDrone.Core.Languages;
-using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Qualities;
 
 namespace Radarr.Api.V3.MovieFiles
@@ -12,6 +11,7 @@ namespace Radarr.Api.V3.MovieFiles
         public QualityModel Quality { get; set; }
         public string Edition { get; set; }
         public string ReleaseGroup { get; set; }
+        public string SceneName { get; set; }
         public int? IndexerFlags { get; set; }
     }
 }

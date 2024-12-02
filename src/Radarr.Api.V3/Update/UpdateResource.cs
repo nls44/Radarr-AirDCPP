@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Newtonsoft.Json;
 using NzbDrone.Core.Update;
 using Radarr.Http.REST;
 
@@ -9,7 +8,6 @@ namespace Radarr.Api.V3.Update
 {
     public class UpdateResource : RestResource
     {
-        [JsonConverter(typeof(Newtonsoft.Json.Converters.VersionConverter))]
         public Version Version { get; set; }
 
         public string Branch { get; set; }
@@ -17,6 +15,7 @@ namespace Radarr.Api.V3.Update
         public string FileName { get; set; }
         public string Url { get; set; }
         public bool Installed { get; set; }
+        public DateTime? InstalledOn { get; set; }
         public bool Installable { get; set; }
         public bool Latest { get; set; }
         public UpdateChanges Changes { get; set; }
@@ -41,9 +40,9 @@ namespace Radarr.Api.V3.Update
                 FileName = model.FileName,
                 Url = model.Url,
 
-                //Installed
-                //Installable
-                //Latest
+                // Installed
+                // Installable
+                // Latest
                 Changes = model.Changes,
                 Hash = model.Hash,
             };

@@ -38,12 +38,12 @@ namespace NzbDrone.Core.Datastore.Migration
             var languageConverter = new EmbeddedDocumentConverter<List<Language>>(new LanguageIntConverter());
 
             var profileLanguages = new Dictionary<int, int>();
-            using (IDbCommand getProfileCmd = conn.CreateCommand())
+            using (var getProfileCmd = conn.CreateCommand())
             {
                 getProfileCmd.Transaction = tran;
-                getProfileCmd.CommandText = "SELECT Id, Language FROM Profiles";
+                getProfileCmd.CommandText = "SELECT \"Id\", \"Language\" FROM \"Profiles\"";
 
-                IDataReader profilesReader = getProfileCmd.ExecuteReader();
+                var profilesReader = getProfileCmd.ExecuteReader();
                 while (profilesReader.Read())
                 {
                     var profileId = profilesReader.GetInt32(0);
@@ -59,15 +59,17 @@ namespace NzbDrone.Core.Datastore.Migration
 
                     profileLanguages[profileId] = movieLanguage;
                 }
+
+                profilesReader.Close();
             }
 
             var movieLanguages = new Dictionary<int, int>();
 
-            using (IDbCommand getSeriesCmd = conn.CreateCommand())
+            using (var getSeriesCmd = conn.CreateCommand())
             {
                 getSeriesCmd.Transaction = tran;
-                getSeriesCmd.CommandText = @"SELECT Id, ProfileId FROM Movies";
-                using (IDataReader moviesReader = getSeriesCmd.ExecuteReader())
+                getSeriesCmd.CommandText = @"SELECT ""Id"", ""ProfileId"" FROM ""Movies""";
+                using (var moviesReader = getSeriesCmd.ExecuteReader())
                 {
                     while (moviesReader.Read())
                     {
@@ -76,17 +78,19 @@ namespace NzbDrone.Core.Datastore.Migration
 
                         movieLanguages[movieId] = profileLanguages.GetValueOrDefault(movieProfileId, Language.English.Id);
                     }
+
+                    moviesReader.Close();
                 }
             }
 
             var movieFileLanguages = new Dictionary<int, List<Language>>();
             var releaseLanguages = new Dictionary<string, List<Language>>();
 
-            using (IDbCommand getSeriesCmd = conn.CreateCommand())
+            using (var getSeriesCmd = conn.CreateCommand())
             {
                 getSeriesCmd.Transaction = tran;
-                getSeriesCmd.CommandText = @"SELECT Id, MovieId, SceneName, MediaInfo FROM MovieFiles";
-                using (IDataReader movieFilesReader = getSeriesCmd.ExecuteReader())
+                getSeriesCmd.CommandText = @"SELECT ""Id"", ""MovieId"", ""SceneName"", ""MediaInfo"" FROM ""MovieFiles""";
+                using (var movieFilesReader = getSeriesCmd.ExecuteReader())
                 {
                     while (movieFilesReader.Read())
                     {
@@ -125,16 +129,18 @@ namespace NzbDrone.Core.Datastore.Migration
 
                         movieFileLanguages[movieFileId] = languages;
                     }
+
+                    movieFilesReader.Close();
                 }
             }
 
             var historyLanguages = new Dictionary<int, List<Language>>();
 
-            using (IDbCommand getSeriesCmd = conn.CreateCommand())
+            using (var getSeriesCmd = conn.CreateCommand())
             {
                 getSeriesCmd.Transaction = tran;
-                getSeriesCmd.CommandText = @"SELECT Id, SourceTitle, MovieId FROM History";
-                using (IDataReader historyReader = getSeriesCmd.ExecuteReader())
+                getSeriesCmd.CommandText = @"SELECT ""Id"", ""SourceTitle"", ""MovieId"" FROM ""History""";
+                using (var historyReader = getSeriesCmd.ExecuteReader())
                 {
                     while (historyReader.Read())
                     {
@@ -160,16 +166,18 @@ namespace NzbDrone.Core.Datastore.Migration
 
                         historyLanguages[historyId] = languages;
                     }
+
+                    historyReader.Close();
                 }
             }
 
             var blacklistLanguages = new Dictionary<int, List<Language>>();
 
-            using (IDbCommand getSeriesCmd = conn.CreateCommand())
+            using (var getSeriesCmd = conn.CreateCommand())
             {
                 getSeriesCmd.Transaction = tran;
-                getSeriesCmd.CommandText = @"SELECT Id, SourceTitle, MovieId FROM Blacklist";
-                using (IDataReader blacklistReader = getSeriesCmd.ExecuteReader())
+                getSeriesCmd.CommandText = @"SELECT ""Id"", ""SourceTitle"", ""MovieId"" FROM ""Blacklist""";
+                using (var blacklistReader = getSeriesCmd.ExecuteReader())
                 {
                     while (blacklistReader.Read())
                     {
@@ -190,6 +198,8 @@ namespace NzbDrone.Core.Datastore.Migration
 
                         blacklistLanguages[blacklistId] = languages;
                     }
+
+                    blacklistReader.Close();
                 }
             }
 
@@ -199,10 +209,18 @@ namespace NzbDrone.Core.Datastore.Migration
 
                 var movieFileIds = group.Select(v => v.ToString()).Join(",");
 
-                using (IDbCommand updateMovieFilesCmd = conn.CreateCommand())
+                using (var updateMovieFilesCmd = conn.CreateCommand())
                 {
                     updateMovieFilesCmd.Transaction = tran;
-                    updateMovieFilesCmd.CommandText = $"UPDATE MovieFiles SET Languages = ? WHERE Id IN ({movieFileIds})";
+                    if (conn.GetType().FullName == "Npgsql.NpgsqlConnection")
+                    {
+                        updateMovieFilesCmd.CommandText = $"UPDATE \"MovieFiles\" SET \"Languages\" = $1 WHERE \"Id\" IN ({movieFileIds})";
+                    }
+                    else
+                    {
+                        updateMovieFilesCmd.CommandText = $"UPDATE \"MovieFiles\" SET \"Languages\" = ? WHERE \"Id\" IN ({movieFileIds})";
+                    }
+
                     var param = updateMovieFilesCmd.CreateParameter();
                     languageConverter.SetValue(param, languages);
                     updateMovieFilesCmd.Parameters.Add(param);
@@ -217,10 +235,18 @@ namespace NzbDrone.Core.Datastore.Migration
 
                 var historyIds = group.Select(v => v.ToString()).Join(",");
 
-                using (IDbCommand updateHistoryCmd = conn.CreateCommand())
+                using (var updateHistoryCmd = conn.CreateCommand())
                 {
                     updateHistoryCmd.Transaction = tran;
-                    updateHistoryCmd.CommandText = $"UPDATE History SET Languages = ? WHERE Id IN ({historyIds})";
+                    if (conn.GetType().FullName == "Npgsql.NpgsqlConnection")
+                    {
+                        updateHistoryCmd.CommandText = $"UPDATE \"History\" SET \"Languages\" = $1 WHERE \"Id\" IN ({historyIds})";
+                    }
+                    else
+                    {
+                        updateHistoryCmd.CommandText = $"UPDATE \"History\" SET \"Languages\" = ? WHERE \"Id\" IN ({historyIds})";
+                    }
+
                     var param = updateHistoryCmd.CreateParameter();
                     languageConverter.SetValue(param, languages);
                     updateHistoryCmd.Parameters.Add(param);
@@ -235,10 +261,18 @@ namespace NzbDrone.Core.Datastore.Migration
 
                 var blacklistIds = group.Select(v => v.ToString()).Join(",");
 
-                using (IDbCommand updateBlacklistCmd = conn.CreateCommand())
+                using (var updateBlacklistCmd = conn.CreateCommand())
                 {
                     updateBlacklistCmd.Transaction = tran;
-                    updateBlacklistCmd.CommandText = $"UPDATE Blacklist SET Languages = ? WHERE Id IN ({blacklistIds})";
+                    if (conn.GetType().FullName == "Npgsql.NpgsqlConnection")
+                    {
+                        updateBlacklistCmd.CommandText = $"UPDATE \"Blacklist\" SET \"Languages\" = $1 WHERE \"Id\" IN ({blacklistIds})";
+                    }
+                    else
+                    {
+                        updateBlacklistCmd.CommandText = $"UPDATE \"Blacklist\" SET \"Languages\" = ? WHERE \"Id\" IN ({blacklistIds})";
+                    }
+
                     var param = updateBlacklistCmd.CreateParameter();
                     languageConverter.SetValue(param, languages);
                     updateBlacklistCmd.Parameters.Add(param);

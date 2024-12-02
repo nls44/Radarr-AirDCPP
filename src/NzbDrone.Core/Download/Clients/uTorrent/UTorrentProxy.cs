@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using NLog;
@@ -189,14 +189,14 @@ namespace NzbDrone.Core.Download.Clients.UTorrent
 
         private HttpRequestBuilder BuildRequest(UTorrentSettings settings)
         {
-            var requestBuilder = new HttpRequestBuilder(false, settings.Host, settings.Port, settings.UrlBase)
+            var requestBuilder = new HttpRequestBuilder(settings.UseSsl, settings.Host, settings.Port, settings.UrlBase)
                 .Resource("/gui/")
                 .KeepAlive()
                 .SetHeader("Cache-Control", "no-cache")
                 .Accept(HttpAccept.Json);
 
             requestBuilder.LogResponseContent = true;
-            requestBuilder.NetworkCredential = new NetworkCredential(settings.Username, settings.Password);
+            requestBuilder.NetworkCredential = new BasicNetworkCredential(settings.Username, settings.Password);
 
             return requestBuilder;
         }

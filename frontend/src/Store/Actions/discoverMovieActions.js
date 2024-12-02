@@ -1,15 +1,16 @@
 import _ from 'lodash';
+import moment from 'moment/moment';
 import { createAction } from 'redux-actions';
 import { batchActions } from 'redux-batched-actions';
 import { filterBuilderTypes, filterBuilderValueTypes, filterTypes, sortDirections } from 'Helpers/Props';
 import { createThunk, handleThunks } from 'Store/thunks';
-import sortByName from 'Utilities/Array/sortByName';
+import sortByProp from 'Utilities/Array/sortByProp';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import getNewMovie from 'Utilities/Movie/getNewMovie';
 import getSectionState from 'Utilities/State/getSectionState';
 import updateSectionState from 'Utilities/State/updateSectionState';
 import translate from 'Utilities/String/translate';
-import { removeItem, set, updateItem } from './baseActions';
+import { removeItem, set, update, updateItem } from './baseActions';
 import createHandleActions from './Creators/createHandleActions';
 import createClearReducer from './Creators/Reducers/createClearReducer';
 import createSetClientSideCollectionFilterReducer from './Creators/Reducers/createSetClientSideCollectionFilterReducer';
@@ -41,31 +42,37 @@ export const defaultState = {
   view: 'overview',
 
   options: {
-    includeRecommendations: true
+    includeRecommendations: true,
+    includeTrending: true,
+    includePopular: true
   },
 
   defaults: {
     rootFolderPath: '',
-    monitor: 'true',
+    monitor: 'movieOnly',
     qualityProfileId: 0,
-    minimumAvailability: 'announced',
+    minimumAvailability: 'released',
     searchForMovie: true,
     tags: []
   },
 
   posterOptions: {
     size: 'large',
-    showTitle: false
+    showTitle: false,
+    showTmdbRating: false,
+    showImdbRating: false,
+    showRottenTomatoesRating: false,
+    showTraktRating: false
   },
 
   overviewOptions: {
-    detailedProgressBar: false,
     size: 'medium',
-    showStudio: true,
-    showRatings: true,
     showYear: true,
-    showCertification: true,
-    showGenres: true
+    showStudio: true,
+    showGenres: true,
+    showTmdbRating: false,
+    showImdbRating: false,
+    showCertification: true
   },
 
   tableOptions: {
@@ -75,88 +82,132 @@ export const defaultState = {
   columns: [
     {
       name: 'status',
-      columnLabel: translate('Status'),
+      columnLabel: () => translate('Status'),
       isSortable: true,
       isVisible: true,
       isModifiable: false
     },
     {
       name: 'isRecommendation',
-      columnLabel: 'Recommedation',
+      columnLabel: () => translate('Recommendation'),
+      isSortable: true,
+      isVisible: true,
+      isModifiable: false
+    },
+    {
+      name: 'isTrending',
+      columnLabel: () => translate('Trending'),
+      isSortable: true,
+      isVisible: true,
+      isModifiable: false
+    },
+    {
+      name: 'isPopular',
+      columnLabel: () => translate('Popular'),
       isSortable: true,
       isVisible: true,
       isModifiable: false
     },
     {
       name: 'sortTitle',
-      label: translate('MovieTitle'),
+      label: () => translate('MovieTitle'),
       isSortable: true,
       isVisible: true,
       isModifiable: false
     },
     {
+      name: 'originalLanguage',
+      label: () => translate('OriginalLanguage'),
+      isSortable: true,
+      isVisible: false
+    },
+    {
       name: 'collection',
-      label: translate('Collection'),
+      label: () => translate('Collection'),
       isSortable: true,
       isVisible: false
     },
     {
       name: 'studio',
-      label: translate('Studio'),
+      label: () => translate('Studio'),
       isSortable: true,
       isVisible: true
     },
     {
       name: 'inCinemas',
-      label: translate('InCinemas'),
+      label: () => translate('InCinemas'),
       isSortable: true,
       isVisible: true
     },
     {
-      name: 'physicalRelease',
-      label: translate('PhysicalRelease'),
+      name: 'digitalRelease',
+      label: () => translate('DigitalRelease'),
       isSortable: true,
       isVisible: false
     },
     {
-      name: 'digitalRelease',
-      label: translate('DigitalRelease'),
+      name: 'physicalRelease',
+      label: () => translate('PhysicalRelease'),
       isSortable: true,
       isVisible: false
     },
     {
       name: 'runtime',
-      label: translate('Runtime'),
+      label: () => translate('Runtime'),
       isSortable: true,
       isVisible: false
     },
     {
       name: 'genres',
-      label: translate('Genres'),
+      label: () => translate('Genres'),
       isSortable: false,
       isVisible: false
     },
     {
-      name: 'ratings',
-      label: translate('Ratings'),
+      name: 'tmdbRating',
+      label: () => translate('TmdbRating'),
+      isSortable: true,
+      isVisible: false
+    },
+    {
+      name: 'imdbRating',
+      label: () => translate('ImdbRating'),
+      isSortable: true,
+      isVisible: false
+    },
+    {
+      name: 'rottenTomatoesRating',
+      label: () => translate('RottenTomatoesRating'),
+      isSortable: true,
+      isVisible: false
+    },
+    {
+      name: 'traktRating',
+      label: () => translate('TraktRating'),
+      isSortable: true,
+      isVisible: false
+    },
+    {
+      name: 'popularity',
+      label: () => translate('Popularity'),
       isSortable: true,
       isVisible: false
     },
     {
       name: 'certification',
-      label: translate('Certification'),
+      label: () => translate('Certification'),
       isSortable: true,
       isVisible: false
     },
     {
       name: 'lists',
-      label: 'Lists',
+      label: () => translate('Lists'),
       isSortable: false,
       isVisible: false
     },
     {
       name: 'actions',
-      columnLabel: translate('Actions'),
+      columnLabel: () => translate('Actions'),
       isVisible: true,
       isModifiable: false
     }
@@ -188,7 +239,13 @@ export const defaultState = {
     collection: function(item) {
       const { collection ={} } = item;
 
-      return collection.name;
+      return collection.title;
+    },
+
+    originalLanguage: function(item) {
+      const { originalLanguage ={} } = item;
+
+      return originalLanguage.name;
     },
 
     studio: function(item) {
@@ -197,10 +254,56 @@ export const defaultState = {
       return studio ? studio.toLowerCase() : '';
     },
 
-    ratings: function(item) {
-      const { ratings = {} } = item;
+    inCinemas: function(item, direction) {
+      if (item.inCinemas) {
+        return moment(item.inCinemas).unix();
+      }
 
-      return ratings.value;
+      if (direction === sortDirections.DESCENDING) {
+        return -1 * Number.MAX_VALUE;
+      }
+
+      return Number.MAX_VALUE;
+    },
+
+    physicalRelease: function(item, direction) {
+      if (item.physicalRelease) {
+        return moment(item.physicalRelease).unix();
+      }
+
+      if (direction === sortDirections.DESCENDING) {
+        return -1 * Number.MAX_VALUE;
+      }
+
+      return Number.MAX_VALUE;
+    },
+
+    digitalRelease: function(item, direction) {
+      if (item.digitalRelease) {
+        return moment(item.digitalRelease).unix();
+      }
+
+      if (direction === sortDirections.DESCENDING) {
+        return -1 * Number.MAX_VALUE;
+      }
+
+      return Number.MAX_VALUE;
+    },
+
+    tmdbRating: function({ ratings = {} }) {
+      return ratings.tmdb ? ratings.tmdb.value : 0;
+    },
+
+    imdbRating: function({ ratings = {} }) {
+      return ratings.imdb ? ratings.imdb.value : 0;
+    },
+
+    rottenTomatoesRating: function({ ratings = {} }) {
+      return ratings.rottenTomatoes ? ratings.rottenTomatoes.value : -1;
+    },
+
+    traktRating: function({ ratings = {} }) {
+      return ratings.trakt ? ratings.trakt.value : 0;
     }
   },
 
@@ -209,12 +312,34 @@ export const defaultState = {
   filters: [
     {
       key: 'all',
-      label: translate('All'),
+      label: () => translate('All'),
       filters: []
     },
     {
+      key: 'popular',
+      label: () => translate('Popular'),
+      filters: [
+        {
+          key: 'isPopular',
+          value: true,
+          type: filterTypes.EQUAL
+        }
+      ]
+    },
+    {
+      key: 'trending',
+      label: () => translate('Trending'),
+      filters: [
+        {
+          key: 'isTrending',
+          value: true,
+          type: filterTypes.EQUAL
+        }
+      ]
+    },
+    {
       key: 'newNotExcluded',
-      label: 'New Non-Excluded',
+      label: () => translate('NewNonExcluded'),
       filters: [
         {
           key: 'isExisting',
@@ -235,13 +360,13 @@ export const defaultState = {
   filterBuilderProps: [
     {
       name: 'status',
-      label: translate('ReleaseStatus'),
+      label: () => translate('ReleaseStatus'),
       type: filterBuilderTypes.EXACT,
       valueType: filterBuilderValueTypes.RELEASE_STATUS
     },
     {
       name: 'studio',
-      label: 'Studio',
+      label: () => translate('Studio'),
       type: filterBuilderTypes.ARRAY,
       optionsSelector: function(items) {
         const tagList = items.reduce((acc, movie) => {
@@ -253,54 +378,73 @@ export const defaultState = {
           return acc;
         }, []);
 
-        return tagList.sort(sortByName);
+        return tagList.sort(sortByProp('name'));
       }
     },
     {
       name: 'collection',
-      label: translate('Collection'),
+      label: () => translate('Collection'),
       type: filterBuilderTypes.ARRAY,
       optionsSelector: function(items) {
         const collectionList = items.reduce((acc, movie) => {
-          if (movie.collection) {
+          if (movie.collection && movie.collection.title) {
             acc.push({
-              id: movie.collection.name,
-              name: movie.collection.name
+              id: movie.collection.title,
+              name: movie.collection.title
             });
           }
 
           return acc;
         }, []);
 
-        return collectionList.sort(sortByName);
+        return collectionList.sort(sortByProp('name'));
+      }
+    },
+    {
+      name: 'originalLanguage',
+      label: () => translate('OriginalLanguage'),
+      type: filterBuilderTypes.EXACT,
+      optionsSelector: function(items) {
+        const collectionList = items.reduce((acc, movie) => {
+          if (movie.originalLanguage) {
+            acc.push({
+              id: movie.originalLanguage.name,
+              name: movie.originalLanguage.name
+            });
+          }
+
+          return acc;
+        }, []);
+
+        return collectionList.sort(sortByProp('name'));
       }
     },
     {
       name: 'inCinemas',
-      label: 'In Cinemas',
+      label: () => translate('InCinemas'),
       type: filterBuilderTypes.DATE,
       valueType: filterBuilderValueTypes.DATE
     },
     {
       name: 'physicalRelease',
-      label: 'Physical Release',
+      label: () => translate('PhysicalRelease'),
       type: filterBuilderTypes.DATE,
       valueType: filterBuilderValueTypes.DATE
     },
     {
       name: 'digitalRelease',
-      label: 'Digital Release',
+      label: () => translate('DigitalRelease'),
       type: filterBuilderTypes.DATE,
       valueType: filterBuilderValueTypes.DATE
     },
     {
       name: 'runtime',
-      label: translate('Runtime'),
+      label: () => translate('Runtime'),
       type: filterBuilderTypes.NUMBER
     },
     {
       name: 'genres',
-      label: 'Genres',
+      label: () => translate('Genres'),
       type: filterBuilderTypes.ARRAY,
       optionsSelector: function(items) {
         const tagList = items.reduce((acc, movie) => {
@@ -314,52 +458,94 @@ export const defaultState = {
           return acc;
         }, []);
 
-        return tagList.sort(sortByName);
+        return tagList.sort(sortByProp('name'));
       }
     },
     {
       name: 'isAvailable',
-      label: translate('ConsideredAvailable'),
+      label: () => translate('ConsideredAvailable'),
       type: filterBuilderTypes.EXACT,
       valueType: filterBuilderValueTypes.BOOL
     },
     {
       name: 'minimumAvailability',
-      label: translate('MinimumAvailability'),
+      label: () => translate('MinimumAvailability'),
       type: filterBuilderTypes.EXACT,
       valueType: filterBuilderValueTypes.MINIMUM_AVAILABILITY
     },
     {
-      name: 'ratings',
-      label: 'Rating',
+      name: 'tmdbRating',
+      label: () => translate('TmdbRating'),
+      type: filterBuilderTypes.NUMBER
+    },
+    {
+      name: 'tmdbVotes',
+      label: () => translate('TmdbVotes'),
+      type: filterBuilderTypes.NUMBER
+    },
+    {
+      name: 'imdbRating',
+      label: () => translate('ImdbRating'),
+      type: filterBuilderTypes.NUMBER
+    },
+    {
+      name: 'imdbVotes',
+      label: () => translate('ImdbVotes'),
+      type: filterBuilderTypes.NUMBER
+    },
+    {
+      name: 'traktRating',
+      label: () => translate('TraktRating'),
+      type: filterBuilderTypes.NUMBER
+    },
+    {
+      name: 'traktVotes',
+      label: () => translate('TraktVotes'),
+      type: filterBuilderTypes.NUMBER
+    },
+    {
+      name: 'popularity',
+      label: () => translate('Popularity'),
       type: filterBuilderTypes.NUMBER
     },
     {
       name: 'certification',
-      label: 'Certification',
+      label: () => translate('Certification'),
       type: filterBuilderTypes.EXACT
     },
     {
       name: 'lists',
-      label: 'Lists',
+      label: () => translate('Lists'),
       type: filterBuilderTypes.ARRAY,
       valueType: filterBuilderValueTypes.IMPORTLIST
     },
     {
       name: 'isExcluded',
-      label: 'On Excluded List',
+      label: () => translate('OnExcludedList'),
       type: filterBuilderTypes.EXACT,
       valueType: filterBuilderValueTypes.BOOL
     },
     {
       name: 'isExisting',
-      label: 'Exists in Library',
+      label: () => translate('ExistsInLibrary'),
       type: filterBuilderTypes.EXACT,
       valueType: filterBuilderValueTypes.BOOL
     },
     {
       name: 'isRecommendation',
-      label: 'Recommended',
+      label: () => translate('Recommended'),
+      type: filterBuilderTypes.EXACT,
+      valueType: filterBuilderValueTypes.BOOL
+    },
+    {
+      name: 'isTrending',
+      label: () => translate('Trending'),
+      type: filterBuilderTypes.EXACT,
+      valueType: filterBuilderValueTypes.BOOL
+    },
+    {
+      name: 'isPopular',
+      label: () => translate('Popular'),
       type: filterBuilderTypes.EXACT,
       valueType: filterBuilderValueTypes.BOOL
     }
@@ -399,7 +585,7 @@ export const SET_LIST_MOVIE_TABLE_OPTION = 'discoverMovie/setListMovieTableOptio
 export const SET_LIST_MOVIE_POSTER_OPTION = 'discoverMovie/setListMoviePosterOption';
 export const SET_LIST_MOVIE_OVERVIEW_OPTION = 'discoverMovie/setListMovieOverviewOption';
 
-export const ADD_IMPORT_EXCLUSIONS = 'discoverMovie/addImportExclusions';
+export const ADD_IMPORT_LIST_EXCLUSIONS = 'discoverMovie/addImportListExclusions';
 
 //
 // Action Creators
@@ -419,7 +605,7 @@ export const setListMovieTableOption = createAction(SET_LIST_MOVIE_TABLE_OPTION)
 export const setListMoviePosterOption = createAction(SET_LIST_MOVIE_POSTER_OPTION);
 export const setListMovieOverviewOption = createAction(SET_LIST_MOVIE_OVERVIEW_OPTION);
 
-export const addImportExclusions = createThunk(ADD_IMPORT_EXCLUSIONS);
+export const addImportListExclusions = createThunk(ADD_IMPORT_LIST_EXCLUSIONS);
 
 export const setAddMovieValue = createAction(SET_ADD_MOVIE_VALUE, (payload) => {
   return {
@@ -441,20 +627,24 @@ export const actionHandlers = handleThunks({
       ...otherPayload
     } = payload;
 
-    const includeRecommendations = getState().discoverMovie.options.includeRecommendations;
+    const {
+      includeRecommendations = false,
+      includeTrending = false,
+      includePopular = false
+    } = getState().discoverMovie.options;
 
     const promise = createAjaxRequest({
-      url: `/importlist/movie?includeRecommendations=${includeRecommendations}`,
+      url: `/importlist/movie?includeRecommendations=${includeRecommendations}&includeTrending=${includeTrending}&includePopular=${includePopular}`,
       data: otherPayload,
       traditional: true
     }).request;
 
     promise.done((data) => {
-      // set an Id so the selectors and updaters done blow up.
+      // set an ID so the selectors and updaters done blow up.
       data = data.map((movie) => ({ ...movie, id: movie.tmdbId }));
 
       dispatch(batchActions([
-        ...data.map((movie) => updateItem({ section, ...movie })),
+        update({ section, data }),
 
         set({
           section,
@@ -546,7 +736,7 @@ export const actionHandlers = handleThunks({
     }, []);
 
     const promise = createAjaxRequest({
-      url: '/movie/import',
+      url: '/importlist/movie',
       method: 'POST',
       contentType: 'application/json',
       data: JSON.stringify(allNewMovies)
@@ -578,7 +768,7 @@ export const actionHandlers = handleThunks({
     });
   },
 
-  [ADD_IMPORT_EXCLUSIONS]: function(getState, payload, dispatch) {
+  [ADD_IMPORT_LIST_EXCLUSIONS]: function(getState, payload, dispatch) {
 
     const ids = payload.ids;
     const items = getState().discoverMovie.items;
@@ -600,12 +790,13 @@ export const actionHandlers = handleThunks({
     const promise = createAjaxRequest({
       url: '/exclusions/bulk',
       method: 'POST',
+      contentType: 'application/json',
       data: JSON.stringify(exclusions)
     }).request;
 
     promise.done((data) => {
       dispatch(batchActions([
-        ...data.map((item) => updateItem({ section: 'settings.importExclusions', ...item })),
+        ...data.map((item) => updateItem({ section: 'settings.importListExclusions', ...item })),
 
         ...data.map((item) => updateItem({ section, id: item.tmdbId, isExcluded: true })),
 

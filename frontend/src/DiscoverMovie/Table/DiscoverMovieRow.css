@@ -19,7 +19,7 @@
 
 .exclusionIcon {
   width: 20px !important;
-  color: $dangerColor;
+  color: var(--dangerColor);
   pointer-events: all;
 }
 
@@ -51,11 +51,26 @@
   flex: 0 0 115px;
 }
 
-.ratings,
+.originalLanguage {
+  composes: cell;
+
+  flex: 1 0 125px;
+}
+
+.tmdbRating,
+.imdbRating,
+.rottenTomatoesRating,
+.traktRating,
 .runtime {
   composes: cell;
 
   flex: 0 0 90px;
+}
+
+.popularity {
+  composes: cell;
+
+  flex: 0 0 100px;
 }
 
 .lists {
@@ -64,10 +79,12 @@
   flex: 1 0 110px;
 }
 
+.isTrending,
+.isPopular,
 .isRecommendation {
   composes: cell;
 
-  flex: 0 0 50px;
+  flex: 0 0 30px;
 }
 
 .actions {
@@ -81,6 +98,11 @@
   composes: input from '~Components/Form/CheckInput.css';
 
   margin-top: 0;
+}
+
+.statusIcon {
+  width: 20px !important;
+  text-align: center;
 }
 
 .externalLinks {

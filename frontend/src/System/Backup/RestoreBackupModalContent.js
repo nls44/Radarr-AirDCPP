@@ -97,7 +97,7 @@ class RestoreBackupModalContent extends Component {
       file: files[0],
       path: value
     });
-  }
+  };
 
   onRestorePress = () => {
     const {
@@ -109,7 +109,7 @@ class RestoreBackupModalContent extends Component {
       id,
       file: this.state.file
     });
-  }
+  };
 
   //
   // Render
@@ -146,7 +146,9 @@ class RestoreBackupModalContent extends Component {
 
         <ModalBody>
           {
-            !!id && translate('WouldYouLikeToRestoreBackup', [name])
+            !!id && translate('WouldYouLikeToRestoreBackup', {
+              name
+            })
           }
 
           {

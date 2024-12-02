@@ -39,8 +39,7 @@ namespace NzbDrone.Core.Indexers.HDBits
                     jsonResponse.Message ?? string.Empty);
             }
 
-            var responseData = jsonResponse.Data as JArray;
-            if (responseData == null)
+            if (jsonResponse.Data is not JArray responseData)
             {
                 throw new IndexerException(indexerResponse,
                     "Indexer API call response missing result data");
@@ -51,23 +50,10 @@ namespace NzbDrone.Core.Indexers.HDBits
             foreach (var result in queryResults)
             {
                 var id = result.Id;
-                var internalRelease = result.TypeOrigin == 1 ? true : false;
 
-                IndexerFlags flags = 0;
-
-                if (result.FreeLeech == "yes")
+                torrentInfos.Add(new HDBitsInfo
                 {
-                    flags |= IndexerFlags.G_Freeleech;
-                }
-
-                if (internalRelease)
-                {
-                    flags |= IndexerFlags.HDB_Internal;
-                }
-
-                torrentInfos.Add(new HDBitsInfo()
-                {
-                    Guid = string.Format("HDBits-{0}", id),
+                    Guid = $"HDBits-{id}",
                     Title = result.Name,
                     Size = result.Size,
                     InfoHash = result.Hash,
@@ -76,16 +62,30 @@ namespace NzbDrone.Core.Indexers.HDBits
                     Seeders = result.Seeders,
                     Peers = result.Leechers + result.Seeders,
                     PublishDate = result.Added.ToUniversalTime(),
-                    Internal = internalRelease,
                     ImdbId = result.ImdbInfo?.Id ?? 0,
-                    IndexerFlags = flags
+                    IndexerFlags = GetIndexerFlags(result)
                 });
             }
 
             return torrentInfos.ToArray();
         }
 
-        public Action<IDictionary<string, string>, DateTime?> CookiesUpdater { get; set; }
+        private static IndexerFlags GetIndexerFlags(TorrentQueryResponse item)
+        {
+            IndexerFlags flags = 0;
+
+            if (item.FreeLeech == "yes")
+            {
+                flags |= IndexerFlags.G_Freeleech;
+            }
+
+            if (item.TypeOrigin == 1)
+            {
+                flags |= IndexerFlags.G_Internal;
+            }
+
+            return flags;
+        }
 
         private string GetDownloadUrl(string torrentId)
         {
@@ -105,5 +105,7 @@ namespace NzbDrone.Core.Indexers.HDBits
 
             return url.FullUri;
         }
+
+        public Action<IDictionary<string, string>, DateTime?> CookiesUpdater { get; set; }
     }
 }

@@ -71,7 +71,7 @@ class CalendarHeader extends Component {
     this.setState({ view }, () => {
       this.props.onViewChange(view);
     });
-  }
+  };
 
   //
   // Render
@@ -126,7 +126,7 @@ class CalendarHeader extends Component {
               isDisabled={view === calendarViews.AGENDA}
               onPress={onTodayPress}
             >
-              Today
+              {translate('Today')}
             </Button>
           </div>
 

@@ -1,11 +1,9 @@
-import _ from 'lodash';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { createSelector } from 'reselect';
 import { saveDelayProfile, setDelayProfileValue } from 'Store/Actions/settingsActions';
 import selectSettings from 'Store/Selectors/selectSettings';
-import translate from 'Utilities/String/translate';
 import EditDelayProfileModalContent from './EditDelayProfileModalContent';
 
 const newDelayProfile = {
@@ -14,15 +12,11 @@ const newDelayProfile = {
   preferredProtocol: 'usenet',
   usenetDelay: 0,
   torrentDelay: 0,
+  bypassIfHighestQuality: false,
+  bypassIfAboveCustomFormatScore: false,
+  minimumCustomFormatScore: 0,
   tags: []
 };
-
-const protocolOptions = [
-  { key: 'preferUsenet', value: translate('PreferUsenet') },
-  { key: 'preferTorrent', value: translate('PreferTorrent') },
-  { key: 'onlyUsenet', value: translate('OnlyUsenet') },
-  { key: 'onlyTorrent', value: translate('OnlyTorrent') }
-];
 
 function createDelayProfileSelector() {
   return createSelector(
@@ -38,7 +32,7 @@ function createDelayProfileSelector() {
         items
       } = delayProfiles;
 
-      const profile = id ? _.find(items, { id }) : newDelayProfile;
+      const profile = id ? items.find((i) => i.id === id) : newDelayProfile;
       const settings = selectSettings(profile, pendingChanges, saveError);
 
       return {
@@ -79,7 +73,6 @@ function createMapStateToProps() {
 
       return {
         protocol,
-        protocolOptions,
         ...delayProfile
       };
     }
@@ -118,7 +111,7 @@ class EditDelayProfileModalContentConnector extends Component {
 
   onInputChange = ({ name, value }) => {
     this.props.setDelayProfileValue({ name, value });
-  }
+  };
 
   onProtocolChange = ({ value }) => {
     switch (value) {
@@ -145,11 +138,11 @@ class EditDelayProfileModalContentConnector extends Component {
       default:
         throw Error(`Unknown protocol option: ${value}`);
     }
-  }
+  };
 
   onSavePress = () => {
     this.props.saveDelayProfile({ id: this.props.id });
-  }
+  };
 
   //
   // Render

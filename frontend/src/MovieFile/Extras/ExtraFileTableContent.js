@@ -11,17 +11,17 @@ import styles from './ExtraFileTableContent.css';
 const columns = [
   {
     name: 'relativePath',
-    label: translate('RelativePath'),
+    label: () => translate('RelativePath'),
     isVisible: true
   },
   {
     name: 'extension',
-    label: translate('Extension'),
+    label: () => translate('Extension'),
     isVisible: true
   },
   {
     name: 'type',
-    label: translate('Type'),
+    label: () => translate('Type'),
     isVisible: true
   },
   {
@@ -46,7 +46,7 @@ class ExtraFileTableContent extends Component {
         {
           !items.length &&
             <div className={styles.blankpad}>
-              No extra files to manage.
+              {translate('NoExtraFilesToManage')}
             </div>
         }
 

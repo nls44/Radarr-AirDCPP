@@ -28,30 +28,30 @@ class Specification extends Component {
 
   onEditSpecificationPress = () => {
     this.setState({ isEditSpecificationModalOpen: true });
-  }
+  };
 
   onEditSpecificationModalClose = () => {
     this.setState({ isEditSpecificationModalOpen: false });
-  }
+  };
 
   onDeleteSpecificationPress = () => {
     this.setState({
       isEditSpecificationModalOpen: false,
       isDeleteSpecificationModalOpen: true
     });
-  }
+  };
 
   onDeleteSpecificationModalClose = () => {
     this.setState({ isDeleteSpecificationModalOpen: false });
-  }
+  };
 
   onCloneSpecificationPress = () => {
     this.props.onCloneSpecificationPress(this.props.id);
-  }
+  };
 
   onConfirmDeleteSpecification = () => {
     this.props.onConfirmDeleteSpecification(this.props.id);
-  }
+  };
 
   //
   // Lifecycle
@@ -78,7 +78,7 @@ class Specification extends Component {
 
           <IconButton
             className={styles.cloneButton}
-            title={translate('CloneFormatTag')}
+            title={translate('CloneCondition')}
             name={icons.CLONE}
             onPress={this.onCloneSpecificationPress}
           />
@@ -114,14 +114,8 @@ class Specification extends Component {
         <ConfirmModal
           isOpen={this.state.isDeleteSpecificationModalOpen}
           kind={kinds.DANGER}
-          title={translate('DeleteCustomFormat')}
-          message={
-            <div>
-              <div>
-                {translate('AreYouSureYouWantToDeleteFormat', [name])}
-              </div>
-            </div>
-          }
+          title={translate('DeleteCondition')}
+          message={translate('DeleteConditionMessageText', { name })}
           confirmLabel={translate('Delete')}
           onConfirm={this.onConfirmDeleteSpecification}
           onCancel={this.onDeleteSpecificationModalClose}

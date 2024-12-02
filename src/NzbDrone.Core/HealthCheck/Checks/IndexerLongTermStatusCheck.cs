@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Indexers;
@@ -28,13 +29,12 @@ namespace NzbDrone.Core.HealthCheck.Checks
         {
             var enabledProviders = _providerFactory.GetAvailableProviders();
             var backOffProviders = enabledProviders.Join(_providerStatusService.GetBlockedProviders(),
-                                                       i => i.Definition.Id,
-                                                       s => s.ProviderId,
-                                                       (i, s) => new { Provider = i, Status = s })
-                                                   .Where(p => p.Status.InitialFailure.HasValue &&
-                                                               p.Status.InitialFailure.Value.Before(
-                                                                   DateTime.UtcNow.AddHours(-6)))
-                                                   .ToList();
+                    i => i.Definition.Id,
+                    s => s.ProviderId,
+                    (i, s) => new { Provider = i, Status = s })
+                .Where(p => p.Status.InitialFailure.HasValue &&
+                            p.Status.InitialFailure.Value.Before(DateTime.UtcNow.AddHours(-6)))
+                .ToList();
 
             if (backOffProviders.Empty())
             {
@@ -46,14 +46,16 @@ namespace NzbDrone.Core.HealthCheck.Checks
                 return new HealthCheck(GetType(),
                     HealthCheckResult.Error,
                     _localizationService.GetLocalizedString("IndexerLongTermStatusCheckAllClientMessage"),
-                    "#indexers_are_unavailable_due_to_failures");
+                    "#indexers-are-unavailable-due-to-failures");
             }
 
             return new HealthCheck(GetType(),
                 HealthCheckResult.Warning,
-                string.Format(_localizationService.GetLocalizedString("IndexerLongTermStatusCheckSingleClientMessage"),
-                    string.Join(", ", backOffProviders.Select(v => v.Provider.Definition.Name))),
-                "#indexers_are_unavailable_due_to_failures");
+                _localizationService.GetLocalizedString("IndexerLongTermStatusCheckSingleClientMessage", new Dictionary<string, object>
+                {
+                    { "indexerNames", string.Join(", ", backOffProviders.Select(v => v.Provider.Definition.Name)) }
+                }),
+                "#indexers-are-unavailable-due-to-failures");
         }
     }
 }

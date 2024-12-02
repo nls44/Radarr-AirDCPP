@@ -10,10 +10,11 @@ namespace NzbDrone.Core.Validation.Paths
         private readonly IRootFolderService _rootFolderService;
 
         public RootFolderAncestorValidator(IRootFolderService rootFolderService)
-            : base("Path is an ancestor of an existing root folder")
         {
             _rootFolderService = rootFolderService;
         }
+
+        protected override string GetDefaultMessageTemplate() => "Path '{path}' is an ancestor of an existing root folder";
 
         protected override bool IsValid(PropertyValidatorContext context)
         {
@@ -21,6 +22,8 @@ namespace NzbDrone.Core.Validation.Paths
             {
                 return true;
             }
+
+            context.MessageFormatter.AppendArgument("path", context.PropertyValue.ToString());
 
             return !_rootFolderService.All().Any(s => context.PropertyValue.ToString().IsParentPath(s.Path));
         }

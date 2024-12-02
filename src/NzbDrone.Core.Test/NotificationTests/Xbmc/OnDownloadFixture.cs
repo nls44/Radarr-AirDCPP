@@ -28,33 +28,39 @@ namespace NzbDrone.Core.Test.NotificationTests.Xbmc
             _downloadMessage = Builder<DownloadMessage>.CreateNew()
                                                        .With(d => d.Movie = movie)
                                                        .With(d => d.MovieFile = movieFile)
-                                                       .With(d => d.OldMovieFiles = new List<MovieFile>())
+                                                       .With(d => d.OldMovieFiles = new List<DeletedMovieFile>())
                                                        .Build();
 
             Subject.Definition = new NotificationDefinition();
             Subject.Definition.Settings = new XbmcSettings
-            {
-                UpdateLibrary = true
-            };
+                                          {
+                                              Host = "localhost",
+                                              UpdateLibrary = true
+                                          };
         }
 
         private void GivenOldFiles()
         {
-            _downloadMessage.OldMovieFiles = Builder<MovieFile>.CreateListOfSize(1)
-                                                               .Build()
-                                                               .ToList();
+            _downloadMessage.OldMovieFiles = Builder<DeletedMovieFile>
+                .CreateListOfSize(1)
+                .All()
+                .WithFactory(() => new DeletedMovieFile(Builder<MovieFile>.CreateNew().Build(), null))
+                .Build()
+                .ToList();
 
             Subject.Definition.Settings = new XbmcSettings
-            {
-                UpdateLibrary = true,
-                CleanLibrary = true
-            };
+                                          {
+                                              Host = "localhost",
+                                              UpdateLibrary = true,
+                                              CleanLibrary = true
+                                          };
         }
 
         [Test]
         public void should_not_clean_if_no_movie_was_replaced()
         {
             Subject.OnDownload(_downloadMessage);
+            Subject.ProcessQueue();
 
             Mocker.GetMock<IXbmcService>().Verify(v => v.Clean(It.IsAny<XbmcSettings>()), Times.Never());
         }
@@ -64,6 +70,7 @@ namespace NzbDrone.Core.Test.NotificationTests.Xbmc
         {
             GivenOldFiles();
             Subject.OnDownload(_downloadMessage);
+            Subject.ProcessQueue();
 
             Mocker.GetMock<IXbmcService>().Verify(v => v.Clean(It.IsAny<XbmcSettings>()), Times.Once());
         }

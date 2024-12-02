@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using FluentMigrator;
 using NzbDrone.Core.Datastore.Migration.Framework;
 
@@ -14,11 +14,11 @@ namespace NzbDrone.Core.Datastore.Migration
 
         private void SetTitleSlug(IDbConnection conn, IDbTransaction tran)
         {
-            using (IDbCommand getSeriesCmd = conn.CreateCommand())
+            using (var getSeriesCmd = conn.CreateCommand())
             {
                 getSeriesCmd.Transaction = tran;
-                getSeriesCmd.CommandText = @"SELECT Id, Title, Year, TmdbId FROM Movies";
-                using (IDataReader seriesReader = getSeriesCmd.ExecuteReader())
+                getSeriesCmd.CommandText = @"SELECT ""Id"", ""Title"", ""Year"", ""TmdbId"" FROM ""Movies""";
+                using (var seriesReader = getSeriesCmd.ExecuteReader())
                 {
                     while (seriesReader.Read())
                     {
@@ -29,10 +29,10 @@ namespace NzbDrone.Core.Datastore.Migration
 
                         var titleSlug = Parser.Parser.ToUrlSlug(title + "-" + tmdbId);
 
-                        using (IDbCommand updateCmd = conn.CreateCommand())
+                        using (var updateCmd = conn.CreateCommand())
                         {
                             updateCmd.Transaction = tran;
-                            updateCmd.CommandText = "UPDATE Movies SET TitleSlug = ? WHERE Id = ?";
+                            updateCmd.CommandText = "UPDATE \"Movies\" SET \"TitleSlug\" = ? WHERE \"Id\" = ?";
                             updateCmd.AddParameter(titleSlug);
                             updateCmd.AddParameter(id);
 

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using NLog;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
@@ -13,12 +14,9 @@ namespace NzbDrone.Core.Notifications.Plex.Server
     public interface IPlexServerProxy
     {
         List<PlexSection> GetMovieSections(PlexServerSettings settings);
-        void Update(int sectionId, PlexServerSettings settings);
-        void UpdateMovie(int metadataId, PlexServerSettings settings);
         void UpdateMovie(string path, int sectionId, PlexServerSettings settings);
         string Version(PlexServerSettings settings);
-        List<PlexPreference> Preferences(PlexServerSettings settings);
-        int? GetMetadataId(int sectionId, string imdbId, string language, PlexServerSettings settings);
+        void Update(int sectionId, string path, PlexServerSettings settings);
     }
 
     public class PlexServerProxy : IPlexServerProxy
@@ -36,7 +34,7 @@ namespace NzbDrone.Core.Notifications.Plex.Server
 
         public List<PlexSection> GetMovieSections(PlexServerSettings settings)
         {
-            var request = BuildRequest("library/sections", HttpMethod.GET, settings);
+            var request = BuildRequest("library/sections", HttpMethod.Get, settings);
             var response = ProcessRequest(request);
 
             CheckForError(response);
@@ -63,19 +61,13 @@ namespace NzbDrone.Core.Notifications.Plex.Server
                        .ToList();
         }
 
-        public void Update(int sectionId, PlexServerSettings settings)
+        public void Update(int sectionId, string path, PlexServerSettings settings)
         {
             var resource = $"library/sections/{sectionId}/refresh";
-            var request = BuildRequest(resource, HttpMethod.GET, settings);
-            var response = ProcessRequest(request);
+            var request = BuildRequest(resource, HttpMethod.Get, settings);
 
-            CheckForError(response);
-        }
+            request.AddQueryParam("path", path);
 
-        public void UpdateMovie(int metadataId, PlexServerSettings settings)
-        {
-            var resource = $"library/metadata/{metadataId}/refresh";
-            var request = BuildRequest(resource, HttpMethod.PUT, settings);
             var response = ProcessRequest(request);
 
             CheckForError(response);
@@ -95,7 +87,7 @@ namespace NzbDrone.Core.Notifications.Plex.Server
 
         public string Version(PlexServerSettings settings)
         {
-            var request = BuildRequest("identity", HttpMethod.GET, settings);
+            var request = BuildRequest("identity", HttpMethod.Get, settings);
             var response = ProcessRequest(request);
 
             CheckForError(response);
@@ -111,60 +103,11 @@ namespace NzbDrone.Core.Notifications.Plex.Server
                        .Version;
         }
 
-        public List<PlexPreference> Preferences(PlexServerSettings settings)
-        {
-            var request = BuildRequest(":/prefs", HttpMethod.GET, settings);
-            var response = ProcessRequest(request);
-
-            CheckForError(response);
-
-            if (response.Contains("_children"))
-            {
-                return Json.Deserialize<PlexPreferencesLegacy>(response)
-                           .Preferences;
-            }
-
-            return Json.Deserialize<PlexResponse<PlexPreferences>>(response)
-                       .MediaContainer
-                       .Preferences;
-        }
-
-        public int? GetMetadataId(int sectionId, string imdbId, string language, PlexServerSettings settings)
-        {
-            var guid = $"com.plexapp.agents.imdb://{imdbId}?lang={language}";
-            var resource = $"library/sections/{sectionId}/all?guid={System.Web.HttpUtility.UrlEncode(guid)}";
-            var request = BuildRequest(resource, HttpMethod.GET, settings);
-            var response = ProcessRequest(request);
-
-            CheckForError(response);
-
-            List<PlexSectionItem> items;
-
-            if (response.Contains("_children"))
-            {
-                items = Json.Deserialize<PlexSectionResponseLegacy>(response)
-                            .Items;
-            }
-            else
-            {
-                items = Json.Deserialize<PlexResponse<PlexSectionResponse>>(response)
-                            .MediaContainer
-                            .Items;
-            }
-
-            if (items == null || items.Empty())
-            {
-                return null;
-            }
-
-            return items.First().Id;
-        }
-
         private HttpRequestBuilder BuildRequest(string resource, HttpMethod method, PlexServerSettings settings)
         {
             var scheme = settings.UseSsl ? "https" : "http";
 
-            var requestBuilder = new HttpRequestBuilder($"{scheme}://{settings.Host}:{settings.Port}")
+            var requestBuilder = new HttpRequestBuilder($"{scheme}://{settings.Host.ToUrlHost()}:{settings.Port}{settings.UrlBase}")
                                  .Accept(HttpAccept.Json)
                                  .AddQueryParam("X-Plex-Client-Identifier", _configService.PlexClientIdentifier)
                                  .AddQueryParam("X-Plex-Product", BuildInfo.AppName)
@@ -207,7 +150,12 @@ namespace NzbDrone.Core.Notifications.Plex.Server
             }
             catch (WebException ex)
             {
-                throw new PlexException("Unable to connect to Plex Media Server", ex);
+                if (ex.Status == WebExceptionStatus.TrustFailure)
+                {
+                    throw new PlexException("Unable to connect to Plex Media Server, certificate validation failed.", ex);
+                }
+
+                throw new PlexException($"Unable to connect to Plex Media Server, {ex.Message}", ex);
             }
 
             return response.Content;

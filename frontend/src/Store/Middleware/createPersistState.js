@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import persistState from 'redux-localstorage';
 import actions from 'Store/Actions';
+import migrate from 'Store/Migrators/migrate';
 
 const columnPaths = [];
 
@@ -28,27 +29,39 @@ function mergeColumns(path, initialState, persistedState, computedState) {
 
   const columns = [];
 
-  initialColumns.forEach((initialColumn) => {
-    const persistedColumnIndex = _.findIndex(persistedColumns, { name: initialColumn.name });
-    const column = Object.assign({}, initialColumn);
-    const persistedColumn = persistedColumnIndex > -1 ? persistedColumns[persistedColumnIndex] : undefined;
+  // Add persisted columns in the same order they're currently in
+  // as long as they haven't been removed.
 
-    if (persistedColumn) {
-      column.isVisible = persistedColumn.isVisible;
+  persistedColumns.forEach((persistedColumn) => {
+    const column = initialColumns.find((i) => i.name === persistedColumn.name);
+
+    if (column) {
+      const newColumn = {};
+
+      // We can't use a spread operator or Object.assign to clone the column
+      // or any accessors are lost and can break translations.
+      for (const prop of Object.keys(column)) {
+        Object.defineProperty(newColumn, prop, Object.getOwnPropertyDescriptor(column, prop));
+      }
+
+      newColumn.isVisible = persistedColumn.isVisible;
+
+      columns.push(newColumn);
     }
-
-    // If there is a persisted column, it's index doesn't exceed the column list
-    // and it's modifiable, insert it in the proper position.
-
-    if (persistedColumn && columns.length - 1 > persistedColumnIndex && persistedColumn.isModifiable !== false) {
-      columns.splice(persistedColumnIndex, 0, column);
-    } else {
-      columns.push(column);
-    }
-
-    // Set the columns in the persisted state
-    _.set(computedState, path, columns);
   });
+
+  // Add any columns added to the app in the initial position.
+  initialColumns.forEach((initialColumn, index) => {
+    const persistedColumnIndex = persistedColumns.findIndex((i) => i.name === initialColumn.name);
+    const column = Object.assign({}, initialColumn);
+
+    if (persistedColumnIndex === -1) {
+      columns.splice(index, 0, column);
+    }
+  });
+
+  // Set the columns in the persisted state
+  _.set(computedState, path, columns);
 }
 
 function slicer(paths_) {
@@ -93,6 +106,7 @@ const config = {
 export default function createPersistState() {
   // Migrate existing local storage before proceeding
   const persistedState = JSON.parse(localStorage.getItem(config.key));
+  migrate(persistedState);
   localStorage.setItem(config.key, serialize(persistedState));
 
   return persistState(paths, config);

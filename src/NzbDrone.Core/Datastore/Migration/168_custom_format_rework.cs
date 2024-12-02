@@ -32,7 +32,7 @@ namespace NzbDrone.Core.Datastore.Migration
 
         private void UpdateCustomFormats(IDbConnection conn, IDbTransaction tran)
         {
-            var existing = conn.Query<FormatTag167>("SELECT Id, Name, FormatTags FROM CustomFormats");
+            var existing = conn.Query<FormatTag167>("SELECT \"Id\", \"Name\", \"FormatTags\" FROM \"CustomFormats\"");
 
             var updated = new List<Specification168>();
 
@@ -66,7 +66,7 @@ namespace NzbDrone.Core.Datastore.Migration
                 });
             }
 
-            var updateSql = "UPDATE CustomFormats SET Specifications = @Specifications WHERE Id = @Id";
+            var updateSql = "UPDATE \"CustomFormats\" SET \"Specifications\" = @Specifications WHERE \"Id\" = @Id";
             conn.Execute(updateSql, updated, transaction: tran);
         }
 
@@ -133,28 +133,28 @@ namespace NzbDrone.Core.Datastore.Migration
             }
         }
 
-        private Source ParseSource(string value)
+        private QualitySource ParseSource(string value)
         {
             switch (value)
             {
                 case "cam":
-                    return Source.CAM;
+                    return QualitySource.CAM;
                 case "telesync":
-                    return Source.TELESYNC;
+                    return QualitySource.TELESYNC;
                 case "telecine":
-                    return Source.TELECINE;
+                    return QualitySource.TELECINE;
                 case "workprint":
-                    return Source.WORKPRINT;
+                    return QualitySource.WORKPRINT;
                 case "dvd":
-                    return Source.DVD;
+                    return QualitySource.DVD;
                 case "tv":
-                    return Source.TV;
+                    return QualitySource.TV;
                 case "webdl":
-                    return Source.WEBDL;
+                    return QualitySource.WEBDL;
                 case "bluray":
-                    return Source.BLURAY;
+                    return QualitySource.BLURAY;
                 default:
-                    return Source.UNKNOWN;
+                    return QualitySource.UNKNOWN;
             }
         }
 

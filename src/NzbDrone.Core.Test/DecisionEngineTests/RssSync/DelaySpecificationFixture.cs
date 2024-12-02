@@ -5,6 +5,7 @@ using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 using NzbDrone.Core.CustomFormats;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.DecisionEngine.Specifications.RssSync;
 using NzbDrone.Core.Download.Pending;
@@ -13,8 +14,8 @@ using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
-using NzbDrone.Core.Profiles;
 using NzbDrone.Core.Profiles.Delay;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Test.Framework;
 
@@ -23,14 +24,14 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
     [TestFixture]
     public class DelaySpecificationFixture : CoreTest<DelaySpecification>
     {
-        private Profile _profile;
+        private QualityProfile _profile;
         private DelayProfile _delayProfile;
         private RemoteMovie _remoteMovie;
 
         [SetUp]
         public void Setup()
         {
-            _profile = Builder<Profile>.CreateNew()
+            _profile = Builder<QualityProfile>.CreateNew()
                                        .Build();
 
             _delayProfile = Builder<DelayProfile>.CreateNew()
@@ -38,17 +39,17 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
                                                  .Build();
 
             var series = Builder<Movie>.CreateNew()
-                                        .With(s => s.Profile = _profile)
+                                        .With(s => s.QualityProfile = _profile)
                                         .Build();
 
             _remoteMovie = Builder<RemoteMovie>.CreateNew()
                                                    .With(r => r.Movie = series)
                                                    .Build();
 
-            _profile.Items = new List<ProfileQualityItem>();
-            _profile.Items.Add(new ProfileQualityItem { Allowed = true, Quality = Quality.HDTV720p });
-            _profile.Items.Add(new ProfileQualityItem { Allowed = true, Quality = Quality.WEBDL720p });
-            _profile.Items.Add(new ProfileQualityItem { Allowed = true, Quality = Quality.Bluray720p });
+            _profile.Items = new List<QualityProfileQualityItem>();
+            _profile.Items.Add(new QualityProfileQualityItem { Allowed = true, Quality = Quality.HDTV720p });
+            _profile.Items.Add(new QualityProfileQualityItem { Allowed = true, Quality = Quality.WEBDL720p });
+            _profile.Items.Add(new QualityProfileQualityItem { Allowed = true, Quality = Quality.Bluray720p });
 
             _profile.Cutoff = Quality.WEBDL720p.Id;
 
@@ -67,15 +68,15 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
 
         private void GivenExistingFile(QualityModel quality)
         {
-            //_remoteEpisode.Episodes.First().EpisodeFileId = 1;
+            // _remoteEpisode.Episodes.First().EpisodeFileId = 1;
             _remoteMovie.Movie.MovieFile = new MovieFile { Quality = quality };
         }
 
         private void GivenUpgradeForExistingFile()
         {
             Mocker.GetMock<IUpgradableSpecification>()
-                  .Setup(s => s.IsUpgradable(It.IsAny<Profile>(), It.IsAny<QualityModel>(), It.IsAny<List<CustomFormat>>(), It.IsAny<QualityModel>(), It.IsAny<List<CustomFormat>>()))
-                  .Returns(true);
+                  .Setup(s => s.IsUpgradable(It.IsAny<QualityProfile>(), It.IsAny<QualityModel>(), It.IsAny<List<CustomFormat>>(), It.IsAny<QualityModel>(), It.IsAny<List<CustomFormat>>()))
+                  .Returns(UpgradeableRejectReason.None);
         }
 
         [Test]
@@ -104,8 +105,23 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
         }
 
         [Test]
-        public void should_be_true_when_quality_is_last_allowed_in_profile()
+        public void should_be_false_when_quality_is_last_allowed_in_profile_and_bypass_disabled()
         {
+            _remoteMovie.Release.PublishDate = DateTime.UtcNow;
+            _remoteMovie.ParsedMovieInfo.Quality = new QualityModel(Quality.Bluray720p);
+
+            _delayProfile.UsenetDelay = 720;
+
+            Subject.IsSatisfiedBy(_remoteMovie, null).Accepted.Should().BeFalse();
+        }
+
+        [Test]
+        public void should_be_true_when_quality_is_last_allowed_in_profile_and_bypass_enabled()
+        {
+            _delayProfile.UsenetDelay = 720;
+            _delayProfile.BypassIfHighestQuality = true;
+
+            _remoteMovie.Release.PublishDate = DateTime.UtcNow;
             _remoteMovie.ParsedMovieInfo.Quality = new QualityModel(Quality.Bluray720p);
 
             Subject.IsSatisfiedBy(_remoteMovie, null).Accepted.Should().BeTrue();
@@ -180,6 +196,44 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
             _delayProfile.UsenetDelay = 720;
 
             Subject.IsSatisfiedBy(_remoteMovie, null).Accepted.Should().BeFalse();
+        }
+
+        [Test]
+        public void should_be_false_when_custom_format_score_is_above_minimum_but_bypass_disabled()
+        {
+            _remoteMovie.Release.PublishDate = DateTime.UtcNow;
+            _remoteMovie.CustomFormatScore = 100;
+
+            _delayProfile.UsenetDelay = 720;
+            _delayProfile.MinimumCustomFormatScore = 50;
+
+            Subject.IsSatisfiedBy(_remoteMovie, null).Accepted.Should().BeFalse();
+        }
+
+        [Test]
+        public void should_be_false_when_custom_format_score_is_above_minimum_and_bypass_enabled_but_under_minimum()
+        {
+            _remoteMovie.Release.PublishDate = DateTime.UtcNow;
+            _remoteMovie.CustomFormatScore = 5;
+
+            _delayProfile.UsenetDelay = 720;
+            _delayProfile.BypassIfAboveCustomFormatScore = true;
+            _delayProfile.MinimumCustomFormatScore = 50;
+
+            Subject.IsSatisfiedBy(_remoteMovie, null).Accepted.Should().BeFalse();
+        }
+
+        [Test]
+        public void should_be_true_when_custom_format_score_is_above_minimum_and_bypass_enabled()
+        {
+            _remoteMovie.Release.PublishDate = DateTime.UtcNow;
+            _remoteMovie.CustomFormatScore = 100;
+
+            _delayProfile.UsenetDelay = 720;
+            _delayProfile.BypassIfAboveCustomFormatScore = true;
+            _delayProfile.MinimumCustomFormatScore = 50;
+
+            Subject.IsSatisfiedBy(_remoteMovie, null).Accepted.Should().BeTrue();
         }
     }
 }

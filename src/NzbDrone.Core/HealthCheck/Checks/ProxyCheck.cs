@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using NLog;
@@ -31,34 +32,57 @@ namespace NzbDrone.Core.HealthCheck.Checks
 
         public override HealthCheck Check()
         {
-            if (_configService.ProxyEnabled)
+            if (!_configService.ProxyEnabled)
             {
-                var addresses = Dns.GetHostAddresses(_configService.ProxyHostname);
-                if (!addresses.Any())
-                {
-                    return new HealthCheck(GetType(), HealthCheckResult.Error, string.Format(_localizationService.GetLocalizedString("ProxyCheckResolveIpMessage"), _configService.ProxyHostname));
-                }
+                return new HealthCheck(GetType());
+            }
 
-                var request = _cloudRequestBuilder.Create()
-                                                  .Resource("/ping")
-                                                  .Build();
+            var addresses = Dns.GetHostAddresses(_configService.ProxyHostname);
 
-                try
-                {
-                    var response = _client.Execute(request);
-
-                    // We only care about 400 responses, other error codes can be ignored
-                    if (response.StatusCode == HttpStatusCode.BadRequest)
+            if (!addresses.Any())
+            {
+                return new HealthCheck(GetType(),
+                    HealthCheckResult.Error,
+                    _localizationService.GetLocalizedString("ProxyCheckResolveIpMessage", new Dictionary<string, object>
                     {
-                        _logger.Error("Proxy Health Check failed: {0}", response.StatusCode);
-                        return new HealthCheck(GetType(), HealthCheckResult.Error, string.Format(_localizationService.GetLocalizedString("ProxyCheckBadRequestMessage"), response.StatusCode));
-                    }
-                }
-                catch (Exception ex)
+                        { "proxyHostName", _configService.ProxyHostname }
+                    }),
+                    "#proxy-failed-resolve-ip");
+            }
+
+            var request = _cloudRequestBuilder.Create()
+                .Resource("/ping")
+                .Build();
+
+            try
+            {
+                var response = _client.Execute(request);
+
+                // We only care about 400 responses, other error codes can be ignored
+                if (response.StatusCode == HttpStatusCode.BadRequest)
                 {
-                    _logger.Error(ex, "Proxy Health Check failed");
-                    return new HealthCheck(GetType(), HealthCheckResult.Error, string.Format(_localizationService.GetLocalizedString("ProxyCheckFailedToTestMessage"), request.Url));
+                    _logger.Error("Proxy Health Check failed: {0}", response.StatusCode);
+
+                    return new HealthCheck(GetType(),
+                        HealthCheckResult.Error,
+                        _localizationService.GetLocalizedString("ProxyCheckBadRequestMessage", new Dictionary<string, object>
+                        {
+                            { "statusCode", response.StatusCode }
+                        }),
+                        "#proxy-failed-test");
                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Proxy Health Check failed");
+
+                return new HealthCheck(GetType(),
+                    HealthCheckResult.Error,
+                    _localizationService.GetLocalizedString("ProxyCheckFailedToTestMessage", new Dictionary<string, object>
+                    {
+                        { "url", request.Url }
+                    }),
+                    "#proxy-failed-test");
             }
 
             return new HealthCheck(GetType());

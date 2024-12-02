@@ -27,11 +27,11 @@ class AgendaEvent extends Component {
 
   onPress = () => {
     this.setState({ isDetailsModalOpen: true });
-  }
+  };
 
   onDetailsModalClose = () => {
     this.setState({ isDetailsModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -82,28 +82,27 @@ class AgendaEvent extends Component {
     startTime = moment(startTime);
     const downloading = !!(queueItem || grabbed);
     const isMonitored = monitored;
-    const statusStyle = getStatusStyle(hasFile, downloading, isAvailable, isMonitored);
+    const statusStyle = getStatusStyle(hasFile, downloading, isMonitored, isAvailable);
     const joinedGenres = genres.slice(0, 2).join(', ');
     const link = `/movie/${titleSlug}`;
 
     return (
-      <div>
+      <div className={styles.event}>
         <Link
-          className={classNames(
-            styles.event,
-            styles.link
-          )}
+          className={styles.underlay}
           to={link}
-        >
-          <div className={styles.dateIcon}>
+        />
+
+        <div className={styles.overlay}>
+          <div className={styles.date}>
+            {showDate ? startTime.format(longDateFormat) : null}
+          </div>
+
+          <div className={styles.releaseIcon}>
             <Icon
               name={releaseIcon}
               kind={kinds.DEFAULT}
             />
-          </div>
-
-          <div className={styles.date}>
-            {(showDate) ? startTime.format(longDateFormat) : null}
           </div>
 
           <div
@@ -143,18 +142,16 @@ class AgendaEvent extends Component {
             }
 
             {
-              showCutoffUnmetIcon &&
-              !!movieFile &&
-              movieFile.qualityCutoffNotMet &&
+              showCutoffUnmetIcon && !!movieFile && movieFile.qualityCutoffNotMet &&
                 <Icon
                   className={styles.statusIcon}
                   name={icons.MOVIE_FILE}
                   kind={kinds.WARNING}
-                  title={translate('QualityCutoffHasNotBeenMet')}
+                  title={translate('QualityCutoffNotMet')}
                 />
             }
           </div>
-        </Link>
+        </div>
       </div>
     );
   }

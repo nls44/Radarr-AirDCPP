@@ -4,8 +4,9 @@ using System.Globalization;
 using System.Linq;
 using System.Xml.Linq;
 using NzbDrone.Common.Extensions;
-using NzbDrone.Common.Http;
 using NzbDrone.Core.Indexers.Exceptions;
+using NzbDrone.Core.Languages;
+using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.Indexers.Newznab
@@ -55,6 +56,12 @@ namespace NzbDrone.Core.Indexers.Newznab
 
         protected override bool PreProcess(IndexerResponse indexerResponse)
         {
+            if (indexerResponse.HttpResponse.HasHttpError &&
+                (indexerResponse.HttpResponse.Headers.ContentType == null || !indexerResponse.HttpResponse.Headers.ContentType.Contains("xml")))
+            {
+                base.PreProcess(indexerResponse);
+            }
+
             var xdoc = LoadXmlDocument(indexerResponse);
 
             CheckError(xdoc, indexerResponse);
@@ -65,16 +72,17 @@ namespace NzbDrone.Core.Indexers.Newznab
         protected override bool PostProcess(IndexerResponse indexerResponse, List<XElement> items, List<ReleaseInfo> releases)
         {
             var enclosureTypes = items.SelectMany(GetEnclosures).Select(v => v.Type).Distinct().ToArray();
+
             if (enclosureTypes.Any() && enclosureTypes.Intersect(PreferredEnclosureMimeTypes).Empty())
             {
                 if (enclosureTypes.Intersect(TorrentEnclosureMimeTypes).Any())
                 {
                     _logger.Warn("{0} does not contain {1}, found {2}, did you intend to add a Torznab indexer?", indexerResponse.Request.Url, NzbEnclosureMimeType, enclosureTypes[0]);
+
+                    return false;
                 }
-                else
-                {
-                    _logger.Warn("{1} does not contain {1}, found {2}.", indexerResponse.Request.Url, NzbEnclosureMimeType, enclosureTypes[0]);
-                }
+
+                _logger.Warn("{0} does not contain {1}, found {2}.", indexerResponse.Request.Url, NzbEnclosureMimeType, enclosureTypes[0]);
             }
 
             return true;
@@ -83,7 +91,10 @@ namespace NzbDrone.Core.Indexers.Newznab
         protected override ReleaseInfo ProcessItem(XElement item, ReleaseInfo releaseInfo)
         {
             releaseInfo = base.ProcessItem(item, releaseInfo);
+
+            releaseInfo.TmdbId = GetTmdbId(item);
             releaseInfo.ImdbId = GetImdbId(item);
+            releaseInfo.IndexerFlags = GetFlags(item);
 
             return releaseInfo;
         }
@@ -98,12 +109,40 @@ namespace NzbDrone.Core.Indexers.Newznab
             return ParseUrl(item.TryGetValue("comments"));
         }
 
+        protected override List<Language> GetLanguages(XElement item)
+        {
+            var languageElements = TryGetMultipleNewznabAttributes(item, "language");
+            var results = new List<Language>();
+
+            // Try to find <language> elements for some indexers that suck at following the rules.
+            if (languageElements.Count == 0)
+            {
+                languageElements = item.Elements("language").Select(e => e.Value).ToList();
+            }
+
+            foreach (var languageElement in languageElements)
+            {
+                var languages = languageElement.Split(',',
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+                foreach (var language in languages)
+                {
+                    var mappedLanguage = IsoLanguages.FindByName(language)?.Language ?? null;
+
+                    if (mappedLanguage != null)
+                    {
+                        results.Add(mappedLanguage);
+                    }
+                }
+            }
+
+            return results;
+        }
+
         protected override long GetSize(XElement item)
         {
-            long size;
-
             var sizeString = TryGetNewznabAttribute(item, "size");
-            if (!sizeString.IsNullOrWhiteSpace() && long.TryParse(sizeString, out size))
+            if (!sizeString.IsNullOrWhiteSpace() && long.TryParse(sizeString, out var size))
             {
                 return size;
             }
@@ -136,12 +175,23 @@ namespace NzbDrone.Core.Indexers.Newznab
             return url;
         }
 
+        protected virtual int GetTmdbId(XElement item)
+        {
+            var tmdbIdString = TryGetNewznabAttribute(item, "tmdbid");
+
+            if (!tmdbIdString.IsNullOrWhiteSpace() && int.TryParse(tmdbIdString, out var tmdbId))
+            {
+                return tmdbId;
+            }
+
+            return 0;
+        }
+
         protected virtual int GetImdbId(XElement item)
         {
             var imdbIdString = TryGetNewznabAttribute(item, "imdb");
-            int imdbId;
 
-            if (!imdbIdString.IsNullOrWhiteSpace() && int.TryParse(imdbIdString, out imdbId))
+            if (!imdbIdString.IsNullOrWhiteSpace() && int.TryParse(imdbIdString, out var imdbId))
             {
                 return imdbId;
             }
@@ -165,14 +215,30 @@ namespace NzbDrone.Core.Indexers.Newznab
         protected virtual int GetImdbYear(XElement item)
         {
             var imdbYearString = TryGetNewznabAttribute(item, "imdbyear");
-            int imdbYear;
 
-            if (!imdbYearString.IsNullOrWhiteSpace() && int.TryParse(imdbYearString, out imdbYear))
+            if (!imdbYearString.IsNullOrWhiteSpace() && int.TryParse(imdbYearString, out var imdbYear))
             {
                 return imdbYear;
             }
 
             return 1900;
+        }
+
+        protected IndexerFlags GetFlags(XElement item)
+        {
+            IndexerFlags flags = 0;
+
+            if (TryGetNewznabAttribute(item, "prematch") == "1" || TryGetNewznabAttribute(item, "haspretime") == "1")
+            {
+                flags |= IndexerFlags.G_Scene;
+            }
+
+            if (TryGetNewznabAttribute(item, "nuked") == "1")
+            {
+                flags |= IndexerFlags.Nuked;
+            }
+
+            return flags;
         }
 
         protected string TryGetNewznabAttribute(XElement item, string key, string defaultValue = "")
@@ -188,6 +254,23 @@ namespace NzbDrone.Core.Indexers.Newznab
             }
 
             return defaultValue;
+        }
+
+        protected List<string> TryGetMultipleNewznabAttributes(XElement item, string key)
+        {
+            var attrElements = item.Elements(ns + "attr").Where(e => e.Attribute("name").Value.Equals(key, StringComparison.OrdinalIgnoreCase));
+            var results = new List<string>();
+
+            foreach (var element in attrElements)
+            {
+                var attrValue = element.Attribute("value");
+                if (attrValue != null)
+                {
+                    results.Add(attrValue.Value);
+                }
+            }
+
+            return results;
         }
     }
 }

@@ -40,13 +40,13 @@ namespace NzbDrone.Core.Test.ParserTests
         [Test]
         public void should_not_parse_md5()
         {
-            string hash = "CRAPPY TEST SEED";
+            var hash = "CRAPPY TEST SEED";
 
             var hashAlgo = System.Security.Cryptography.MD5.Create();
 
             var repetitions = 100;
             var success = 0;
-            for (int i = 0; i < repetitions; i++)
+            for (var i = 0; i < repetitions; i++)
             {
                 var hashData = hashAlgo.ComputeHash(Encoding.Default.GetBytes(hash));
 
@@ -65,17 +65,17 @@ namespace NzbDrone.Core.Test.ParserTests
         [TestCase(40)]
         public void should_not_parse_random(int length)
         {
-            string charset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            var charset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
             var hashAlgo = new Random();
 
             var repetitions = 500;
             var success = 0;
-            for (int i = 0; i < repetitions; i++)
+            for (var i = 0; i < repetitions; i++)
             {
-                StringBuilder hash = new StringBuilder(length);
+                var hash = new StringBuilder(length);
 
-                for (int x = 0; x < length; x++)
+                for (var x = 0; x < length; x++)
                 {
                     hash.Append(charset[hashAlgo.Next() % charset.Length]);
                 }
@@ -89,13 +89,13 @@ namespace NzbDrone.Core.Test.ParserTests
             success.Should().Be(repetitions);
         }
 
-        [TestCase("thebiggestloser1618finale")]
+        [TestCase("thebiggestmovie1618finale")]
         public void should_not_parse_file_name_without_proper_spacing(string fileName)
         {
             Parser.Parser.ParseMovieTitle(fileName).Should().BeNull();
         }
 
-        [TestCase("Big Forest (S01E18) Complete 360p HDTV AAC H.264-NEXT")]
+        [TestCase("Big Movie (S01E18) Complete 360p HDTV AAC H.264-NEXT")]
         public void should_not_parse_invalid_release_name(string fileName)
         {
             Parser.Parser.ParseMovieTitle(fileName).Should().BeNull();

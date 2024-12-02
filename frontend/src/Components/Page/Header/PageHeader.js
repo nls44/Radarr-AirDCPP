@@ -7,7 +7,7 @@ import { icons } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 import MovieSearchInputConnector from './MovieSearchInputConnector';
-import PageHeaderActionsMenuConnector from './PageHeaderActionsMenuConnector';
+import PageHeaderActionsMenu from './PageHeaderActionsMenu';
 import styles from './PageHeader.css';
 
 class PageHeader extends Component {
@@ -32,14 +32,14 @@ class PageHeader extends Component {
 
   onOpenKeyboardShortcutsModal = () => {
     this.setState({ isKeyboardShortcutsModalOpen: true });
-  }
+  };
 
   //
   // Listeners
 
   onKeyboardShortcutsModalClose = () => {
     this.setState({ isKeyboardShortcutsModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -53,10 +53,14 @@ class PageHeader extends Component {
     return (
       <div className={styles.header}>
         <div className={styles.logoContainer}>
-          <Link to={'/'}>
+          <Link
+            className={styles.logoLink}
+            to={'/'}
+          >
             <img
               className={isSmallScreen ? styles.logo : styles.logoFull}
               src={isSmallScreen ? `${window.Radarr.urlBase}/Content/Images/logo.png` : `${window.Radarr.urlBase}/Content/Images/logo-full.png`}
+              alt="Radarr Logo"
             />
           </Link>
         </div>
@@ -75,9 +79,12 @@ class PageHeader extends Component {
           <IconButton
             className={styles.donate}
             name={icons.HEART}
-            to="https://opencollective.com/radarr"
+            aria-label="Donate"
+            to="https://radarr.video/donate"
             size={14}
+            title={translate('Donate')}
           />
+
           <IconButton
             className={styles.translate}
             title={translate('SuggestTranslationChange')}
@@ -85,7 +92,8 @@ class PageHeader extends Component {
             to="https://translate.servarr.com/projects/radarr/radarr/"
             size={24}
           />
-          <PageHeaderActionsMenuConnector
+
+          <PageHeaderActionsMenu
             onKeyboardShortcutsPress={this.onOpenKeyboardShortcutsModal}
           />
         </div>

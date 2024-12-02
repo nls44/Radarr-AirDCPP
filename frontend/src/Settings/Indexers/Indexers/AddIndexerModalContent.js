@@ -44,9 +44,9 @@ class AddIndexerModalContent extends Component {
 
           {
             !isSchemaFetching && !!schemaError &&
-              <div>
-                {translate('UnableToAddANewIndexerPleaseTryAgain')}
-              </div>
+              <Alert kind={kinds.DANGER}>
+                {translate('AddIndexerError')}
+              </Alert>
           }
 
           {
@@ -55,10 +55,10 @@ class AddIndexerModalContent extends Component {
 
                 <Alert kind={kinds.INFO}>
                   <div>
-                    {translate('RadarrSupportsAnyIndexer')}
+                    {translate('SupportedIndexers')}
                   </div>
                   <div>
-                    {translate('ForMoreInformationOnTheIndividualIndexers')}
+                    {translate('SupportedIndexersMoreInfo')}
                   </div>
                 </Alert>
 

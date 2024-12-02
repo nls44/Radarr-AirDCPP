@@ -1,7 +1,10 @@
 import _ from 'lodash';
 import { createAction } from 'redux-actions';
+import { createThunk, handleThunks } from 'Store/thunks';
+import createAjaxRequest from 'Utilities/createAjaxRequest';
 import getSectionState from 'Utilities/State/getSectionState';
 import updateSectionState from 'Utilities/State/updateSectionState';
+import { fetchTranslations as fetchAppTranslations } from 'Utilities/String/translate';
 import createHandleActions from './Creators/createHandleActions';
 
 function getDimensions(width, height) {
@@ -22,6 +25,8 @@ function getDimensions(width, height) {
 
 export const section = 'app';
 const messagesSection = 'app.messages';
+let abortPingServer = null;
+let pingTimeout = null;
 
 //
 // State
@@ -37,7 +42,12 @@ export const defaultState = {
   isReconnecting: false,
   isDisconnected: false,
   isRestarting: false,
-  isSidebarVisible: !getDimensions(window.innerWidth, window.innerHeight).isSmallScreen
+  isSidebarVisible: !getDimensions(window.innerWidth, window.innerHeight).isSmallScreen,
+  translations: {
+    isFetching: true,
+    isPopulated: false,
+    error: null
+  }
 };
 
 //
@@ -49,6 +59,9 @@ export const SAVE_DIMENSIONS = 'app/saveDimensions';
 export const SET_VERSION = 'app/setVersion';
 export const SET_APP_VALUE = 'app/setAppValue';
 export const SET_IS_SIDEBAR_VISIBLE = 'app/setIsSidebarVisible';
+export const FETCH_TRANSLATIONS = 'app/fetchTranslations';
+
+export const PING_SERVER = 'app/pingServer';
 
 //
 // Action Creators
@@ -59,6 +72,82 @@ export const setIsSidebarVisible = createAction(SET_IS_SIDEBAR_VISIBLE);
 export const setAppValue = createAction(SET_APP_VALUE);
 export const showMessage = createAction(SHOW_MESSAGE);
 export const hideMessage = createAction(HIDE_MESSAGE);
+export const pingServer = createThunk(PING_SERVER);
+export const fetchTranslations = createThunk(FETCH_TRANSLATIONS);
+
+//
+// Helpers
+
+function pingServerAfterTimeout(getState, dispatch) {
+  if (abortPingServer) {
+    abortPingServer();
+    abortPingServer = null;
+  }
+
+  if (pingTimeout) {
+    clearTimeout(pingTimeout);
+    pingTimeout = null;
+  }
+
+  pingTimeout = setTimeout(() => {
+    if (!getState().isRestarting && getState().isConnected) {
+      return;
+    }
+
+    const ajaxOptions = {
+      url: '/system/status',
+      method: 'GET',
+      contentType: 'application/json'
+    };
+
+    const { request, abortRequest } = createAjaxRequest(ajaxOptions);
+
+    abortPingServer = abortRequest;
+
+    request.done(() => {
+      abortPingServer = null;
+      pingTimeout = null;
+
+      dispatch(setAppValue({
+        isRestarting: false
+      }));
+    });
+
+    request.fail((xhr) => {
+      abortPingServer = null;
+      pingTimeout = null;
+
+      // Unauthorized, but back online
+      if (xhr.status === 401) {
+        dispatch(setAppValue({
+          isRestarting: false
+        }));
+      } else {
+        pingServerAfterTimeout(getState, dispatch);
+      }
+    });
+  }, 5000);
+}
+
+//
+// Action Handlers
+
+export const actionHandlers = handleThunks({
+  [PING_SERVER]: function(getState, payload, dispatch) {
+    pingServerAfterTimeout(getState, dispatch);
+  },
+  [FETCH_TRANSLATIONS]: async function(getState, payload, dispatch) {
+    const isFetchingComplete = await fetchAppTranslations();
+
+    dispatch(setAppValue({
+      translations: {
+        isFetching: false,
+        isPopulated: isFetchingComplete,
+        error: isFetchingComplete ? null : 'Failed to load translations from API'
+      }
+    }));
+  }
+});
 
 //
 // Reducers
@@ -117,6 +206,9 @@ export const reducers = createHandleActions({
     };
 
     if (state.version !== version) {
+      if (!state.prevVersion) {
+        newState.prevVersion = state.version;
+      }
       newState.isUpdated = true;
     }
 
@@ -132,4 +224,3 @@ export const reducers = createHandleActions({
   }
 
 }, defaultState, section);
-

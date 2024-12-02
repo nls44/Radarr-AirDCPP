@@ -83,7 +83,7 @@ namespace NzbDrone.Core.Update
         {
             EnsureAppDataSafety();
 
-            if (OsInfo.IsWindows || _configFileProvider.UpdateMechanism != UpdateMechanism.Script)
+            if (_configFileProvider.UpdateMechanism != UpdateMechanism.Script)
             {
                 var startupFolder = _appFolderInfo.StartUpFolder;
                 var uiFolder = Path.Combine(startupFolder, "UI");
@@ -105,7 +105,13 @@ namespace NzbDrone.Core.Update
                 return false;
             }
 
+            var tempFolder = _appFolderInfo.TempFolder;
             var updateSandboxFolder = _appFolderInfo.GetUpdateSandboxFolder();
+
+            if (_diskProvider.GetTotalSize(tempFolder) < 1.Gigabytes())
+            {
+                _logger.Warn("Temporary location '{0}' has less than 1 GB free space, Radarr may not be able to update itself.", tempFolder);
+            }
 
             var packageDestination = Path.Combine(updateSandboxFolder, updatePackage.FileName);
 
@@ -137,7 +143,7 @@ namespace NzbDrone.Core.Update
 
             _backupService.Backup(BackupType.Update);
 
-            if (OsInfo.IsNotWindows && _configFileProvider.UpdateMechanism == UpdateMechanism.Script)
+            if (_configFileProvider.UpdateMechanism == UpdateMechanism.Script)
             {
                 InstallUpdateWithScript(updateSandboxFolder);
                 return true;
@@ -146,16 +152,24 @@ namespace NzbDrone.Core.Update
             _logger.Info("Preparing client");
             _diskTransferService.TransferFolder(_appFolderInfo.GetUpdateClientFolder(), updateSandboxFolder, TransferMode.Move);
 
-            // Set executable flag on update app
-            if (OsInfo.IsOsx || (OsInfo.IsLinux && PlatformInfo.IsNetCore))
+            var updateClientExePath = _appFolderInfo.GetUpdateClientExePath();
+
+            if (!_diskProvider.FileExists(updateClientExePath))
             {
-                _diskProvider.SetFilePermissions(_appFolderInfo.GetUpdateClientExePath(updatePackage.Runtime), "755", null);
+                _logger.Warn("Update client {0} does not exist, aborting update.", updateClientExePath);
+                return false;
             }
 
-            _logger.Info("Starting update client {0}", _appFolderInfo.GetUpdateClientExePath(updatePackage.Runtime));
+            // Set executable flag on update app
+            if (OsInfo.IsOsx || OsInfo.IsLinux)
+            {
+                _diskProvider.SetFilePermissions(updateClientExePath, "755", null);
+            }
+
+            _logger.Info("Starting update client {0}", updateClientExePath);
             _logger.ProgressInfo("Radarr will restart shortly.");
 
-            _processProvider.Start(_appFolderInfo.GetUpdateClientExePath(updatePackage.Runtime), GetUpdaterArgs(updateSandboxFolder));
+            _processProvider.Start(updateClientExePath, GetUpdaterArgs(updateSandboxFolder));
 
             return true;
         }
@@ -217,7 +231,7 @@ namespace NzbDrone.Core.Update
             }
         }
 
-        private UpdatePackage GetUpdatePackage(CommandTrigger updateTrigger)
+        private UpdatePackage GetUpdatePackage(CommandTrigger updateTrigger, bool installMajorUpdate)
         {
             _logger.ProgressDebug("Checking for updates");
 
@@ -229,15 +243,21 @@ namespace NzbDrone.Core.Update
                 return null;
             }
 
-            if (_osInfo.IsDocker)
+            if (latestAvailable.Version.Major > BuildInfo.Version.Major && !installMajorUpdate)
             {
-                _logger.ProgressDebug("Updating is disabled inside a docker container.  Please update the container image.");
+                _logger.ProgressInfo("Unable to install major update, please update update manually from System: Updates");
                 return null;
             }
 
-            if (OsInfo.IsNotWindows && !_configFileProvider.UpdateAutomatically && updateTrigger != CommandTrigger.Manual)
+            if (!_configFileProvider.UpdateAutomatically && updateTrigger != CommandTrigger.Manual)
             {
                 _logger.ProgressDebug("Auto-update not enabled, not installing available update.");
+                return null;
+            }
+
+            if (_configFileProvider.UpdateMechanism == UpdateMechanism.BuiltIn && _deploymentInfoProvider.PackageUpdateMechanism == UpdateMechanism.Docker)
+            {
+                _logger.ProgressDebug("Built-In updater disabled inside a docker container. Please update the container image.");
                 return null;
             }
 
@@ -258,7 +278,7 @@ namespace NzbDrone.Core.Update
 
         public void Execute(ApplicationCheckUpdateCommand message)
         {
-            if (GetUpdatePackage(message.Trigger) != null)
+            if (GetUpdatePackage(message.Trigger, true) != null)
             {
                 _commandQueueManager.Push(new ApplicationUpdateCommand(), trigger: message.Trigger);
             }
@@ -266,7 +286,7 @@ namespace NzbDrone.Core.Update
 
         public void Execute(ApplicationUpdateCommand message)
         {
-            var latestAvailable = GetUpdatePackage(message.Trigger);
+            var latestAvailable = GetUpdatePackage(message.Trigger, message.InstallMajorUpdate);
 
             if (latestAvailable != null)
             {
@@ -298,14 +318,6 @@ namespace NzbDrone.Core.Update
             // Check if we have to do an application update on startup
             try
             {
-                // Don't do a prestartup update check unless BuiltIn update is enabled
-                if (_configFileProvider.UpdateAutomatically ||
-                    _configFileProvider.UpdateMechanism != UpdateMechanism.BuiltIn ||
-                    _deploymentInfoProvider.IsExternalUpdateMechanism)
-                {
-                    return;
-                }
-
                 var updateMarker = Path.Combine(_appFolderInfo.AppDataFolder, "update_required");
                 if (!_diskProvider.FileExists(updateMarker))
                 {
@@ -313,6 +325,15 @@ namespace NzbDrone.Core.Update
                 }
 
                 _logger.Debug("Post-install update check requested");
+
+                // Don't do a prestartup update check unless BuiltIn update is enabled
+                if (!_configFileProvider.UpdateAutomatically ||
+                    _configFileProvider.UpdateMechanism != UpdateMechanism.BuiltIn ||
+                    _deploymentInfoProvider.IsExternalUpdateMechanism)
+                {
+                    _logger.Debug("Built-in updater disabled, skipping post-install update check");
+                    return;
+                }
 
                 var latestAvailable = _checkUpdateService.AvailableUpdate();
                 if (latestAvailable == null)

@@ -1,10 +1,12 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import Alert from 'Components/Alert';
 import FieldSet from 'Components/FieldSet';
 import Icon from 'Components/Icon';
 import Link from 'Components/Link/Link';
+import InlineMarkdown from 'Components/Markdown/InlineMarkdown';
 import PageSectionContent from 'Components/Page/PageSectionContent';
-import { icons } from 'Helpers/Props';
+import { icons, kinds } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import EditRemotePathMappingModalConnector from './EditRemotePathMappingModalConnector';
 import RemotePathMapping from './RemotePathMapping';
@@ -28,11 +30,11 @@ class RemotePathMappings extends Component {
 
   onAddRemotePathMappingPress = () => {
     this.setState({ isAddRemotePathMappingModalOpen: true });
-  }
+  };
 
   onModalClose = () => {
     this.setState({ isAddRemotePathMappingModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -47,13 +49,24 @@ class RemotePathMappings extends Component {
     return (
       <FieldSet legend={translate('RemotePathMappings')}>
         <PageSectionContent
-          errorMessage={translate('UnableToLoadRemotePathMappings')}
+          errorMessage={translate('RemotePathMappingsLoadError')}
           {...otherProps}
         >
+
+          <Alert kind={kinds.INFO}>
+            <InlineMarkdown data={translate('RemotePathMappingsInfo', { wikiLink: 'https://wiki.servarr.com/radarr/settings#remote-path-mappings' })} />
+          </Alert>
+
           <div className={styles.remotePathMappingsHeader}>
-            <div className={styles.host}>Host</div>
-            <div className={styles.path}>Remote Path</div>
-            <div className={styles.path}>Local Path</div>
+            <div className={styles.host}>
+              {translate('Host')}
+            </div>
+            <div className={styles.path}>
+              {translate('RemotePath')}
+            </div>
+            <div className={styles.path}>
+              {translate('LocalPath')}
+            </div>
           </div>
 
           <div>

@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import Alert from 'Components/Alert';
 import Form from 'Components/Form/Form';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
 import ConfirmModal from 'Components/Modal/ConfirmModal';
@@ -21,13 +22,11 @@ const requiresRestartKeys = [
   'bindAddress',
   'port',
   'urlBase',
+  'instanceName',
   'enableSsl',
   'sslPort',
   'sslCertPath',
-  'sslCertPassword',
-  'authenticationMethod',
-  'username',
-  'password'
+  'sslCertPassword'
 ];
 
 class GeneralSettings extends Component {
@@ -85,11 +84,11 @@ class GeneralSettings extends Component {
   onConfirmRestart = () => {
     this.setState({ isRestartRequiredModalOpen: false });
     this.props.onConfirmRestart();
-  }
+  };
 
   onCloseRestartRequiredModalOpen = () => {
     this.setState({ isRestartRequiredModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -126,9 +125,9 @@ class GeneralSettings extends Component {
 
           {
             !isFetching && error &&
-              <div>
-                {translate('UnableToLoadGeneralSettings')}
-              </div>
+              <Alert kind={kinds.DANGER}>
+                {translate('GeneralSettingsLoadError')}
+              </Alert>
           }
 
           {
@@ -158,6 +157,7 @@ class GeneralSettings extends Component {
                 />
 
                 <LoggingSettings
+                  advancedSettings={advancedSettings}
                   settings={settings}
                   onInputChange={onInputChange}
                 />
@@ -188,10 +188,8 @@ class GeneralSettings extends Component {
           isOpen={this.state.isRestartRequiredModalOpen}
           kind={kinds.DANGER}
           title={translate('RestartRadarr')}
-          message={
-            `Radarr requires a restart to apply changes, do you want to restart now? ${isWindowsService ? 'Depending which user is running the Radarr service you may need to restart Radarr as admin once before the service will start automatically.' : ''}`
-          }
-          cancelLabel={translate('IllRestartLater')}
+          message={`${translate('RestartRequiredToApplyChanges')} ${isWindowsService ? translate('RestartRequiredWindowsService') : ''}`}
+          cancelLabel={translate('RestartLater')}
           confirmLabel={translate('RestartNow')}
           onConfirm={this.onConfirmRestart}
           onCancel={this.onCloseRestartRequiredModalOpen}

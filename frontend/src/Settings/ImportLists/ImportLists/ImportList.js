@@ -3,7 +3,9 @@ import React, { Component } from 'react';
 import Card from 'Components/Card';
 import Label from 'Components/Label';
 import ConfirmModal from 'Components/Modal/ConfirmModal';
+import TagList from 'Components/TagList';
 import { kinds } from 'Helpers/Props';
+import formatShortTimeSpan from 'Utilities/Date/formatShortTimeSpan';
 import translate from 'Utilities/String/translate';
 import EditImportListModalConnector from './EditImportListModalConnector';
 import styles from './ImportList.css';
@@ -27,26 +29,26 @@ class ImportList extends Component {
 
   onEditImportListPress = () => {
     this.setState({ isEditImportListModalOpen: true });
-  }
+  };
 
   onEditImportListModalClose = () => {
     this.setState({ isEditImportListModalOpen: false });
-  }
+  };
 
   onDeleteImportListPress = () => {
     this.setState({
       isEditImportListModalOpen: false,
       isDeleteImportListModalOpen: true
     });
-  }
+  };
 
-  onDeleteImportListModalClose= () => {
+  onDeleteImportListModalClose = () => {
     this.setState({ isDeleteImportListModalOpen: false });
-  }
+  };
 
   onConfirmDeleteImportList = () => {
     this.props.onConfirmDeleteImportList(this.props.id);
-  }
+  };
 
   //
   // Render
@@ -56,12 +58,15 @@ class ImportList extends Component {
       id,
       name,
       enabled,
-      enableAuto
+      enableAuto,
+      tags,
+      tagList,
+      minRefreshInterval
     } = this.props;
 
     return (
       <Card
-        className={styles.importList}
+        className={styles.list}
         overlayContent={true}
         onPress={this.onEditImportListPress}
       >
@@ -70,23 +75,11 @@ class ImportList extends Component {
         </div>
 
         <div className={styles.enabled}>
-
           {
-            enabled &&
+            enabled ?
               <Label kind={kinds.SUCCESS}>
                 {translate('Enabled')}
-              </Label>
-          }
-
-          {
-            enableAuto &&
-              <Label kind={kinds.SUCCESS}>
-                {translate('Auto')}
-              </Label>
-          }
-
-          {
-            !enabled && !enableAuto &&
+              </Label> :
               <Label
                 kind={kinds.DISABLED}
                 outline={true}
@@ -94,6 +87,25 @@ class ImportList extends Component {
                 {translate('Disabled')}
               </Label>
           }
+
+          {
+            enableAuto ?
+              <Label kind={kinds.SUCCESS}>
+                {translate('AutomaticAdd')}
+              </Label> :
+              null
+          }
+        </div>
+
+        <TagList
+          tags={tags}
+          tagList={tagList}
+        />
+
+        <div className={styles.enabled}>
+          <Label kind={kinds.DEFAULT} title='List Refresh Interval'>
+            {`${translate('Refresh')}: ${formatShortTimeSpan(minRefreshInterval)}`}
+          </Label>
         </div>
 
         <EditImportListModalConnector
@@ -106,8 +118,8 @@ class ImportList extends Component {
         <ConfirmModal
           isOpen={this.state.isDeleteImportListModalOpen}
           kind={kinds.DANGER}
-          title={translate('DeleteList')}
-          message={translate('DeleteListMessageText', [name])}
+          title={translate('DeleteImportList')}
+          message={translate('DeleteImportListMessageText', { name })}
           confirmLabel={translate('Delete')}
           onConfirm={this.onConfirmDeleteImportList}
           onCancel={this.onDeleteImportListModalClose}
@@ -122,6 +134,9 @@ ImportList.propTypes = {
   name: PropTypes.string.isRequired,
   enabled: PropTypes.bool.isRequired,
   enableAuto: PropTypes.bool.isRequired,
+  tags: PropTypes.arrayOf(PropTypes.number).isRequired,
+  tagList: PropTypes.arrayOf(PropTypes.object).isRequired,
+  minRefreshInterval: PropTypes.string.isRequired,
   onConfirmDeleteImportList: PropTypes.func.isRequired
 };
 

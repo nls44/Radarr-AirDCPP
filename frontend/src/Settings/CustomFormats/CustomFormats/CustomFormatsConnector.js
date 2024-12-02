@@ -4,12 +4,12 @@ import { connect } from 'react-redux';
 import { createSelector } from 'reselect';
 import { cloneCustomFormat, deleteCustomFormat, fetchCustomFormats } from 'Store/Actions/settingsActions';
 import createSortedSectionSelector from 'Store/Selectors/createSortedSectionSelector';
-import sortByName from 'Utilities/Array/sortByName';
+import sortByProp from 'Utilities/Array/sortByProp';
 import CustomFormats from './CustomFormats';
 
 function createMapStateToProps() {
   return createSelector(
-    createSortedSectionSelector('settings.customFormats', sortByName),
+    createSortedSectionSelector('settings.customFormats', sortByProp('name')),
     (customFormats) => customFormats
   );
 }
@@ -34,11 +34,11 @@ class CustomFormatsConnector extends Component {
 
   onConfirmDeleteCustomFormat = (id) => {
     this.props.dispatchDeleteCustomFormat({ id });
-  }
+  };
 
   onCloneCustomFormatPress = (id) => {
     this.props.dispatchCloneCustomFormat({ id });
-  }
+  };
 
   //
   // Render

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,26 +18,6 @@ namespace NzbDrone.Core
             }
 
             return actual;
-        }
-
-        public static long Megabytes(this int megabytes)
-        {
-            return Convert.ToInt64(megabytes * 1024L * 1024L);
-        }
-
-        public static long Gigabytes(this int gigabytes)
-        {
-            return Convert.ToInt64(gigabytes * 1024L * 1024L * 1024L);
-        }
-
-        public static long Megabytes(this double megabytes)
-        {
-            return Convert.ToInt64(megabytes * 1024L * 1024L);
-        }
-
-        public static long Gigabytes(this double gigabytes)
-        {
-            return Convert.ToInt64(gigabytes * 1024L * 1024L * 1024L);
         }
 
         public static long Round(this long number, long level)
@@ -95,17 +75,17 @@ namespace NzbDrone.Core
             }
 
             var cs = s.ToCharArray();
-            int length = 0;
-            int i = 0;
+            var length = 0;
+            var i = 0;
             while (i < cs.Length)
             {
-                int charSize = 1;
+                var charSize = 1;
                 if (i < (cs.Length - 1) && char.IsSurrogate(cs[i]))
                 {
                     charSize = 2;
                 }
 
-                int byteSize = Encoding.UTF8.GetByteCount(cs, i, charSize);
+                var byteSize = Encoding.UTF8.GetByteCount(cs, i, charSize);
                 if ((byteSize + length) <= maxLength)
                 {
                     i = i + charSize;

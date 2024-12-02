@@ -22,7 +22,7 @@ function getUrls(state) {
     tags
   } = state;
 
-  let icalUrl = `${window.location.host}${window.Radarr.urlBase}/feed/calendar/Radarr.ics?`;
+  let icalUrl = `${window.location.host}${window.Radarr.urlBase}/feed/v3/calendar/Radarr.ics?`;
 
   if (unmonitored) {
     icalUrl += 'unmonitored=true&';
@@ -36,7 +36,7 @@ function getUrls(state) {
     icalUrl += `tags=${tags.toString()}&`;
   }
 
-  icalUrl += `apikey=${window.Radarr.apiKey}`;
+  icalUrl += `apikey=${encodeURIComponent(window.Radarr.apiKey)}`;
 
   const iCalHttpUrl = `${window.location.protocol}//${icalUrl}`;
   const iCalWebCalUrl = `webcal://${icalUrl}`;
@@ -84,11 +84,11 @@ class CalendarLinkModalContent extends Component {
       [name]: value,
       ...urls
     });
-  }
+  };
 
   onLinkFocus = (event) => {
     event.target.select();
-  }
+  };
 
   //
   // Render
@@ -109,7 +109,7 @@ class CalendarLinkModalContent extends Component {
     return (
       <ModalContent onModalClose={onModalClose}>
         <ModalHeader>
-          {translate('RadarrCalendarFeed')}
+          {translate('CalendarFeed')}
         </ModalHeader>
 
         <ModalBody>
@@ -121,19 +121,19 @@ class CalendarLinkModalContent extends Component {
                 type={inputTypes.CHECK}
                 name="unmonitored"
                 value={unmonitored}
-                helpText={translate('UnmonitoredHelpText')}
+                helpText={translate('ICalIncludeUnmonitoredMoviesHelpText')}
                 onChange={this.onInputChange}
               />
             </FormGroup>
 
             <FormGroup>
-              <FormLabel>{translate('ShowAsAllDayEvents')}</FormLabel>
+              <FormLabel>{translate('ICalShowAsAllDayEvents')}</FormLabel>
 
               <FormInputGroup
                 type={inputTypes.CHECK}
                 name="asAllDay"
                 value={asAllDay}
-                helpText={translate('AsAllDayHelpText')}
+                helpText={translate('ICalShowAsAllDayEventsHelpText')}
                 onChange={this.onInputChange}
               />
             </FormGroup>
@@ -145,7 +145,7 @@ class CalendarLinkModalContent extends Component {
                 type={inputTypes.TAG}
                 name="tags"
                 value={tags}
-                helpText={translate('TagsHelpText')}
+                helpText={translate('ICalTagsMoviesHelpText')}
                 onChange={this.onInputChange}
               />
             </FormGroup>
@@ -160,7 +160,7 @@ class CalendarLinkModalContent extends Component {
                 name="iCalHttpUrl"
                 value={iCalHttpUrl}
                 readOnly={true}
-                helpText={translate('ICalHttpUrlHelpText')}
+                helpText={translate('ICalFeedHelpText')}
                 buttons={[
                   <ClipboardButton
                     key="copy"

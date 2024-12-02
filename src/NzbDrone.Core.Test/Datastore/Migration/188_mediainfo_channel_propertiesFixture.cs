@@ -67,23 +67,23 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                 AddMovieFile(c, 1);
             });
 
-            var items = db.Query<MovieFile188>("SELECT MediaInfo FROM MovieFiles");
+            var items = db.Query<MovieFile188>("SELECT \"MediaInfo\" FROM \"MovieFiles\"");
 
             items.Should().HaveCount(1);
 
             var mediainfo = items.First().MediaInfo;
 
-            //Removed props should be null
+            // Removed props should be null
             mediainfo.AudioChannels.Should().BeNull();
             mediainfo.AudioChannelPositionsText.Should().BeNull();
 
-            //Renamed should have original value
+            // Renamed should have original value
             mediainfo.AudioChannelsContainer.Should().NotBeNull();
             mediainfo.AudioChannelPositionsTextContainer.Should().NotBeNull();
             mediainfo.AudioChannelsContainer.Should().Be(6);
             mediainfo.AudioChannelPositionsTextContainer.Should().Be("Front: L C R, Side: L R, LFE");
 
-            //Should not touch other props
+            // Should not touch other props
             mediainfo.AudioChannelPositions.Should().Be("3/2/0.1");
         }
 

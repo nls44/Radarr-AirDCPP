@@ -4,10 +4,11 @@ import Icon from 'Components/Icon';
 import IconButton from 'Components/Link/IconButton';
 import Link from 'Components/Link/Link';
 import ConfirmModal from 'Components/Modal/ConfirmModal';
-import RelativeDateCellConnector from 'Components/Table/Cells/RelativeDateCellConnector';
+import RelativeDateCell from 'Components/Table/Cells/RelativeDateCell';
 import TableRowCell from 'Components/Table/Cells/TableRowCell';
 import TableRow from 'Components/Table/TableRow';
 import { icons, kinds } from 'Helpers/Props';
+import formatBytes from 'Utilities/Number/formatBytes';
 import translate from 'Utilities/String/translate';
 import RestoreBackupModalConnector from './RestoreBackupModalConnector';
 import styles from './BackupRow.css';
@@ -31,19 +32,19 @@ class BackupRow extends Component {
 
   onRestorePress = () => {
     this.setState({ isRestoreModalOpen: true });
-  }
+  };
 
   onRestoreModalClose = () => {
     this.setState({ isRestoreModalOpen: false });
-  }
+  };
 
   onDeletePress = () => {
     this.setState({ isConfirmDeleteModalOpen: true });
-  }
+  };
 
   onConfirmDeleteModalClose = () => {
     this.setState({ isConfirmDeleteModalOpen: false });
-  }
+  };
 
   onConfirmDeletePress = () => {
     const {
@@ -54,7 +55,7 @@ class BackupRow extends Component {
     this.setState({ isConfirmDeleteModalOpen: false }, () => {
       onDeleteBackupPress(id);
     });
-  }
+  };
 
   //
   // Render
@@ -65,6 +66,7 @@ class BackupRow extends Component {
       type,
       name,
       path,
+      size,
       time
     } = this.props;
 
@@ -104,12 +106,17 @@ class BackupRow extends Component {
           </Link>
         </TableRowCell>
 
-        <RelativeDateCellConnector
+        <TableRowCell>
+          {formatBytes(size)}
+        </TableRowCell>
+
+        <RelativeDateCell
           date={time}
         />
 
         <TableRowCell className={styles.actions}>
           <IconButton
+            title={translate('RestoreBackup')}
             name={icons.RESTORE}
             onPress={this.onRestorePress}
           />
@@ -132,7 +139,9 @@ class BackupRow extends Component {
           isOpen={isConfirmDeleteModalOpen}
           kind={kinds.DANGER}
           title={translate('DeleteBackup')}
-          message={translate('DeleteBackupMessageText', [name])}
+          message={translate('DeleteBackupMessageText', {
+            name
+          })}
           confirmLabel={translate('Delete')}
           onConfirm={this.onConfirmDeletePress}
           onCancel={this.onConfirmDeleteModalClose}
@@ -147,6 +156,7 @@ BackupRow.propTypes = {
   type: PropTypes.string.isRequired,
   name: PropTypes.string.isRequired,
   path: PropTypes.string.isRequired,
+  size: PropTypes.number.isRequired,
   time: PropTypes.string.isRequired,
   onDeleteBackupPress: PropTypes.func.isRequired
 };

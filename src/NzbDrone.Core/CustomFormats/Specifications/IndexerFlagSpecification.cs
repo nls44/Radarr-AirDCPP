@@ -1,22 +1,44 @@
-using System.Collections.Generic;
-using NzbDrone.Common.Extensions;
+using System;
+using FluentValidation;
 using NzbDrone.Core.Annotations;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Validation;
 
 namespace NzbDrone.Core.CustomFormats
 {
+    public class IndexerFlagSpecificationValidator : AbstractValidator<IndexerFlagSpecification>
+    {
+        public IndexerFlagSpecificationValidator()
+        {
+            RuleFor(c => c.Value).NotEmpty();
+            RuleFor(c => c.Value).Custom((qualityValue, context) =>
+            {
+                if (!Enum.IsDefined(typeof(IndexerFlags), qualityValue))
+                {
+                    context.AddFailure($"Invalid indexer flag condition value: {qualityValue}");
+                }
+            });
+        }
+    }
+
     public class IndexerFlagSpecification : CustomFormatSpecificationBase
     {
+        private static readonly IndexerFlagSpecificationValidator Validator = new ();
+
         public override int Order => 4;
         public override string ImplementationName => "Indexer Flag";
 
-        [FieldDefinition(1, Label = "Flag", Type = FieldType.Select, SelectOptions = typeof(IndexerFlags))]
+        [FieldDefinition(1, Label = "CustomFormatsSpecificationFlag", Type = FieldType.Select, SelectOptions = typeof(IndexerFlags))]
         public int Value { get; set; }
 
-        protected override bool IsSatisfiedByWithoutNegate(ParsedMovieInfo movieInfo)
+        protected override bool IsSatisfiedByWithoutNegate(CustomFormatInput input)
         {
-            var flags = movieInfo?.ExtraInfo?.GetValueOrDefault("IndexerFlags") as IndexerFlags?;
-            return flags?.HasFlag((IndexerFlags)Value) == true;
+            return input.IndexerFlags.HasFlag((IndexerFlags)Value);
+        }
+
+        public override NzbDroneValidationResult Validate()
+        {
+            return new NzbDroneValidationResult(Validator.Validate(this));
         }
     }
 }

@@ -19,53 +19,62 @@ namespace NzbDrone.Core.ImportLists
         private readonly IMovieService _movieService;
         private readonly IAddMovieService _addMovieService;
         private readonly IConfigService _configService;
-        private readonly IImportExclusionsService _exclusionService;
+        private readonly IImportListExclusionService _listExclusionService;
+        private readonly IImportListMovieService _listMovieService;
 
         public ImportListSyncService(IImportListFactory importListFactory,
                                       IFetchAndParseImportList listFetcherAndParser,
                                       IMovieService movieService,
                                       IAddMovieService addMovieService,
                                       IConfigService configService,
-                                      IImportExclusionsService exclusionService,
+                                      IImportListExclusionService listExclusionService,
+                                      IImportListMovieService listMovieService,
                                       Logger logger)
         {
             _importListFactory = importListFactory;
             _listFetcherAndParser = listFetcherAndParser;
             _movieService = movieService;
             _addMovieService = addMovieService;
-            _exclusionService = exclusionService;
+            _listExclusionService = listExclusionService;
+            _listMovieService = listMovieService;
             _logger = logger;
             _configService = configService;
         }
 
-        private void SyncList(ImportListDefinition definition)
-        {
-            _logger.ProgressInfo(string.Format("Starting Import List Refresh for List {0}", definition.Name));
-
-            var result = _listFetcherAndParser.FetchSingleList(definition);
-
-            ProcessReports(result);
-        }
-
         private void SyncAll()
         {
-            var result = _listFetcherAndParser.Fetch();
-
-            if (_importListFactory.Enabled().Where(a => ((ImportListDefinition)a.Definition).EnableAuto).Empty())
+            if (_importListFactory.Enabled().Empty())
             {
-                _logger.Info("No auto enabled lists, skipping sync and cleaning");
+                _logger.Debug("No enabled import lists, skipping sync and cleaning");
+
                 return;
             }
 
-            if (!result.AnyFailure)
+            var listItemsResult = _listFetcherAndParser.Fetch();
+
+            if (listItemsResult.SyncedLists == 0)
             {
-                CleanLibrary(result.Movies.ToList());
+                return;
             }
 
-            ProcessReports(result);
+            if (!listItemsResult.AnyFailure)
+            {
+                CleanLibrary();
+            }
+
+            ProcessListItems(listItemsResult);
         }
 
-        private void ProcessMovieReport(ImportListDefinition importList, ImportListMovie report, List<ImportExclusion> listExclusions, List<int> dbMovies, List<Movie> moviesToAdd)
+        private void SyncList(ImportListDefinition definition)
+        {
+            _logger.ProgressInfo("Starting Import List Refresh for List {0}", definition.Name);
+
+            var listItemsResult = _listFetcherAndParser.FetchSingleList(definition);
+
+            ProcessListItems(listItemsResult);
+        }
+
+        private void ProcessMovieReport(ImportListDefinition importList, ImportListMovie report, List<ImportListExclusion> listExclusions, List<int> dbMovies, List<Movie> moviesToAdd)
         {
             if (report.TmdbId == 0 || !importList.EnableAuto)
             {
@@ -80,24 +89,24 @@ namespace NzbDrone.Core.ImportLists
             }
 
             // Check to see if movie excluded
-            var excludedMovie = listExclusions.Where(s => s.TmdbId == report.TmdbId).SingleOrDefault();
+            var excludedMovie = listExclusions.SingleOrDefault(s => s.TmdbId == report.TmdbId);
 
             if (excludedMovie != null)
             {
-                _logger.Debug("{0} [{1}] Rejected due to list exlcusion", report.TmdbId, report.Title);
+                _logger.Debug("{0} [{1}] Rejected due to list exclusion", report.TmdbId, report.Title);
                 return;
             }
 
             // Append Artist if not already in DB or already on add list
             if (moviesToAdd.All(s => s.TmdbId != report.TmdbId))
             {
-                var monitored = importList.ShouldMonitor;
+                var monitorType = importList.Monitor;
 
                 moviesToAdd.Add(new Movie
                 {
-                    Monitored = monitored,
+                    Monitored = monitorType != MonitorTypes.None,
                     RootFolderPath = importList.RootFolderPath,
-                    ProfileId = importList.ProfileId,
+                    QualityProfileId = importList.QualityProfileId,
                     MinimumAvailability = importList.MinimumAvailability,
                     Tags = importList.Tags,
                     TmdbId = report.TmdbId,
@@ -106,13 +115,15 @@ namespace NzbDrone.Core.ImportLists
                     ImdbId = report.ImdbId,
                     AddOptions = new AddMovieOptions
                     {
-                        SearchForMovie = monitored && importList.SearchOnAdd,
+                        SearchForMovie = monitorType != MonitorTypes.None && importList.SearchOnAdd,
+                        Monitor = monitorType,
+                        AddMethod = AddMovieMethod.List
                     }
                 });
             }
         }
 
-        private void ProcessReports(ImportListFetchResult listFetchResult)
+        private void ProcessListItems(ImportListFetchResult listFetchResult)
         {
             listFetchResult.Movies = listFetchResult.Movies.DistinctBy(x =>
             {
@@ -131,7 +142,7 @@ namespace NzbDrone.Core.ImportLists
 
             var listedMovies = listFetchResult.Movies.ToList();
 
-            var importExclusions = _exclusionService.GetAllExclusions();
+            var importExclusions = _listExclusionService.All();
             var dbMovies = _movieService.AllMovieTmdbIds();
             var moviesToAdd = new List<Movie>();
 
@@ -152,10 +163,9 @@ namespace NzbDrone.Core.ImportLists
 
             if (moviesToAdd.Any())
             {
-                _logger.Info($"Adding {moviesToAdd.Count} movies from your auto enabled lists to library");
+                _logger.ProgressInfo("Adding {0} movies from your auto enabled lists to library", moviesToAdd.Count);
+                _addMovieService.AddMovies(moviesToAdd, true);
             }
-
-            _addMovieService.AddMovies(moviesToAdd, true);
         }
 
         public void Execute(ImportListSyncCommand message)
@@ -170,17 +180,20 @@ namespace NzbDrone.Core.ImportLists
             }
         }
 
-        private void CleanLibrary(List<ImportListMovie> listMovies)
+        private void CleanLibrary()
         {
-            var moviesToUpdate = new List<Movie>();
-
             if (_configService.ListSyncLevel == "disabled")
             {
                 return;
             }
 
+            var listMovies = _listMovieService.GetAllListMovies();
+
             // TODO use AllMovieTmdbIds here?
             var moviesInLibrary = _movieService.GetAllMovies();
+
+            var moviesToUpdate = new List<Movie>();
+
             foreach (var movie in moviesInLibrary)
             {
                 var movieExists = listMovies.Any(c => c.TmdbId == movie.TmdbId || c.ImdbId == movie.ImdbId);
@@ -204,8 +217,6 @@ namespace NzbDrone.Core.ImportLists
                         case "removeAndDelete":
                             _logger.Info("{0} was in your library, but not found in your lists --> Removing from library and deleting files", movie);
                             _movieService.DeleteMovie(movie.Id, true);
-                            break;
-                        default:
                             break;
                     }
                 }

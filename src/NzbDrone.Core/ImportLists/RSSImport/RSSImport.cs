@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NLog;
 using NzbDrone.Common.Http;
@@ -12,6 +13,7 @@ namespace NzbDrone.Core.ImportLists.RSSImport
         public override string Name => "RSS List";
 
         public override ImportListType ListType => ImportListType.Advanced;
+        public override TimeSpan MinRefreshInterval => TimeSpan.FromHours(12);
         public override bool Enabled => true;
         public override bool EnableAuto => false;
 
@@ -34,8 +36,9 @@ namespace NzbDrone.Core.ImportLists.RSSImport
                     Name = "IMDb List",
                     Enabled = Enabled,
                     EnableAuto = true,
-                    ProfileId = 1,
+                    QualityProfileId = 1,
                     Implementation = GetType().Name,
+                    MinRefreshInterval = MinRefreshInterval,
                     Settings = new RSSImportSettings { Link = "https://rss.imdb.com/list/YOURLISTID" },
                 };
                 yield return new ImportListDefinition
@@ -43,8 +46,9 @@ namespace NzbDrone.Core.ImportLists.RSSImport
                     Name = "IMDb Watchlist",
                     Enabled = Enabled,
                     EnableAuto = true,
-                    ProfileId = 1,
+                    QualityProfileId = 1,
                     Implementation = GetType().Name,
+                    MinRefreshInterval = MinRefreshInterval,
                     Settings = new RSSImportSettings { Link = "https://rss.imdb.com/user/IMDBUSERID/watchlist" },
                 };
             }

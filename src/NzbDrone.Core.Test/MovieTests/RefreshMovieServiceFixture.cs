@@ -1,15 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using FizzWare.NBuilder;
 using Moq;
 using NUnit.Framework;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.AutoTagging;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Movies.Collections;
 using NzbDrone.Core.Movies.Commands;
 using NzbDrone.Core.Movies.Credits;
+using NzbDrone.Core.RootFolders;
 using NzbDrone.Core.Test.Framework;
 using NzbDrone.Test.Common;
 
@@ -18,29 +20,54 @@ namespace NzbDrone.Core.Test.MovieTests
     [TestFixture]
     public class RefreshMovieServiceFixture : CoreTest<RefreshMovieService>
     {
-        private Movie _movie;
+        private MovieMetadata _movie;
+        private MovieCollection _movieCollection;
+        private Movie _existingMovie;
 
         [SetUp]
         public void Setup()
         {
-            _movie = Builder<Movie>.CreateNew()
+            _movie = Builder<MovieMetadata>.CreateNew()
                 .With(s => s.Status = MovieStatusType.Released)
+                .Build();
+
+            _movieCollection = Builder<MovieCollection>.CreateNew()
+                .Build();
+
+            _existingMovie = Builder<Movie>.CreateNew()
+                .With(s => s.MovieMetadata.Value.Status = MovieStatusType.Released)
                 .Build();
 
             Mocker.GetMock<IMovieService>()
                   .Setup(s => s.GetMovie(_movie.Id))
+                  .Returns(_existingMovie);
+
+            Mocker.GetMock<IMovieMetadataService>()
+                  .Setup(s => s.Get(_movie.Id))
                   .Returns(_movie);
+
+            Mocker.GetMock<IAddMovieCollectionService>()
+                  .Setup(v => v.AddMovieCollection(It.IsAny<MovieCollection>()))
+                  .Returns(_movieCollection);
 
             Mocker.GetMock<IProvideMovieInfo>()
                   .Setup(s => s.GetMovieInfo(It.IsAny<int>()))
                   .Callback<int>((i) => { throw new MovieNotFoundException(i); });
+
+            Mocker.GetMock<IRootFolderService>()
+                  .Setup(s => s.GetBestRootFolderPath(It.IsAny<string>(), null))
+                  .Returns(string.Empty);
+
+            Mocker.GetMock<IAutoTaggingService>()
+                .Setup(s => s.GetTagChanges(_existingMovie))
+                .Returns(new AutoTaggingChanges());
         }
 
-        private void GivenNewMovieInfo(Movie movie)
+        private void GivenNewMovieInfo(MovieMetadata movie)
         {
             Mocker.GetMock<IProvideMovieInfo>()
                   .Setup(s => s.GetMovieInfo(_movie.TmdbId))
-                  .Returns(new Tuple<Movie, List<Credit>>(movie, new List<Credit>()));
+                  .Returns(new Tuple<MovieMetadata, List<Credit>>(movie, new List<Credit>()));
         }
 
         [Test]
@@ -53,8 +80,8 @@ namespace NzbDrone.Core.Test.MovieTests
 
             Subject.Execute(new RefreshMovieCommand(new List<int> { _movie.Id }));
 
-            Mocker.GetMock<IMovieService>()
-                .Verify(v => v.UpdateMovie(It.Is<List<Movie>>(s => s.First().ImdbId == newMovieInfo.ImdbId), true));
+            Mocker.GetMock<IMovieMetadataService>()
+                .Verify(v => v.Upsert(It.Is<MovieMetadata>(s => s.ImdbId == newMovieInfo.ImdbId)));
         }
 
         [Test]
@@ -62,8 +89,8 @@ namespace NzbDrone.Core.Test.MovieTests
         {
             Subject.Execute(new RefreshMovieCommand(new List<int> { _movie.Id }));
 
-            Mocker.GetMock<IMovieService>()
-                .Verify(v => v.UpdateMovie(It.Is<Movie>(s => s.Status == MovieStatusType.Deleted)), Times.Once());
+            Mocker.GetMock<IMovieMetadataService>()
+                .Verify(v => v.Upsert(It.Is<MovieMetadata>(s => s.Status == MovieStatusType.Deleted)), Times.Once());
 
             ExceptionVerification.ExpectedErrors(1);
         }
@@ -78,8 +105,8 @@ namespace NzbDrone.Core.Test.MovieTests
 
             Subject.Execute(new RefreshMovieCommand(new List<int> { _movie.Id }));
 
-            Mocker.GetMock<IMovieService>()
-                .Verify(v => v.UpdateMovie(It.Is<List<Movie>>(s => s.First().TmdbId == newMovieInfo.TmdbId), true));
+            Mocker.GetMock<IMovieMetadataService>()
+                .Verify(v => v.Upsert(It.Is<MovieMetadata>(s => s.TmdbId == newMovieInfo.TmdbId)));
 
             ExceptionVerification.ExpectedWarns(1);
         }
@@ -89,8 +116,8 @@ namespace NzbDrone.Core.Test.MovieTests
         {
             Subject.Execute(new RefreshMovieCommand(new List<int> { _movie.Id }));
 
-            Mocker.GetMock<IMovieService>()
-                .Verify(v => v.UpdateMovie(It.Is<Movie>(s => s.Status == MovieStatusType.Deleted)), Times.Once());
+            Mocker.GetMock<IMovieMetadataService>()
+                .Verify(v => v.Upsert(It.Is<MovieMetadata>(s => s.Status == MovieStatusType.Deleted)), Times.Once());
 
             ExceptionVerification.ExpectedErrors(1);
         }
@@ -102,8 +129,8 @@ namespace NzbDrone.Core.Test.MovieTests
 
             Subject.Execute(new RefreshMovieCommand(new List<int> { _movie.Id }));
 
-            Mocker.GetMock<IMovieService>()
-                .Verify(v => v.UpdateMovie(It.IsAny<Movie>()), Times.Never());
+            Mocker.GetMock<IMovieMetadataService>()
+                .Verify(v => v.Upsert(It.IsAny<MovieMetadata>()), Times.Never());
 
             ExceptionVerification.ExpectedErrors(1);
         }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Cache;
@@ -18,13 +19,17 @@ namespace NzbDrone.Core.Localization
     public interface ILocalizationService
     {
         Dictionary<string, string> GetLocalizationDictionary();
+
         string GetLocalizedString(string phrase);
-        string GetLocalizedString(string phrase, string language);
+        string GetLocalizedString(string phrase, Dictionary<string, object> tokens);
+        string GetLanguageIdentifier();
     }
 
     public class LocalizationService : ILocalizationService, IHandleAsync<ConfigSavedEvent>
     {
         private const string DefaultCulture = "en";
+        private static readonly Regex TokenRegex = new Regex(@"(?:\{)(?<token>[a-z0-9]+)(?:\})",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         private readonly ICached<Dictionary<string, string>> _cache;
 
@@ -45,28 +50,23 @@ namespace NzbDrone.Core.Localization
 
         public Dictionary<string, string> GetLocalizationDictionary()
         {
-            var language = GetSetLanguageFileName();
+            var language = GetLanguageFileName();
 
             return GetLocalizationDictionary(language);
         }
 
         public string GetLocalizedString(string phrase)
         {
-            var language = GetSetLanguageFileName();
-
-            return GetLocalizedString(phrase, language);
+            return GetLocalizedString(phrase, new Dictionary<string, object>());
         }
 
-        public string GetLocalizedString(string phrase, string language)
+        public string GetLocalizedString(string phrase, Dictionary<string, object> tokens)
         {
+            var language = GetLanguageFileName();
+
             if (string.IsNullOrEmpty(phrase))
             {
                 throw new ArgumentNullException(nameof(phrase));
-            }
-
-            if (language.IsNullOrWhiteSpace())
-            {
-                language = GetSetLanguageFileName();
             }
 
             if (language == null)
@@ -78,23 +78,42 @@ namespace NzbDrone.Core.Localization
 
             if (dictionary.TryGetValue(phrase, out var value))
             {
-                return value;
+                return ReplaceTokens(value, tokens);
             }
 
             return phrase;
         }
 
-        private string GetSetLanguageFileName()
+        public string GetLanguageIdentifier()
         {
-            var isoLanguage = IsoLanguages.Get((Language)_configService.UILanguage);
+            var isoLanguage = IsoLanguages.Get((Language)_configService.UILanguage) ?? IsoLanguages.Get(Language.English);
             var language = isoLanguage.TwoLetterCode;
 
             if (isoLanguage.CountryCode.IsNotNullOrWhiteSpace())
             {
-                language = string.Format("{0}_{1}", language, isoLanguage.CountryCode);
+                language = $"{language}-{isoLanguage.CountryCode.ToUpperInvariant()}";
             }
 
             return language;
+        }
+
+        private string ReplaceTokens(string input, Dictionary<string, object> tokens)
+        {
+            tokens.TryAdd("appName", "Radarr");
+
+            return TokenRegex.Replace(input, (match) =>
+            {
+                var tokenName = match.Groups["token"].Value;
+
+                tokens.TryGetValue(tokenName, out var token);
+
+                return token?.ToString() ?? $"{{{tokenName}}}";
+            });
+        }
+
+        private string GetLanguageFileName()
+        {
+            return GetLanguageIdentifier().Replace("-", "_").ToLowerInvariant();
         }
 
         private Dictionary<string, string> GetLocalizationDictionary(string language)
@@ -127,7 +146,7 @@ namespace NzbDrone.Core.Localization
 
             await CopyInto(dictionary, baseFilenamePath).ConfigureAwait(false);
 
-            if (culture.Contains("_"))
+            if (culture.Contains('_'))
             {
                 var languageBaseFilenamePath = Path.Combine(prefix, GetResourceFilename(culture.Split('_')[0]));
                 await CopyInto(dictionary, languageBaseFilenamePath).ConfigureAwait(false);
@@ -142,25 +161,16 @@ namespace NzbDrone.Core.Localization
         {
             if (!File.Exists(resourcePath))
             {
-                _logger.Error("Missing translation/culture resource: {0}", resourcePath);
+                _logger.Trace("Missing translation/culture resource: {0}", resourcePath);
                 return;
             }
 
-            using (var fs = File.OpenRead(resourcePath))
-            {
-                if (fs != null)
-                {
-                    var dict = await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(fs);
+            await using var fs = File.OpenRead(resourcePath);
+            var dict = await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(fs);
 
-                    foreach (var key in dict.Keys)
-                    {
-                        dictionary[key] = dict[key];
-                    }
-                }
-                else
-                {
-                    _logger.Error("Missing translation/culture resource: {0}", resourcePath);
-                }
+            foreach (var key in dict.Keys)
+            {
+                dictionary[key] = dict[key];
             }
         }
 

@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import Alert from 'Components/Alert';
 import Form from 'Components/Form/Form';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputGroup from 'Components/Form/FormInputGroup';
@@ -39,19 +40,19 @@ class SelectQualityModalContent extends Component {
 
   onQualityChange = ({ value }) => {
     this.setState({ qualityId: parseInt(value) });
-  }
+  };
 
   onProperChange = ({ value }) => {
     this.setState({ proper: value });
-  }
+  };
 
   onRealChange = ({ value }) => {
     this.setState({ real: value });
-  }
+  };
 
   onQualitySelect = () => {
     this.props.onQualitySelect(this.state);
-  }
+  };
 
   //
   // Render
@@ -92,9 +93,9 @@ class SelectQualityModalContent extends Component {
 
           {
             !isFetching && !!error &&
-              <div>
-                {translate('UnableToLoadQualities')}
-              </div>
+              <Alert kind={kinds.DANGER}>
+                {translate('QualitiesLoadError')}
+              </Alert>
           }
 
           {

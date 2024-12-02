@@ -7,9 +7,10 @@ import PageToolbarSeparator from 'Components/Page/Toolbar/PageToolbarSeparator';
 import { icons } from 'Helpers/Props';
 import SettingsToolbarConnector from 'Settings/SettingsToolbarConnector';
 import translate from 'Utilities/String/translate';
-import ImportExclusionsConnector from './ImportExclusions/ImportExclusionsConnector';
+import ImportListExclusions from './ImportListExclusions/ImportListExclusions';
 import ImportListsConnector from './ImportLists/ImportListsConnector';
-import ImportListOptionsConnector from './Options/ImportListOptionsConnector';
+import ManageImportListsModal from './ImportLists/Manage/ManageImportListsModal';
+import ImportListOptions from './Options/ImportListOptions';
 
 class ImportListSettings extends Component {
 
@@ -23,43 +24,53 @@ class ImportListSettings extends Component {
 
     this.state = {
       isSaving: false,
-      hasPendingChanges: false
+      hasPendingChanges: false,
+      isManageImportListsOpen: false
     };
   }
 
   //
   // Listeners
 
-  onChildMounted = (saveCallback) => {
+  setChildSave = (saveCallback) => {
     this._saveCallback = saveCallback;
-  }
+  };
 
   onChildStateChange = (payload) => {
     this.setState(payload);
-  }
+  };
+
+  onManageImportListsPress = () => {
+    this.setState({ isManageImportListsOpen: true });
+  };
+
+  onManageImportListsModalClose = () => {
+    this.setState({ isManageImportListsOpen: false });
+  };
 
   onSavePress = () => {
     if (this._saveCallback) {
       this._saveCallback();
     }
-  }
+  };
 
-  // Render
   //
+  // Render
 
   render() {
     const {
       isTestingAll,
-      dispatchTestAllImportList
+      dispatchTestAllImportLists
     } = this.props;
 
     const {
       isSaving,
-      hasPendingChanges
+      hasPendingChanges,
+      isManageImportListsOpen
     } = this.state;
 
     return (
-      <PageContent title={translate('ListSettings')}>
+      <PageContent title={translate('ImportListSettings')}>
         <SettingsToolbarConnector
           isSaving={isSaving}
           hasPendingChanges={hasPendingChanges}
@@ -71,7 +82,13 @@ class ImportListSettings extends Component {
                 label={translate('TestAllLists')}
                 iconName={icons.TEST}
                 isSpinning={isTestingAll}
-                onPress={dispatchTestAllImportList}
+                onPress={dispatchTestAllImportLists}
+              />
+
+              <PageToolbarButton
+                label={translate('ManageLists')}
+                iconName={icons.MANAGE}
+                onPress={this.onManageImportListsPress}
               />
             </Fragment>
           }
@@ -81,13 +98,17 @@ class ImportListSettings extends Component {
         <PageContentBody>
           <ImportListsConnector />
 
-          <ImportListOptionsConnector
-            onChildMounted={this.onChildMounted}
+          <ImportListOptions
+            setChildSave={this.setChildSave}
             onChildStateChange={this.onChildStateChange}
           />
 
-          <ImportExclusionsConnector />
+          <ImportListExclusions />
 
+          <ManageImportListsModal
+            isOpen={isManageImportListsOpen}
+            onModalClose={this.onManageImportListsModalClose}
+          />
         </PageContentBody>
       </PageContent>
     );
@@ -96,7 +117,7 @@ class ImportListSettings extends Component {
 
 ImportListSettings.propTypes = {
   isTestingAll: PropTypes.bool.isRequired,
-  dispatchTestAllImportList: PropTypes.func.isRequired
+  dispatchTestAllImportLists: PropTypes.func.isRequired
 };
 
 export default ImportListSettings;

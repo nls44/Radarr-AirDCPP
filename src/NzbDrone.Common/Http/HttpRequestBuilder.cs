@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text;
 using NzbDrone.Common.Extensions;
 
@@ -19,28 +20,30 @@ namespace NzbDrone.Common.Http
         public Dictionary<string, string> Segments { get; private set; }
         public HttpHeader Headers { get; private set; }
         public bool SuppressHttpError { get; set; }
+        public IEnumerable<HttpStatusCode> SuppressHttpErrorStatusCodes { get; set; }
+        public bool LogHttpError { get; set; }
         public bool UseSimplifiedUserAgent { get; set; }
         public bool AllowAutoRedirect { get; set; }
         public bool ConnectionKeepAlive { get; set; }
         public TimeSpan RateLimit { get; set; }
         public bool LogResponseContent { get; set; }
-        public NetworkCredential NetworkCredential { get; set; }
+        public ICredentials NetworkCredential { get; set; }
         public Dictionary<string, string> Cookies { get; private set; }
         public List<HttpFormData> FormData { get; private set; }
-
         public Action<HttpRequest> PostProcess { get; set; }
 
         public HttpRequestBuilder(string baseUrl)
         {
             BaseUrl = new HttpUri(baseUrl);
             ResourceUrl = string.Empty;
-            Method = HttpMethod.GET;
+            Method = HttpMethod.Get;
             QueryParams = new List<KeyValuePair<string, string>>();
             SuffixQueryParams = new List<KeyValuePair<string, string>>();
             Segments = new Dictionary<string, string>();
             Headers = new HttpHeader();
             Cookies = new Dictionary<string, string>();
             FormData = new List<HttpFormData>();
+            LogHttpError = true;
         }
 
         public HttpRequestBuilder(bool useHttps, string host, int port, string urlBase = null)
@@ -100,18 +103,14 @@ namespace NzbDrone.Common.Http
         {
             request.Method = Method;
             request.SuppressHttpError = SuppressHttpError;
+            request.SuppressHttpErrorStatusCodes = SuppressHttpErrorStatusCodes;
+            request.LogHttpError = LogHttpError;
             request.UseSimplifiedUserAgent = UseSimplifiedUserAgent;
             request.AllowAutoRedirect = AllowAutoRedirect;
             request.ConnectionKeepAlive = ConnectionKeepAlive;
             request.RateLimit = RateLimit;
             request.LogResponseContent = LogResponseContent;
-
-            if (NetworkCredential != null)
-            {
-                var authInfo = NetworkCredential.UserName + ":" + NetworkCredential.Password;
-                authInfo = Convert.ToBase64String(Encoding.GetEncoding("ISO-8859-1").GetBytes(authInfo));
-                request.Headers.Set("Authorization", "Basic " + authInfo);
-            }
+            request.Credentials = NetworkCredential;
 
             foreach (var header in Headers)
             {
@@ -268,7 +267,7 @@ namespace NzbDrone.Common.Http
 
         public virtual HttpRequestBuilder Post()
         {
-            Method = HttpMethod.POST;
+            Method = HttpMethod.Post;
 
             return this;
         }
@@ -359,7 +358,7 @@ namespace NzbDrone.Common.Http
 
         public virtual HttpRequestBuilder AddFormParameter(string key, object value)
         {
-            if (Method != HttpMethod.POST)
+            if (Method != HttpMethod.Post)
             {
                 throw new NotSupportedException("HttpRequest Method must be POST to add FormParameter.");
             }
@@ -375,7 +374,7 @@ namespace NzbDrone.Common.Http
 
         public virtual HttpRequestBuilder AddFormUpload(string name, string fileName, byte[] data, string contentType = "application/octet-stream")
         {
-            if (Method != HttpMethod.POST)
+            if (Method != HttpMethod.Post)
             {
                 throw new NotSupportedException("HttpRequest Method must be POST to add FormUpload.");
             }

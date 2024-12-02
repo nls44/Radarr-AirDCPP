@@ -53,7 +53,7 @@ class AddDownloadClientModalContentConnector extends Component {
   onDownloadClientSelect = ({ implementation }) => {
     this.props.selectDownloadClientSchema({ implementation });
     this.props.onModalClose({ downloadClientSelected: true });
-  }
+  };
 
   //
   // Render

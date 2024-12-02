@@ -4,12 +4,12 @@ import React, { Component } from 'react';
 import Measure from 'Components/Measure';
 import Menu from 'Components/Menu/Menu';
 import MenuContent from 'Components/Menu/MenuContent';
-import MenuItem from 'Components/Menu/MenuItem';
 import ToolbarMenuButton from 'Components/Menu/ToolbarMenuButton';
-import SpinnerIcon from 'Components/SpinnerIcon';
 import { forEach } from 'Helpers/elementChildren';
 import { align, icons } from 'Helpers/Props';
 import dimensions from 'Styles/Variables/dimensions';
+import translate from 'Utilities/String/translate';
+import PageToolbarOverflowMenuItem from './PageToolbarOverflowMenuItem';
 import styles from './PageToolbarSection.css';
 
 const BUTTON_WIDTH = parseInt(dimensions.toolbarButtonWidth);
@@ -108,7 +108,7 @@ class PageToolbarSection extends Component {
       isMeasured: true,
       width
     });
-  }
+  };
 
   //
   // Render
@@ -161,35 +161,22 @@ class PageToolbarSection extends Component {
                       <ToolbarMenuButton
                         className={styles.overflowMenuButton}
                         iconName={icons.OVERFLOW}
-                        text="More"
+                        text={translate('More')}
                       />
 
                       <MenuContent>
                         {
                           overflowItems.map((item) => {
                             const {
-                              iconName,
-                              spinningName,
                               label,
-                              isDisabled,
-                              isSpinning,
-                              ...otherProps
+                              overflowComponent: OverflowComponent = PageToolbarOverflowMenuItem
                             } = item;
 
                             return (
-                              <MenuItem
+                              <OverflowComponent
                                 key={label}
-                                isDisabled={isDisabled || isSpinning}
-                                {...otherProps}
-                              >
-                                <SpinnerIcon
-                                  className={styles.overflowMenuItemIcon}
-                                  name={iconName}
-                                  spinningName={spinningName}
-                                  isSpinning={isSpinning}
-                                />
-                                {label}
-                              </MenuItem>
+                                {...item}
+                              />
                             );
                           })
                         }

@@ -1,12 +1,13 @@
 import PropTypes from 'prop-types';
 import React from 'react';
+import Alert from 'Components/Alert';
 import FieldSet from 'Components/FieldSet';
 import Form from 'Components/Form/Form';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputGroup from 'Components/Form/FormInputGroup';
 import FormLabel from 'Components/Form/FormLabel';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
-import { inputTypes } from 'Helpers/Props';
+import { inputTypes, kinds } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 
 function IndexerOptions(props) {
@@ -16,7 +17,8 @@ function IndexerOptions(props) {
     error,
     settings,
     hasSettings,
-    onInputChange
+    onInputChange,
+    onWhitelistedSubtitleChange
   } = props;
 
   return (
@@ -28,9 +30,9 @@ function IndexerOptions(props) {
 
       {
         !isFetching && error &&
-          <div>
-            {translate('UnableToLoadIndexerOptions')}
-          </div>
+          <Alert kind={kinds.DANGER}>
+            {translate('IndexerOptionsLoadError')}
+          </Alert>
       }
 
       {
@@ -85,7 +87,7 @@ function IndexerOptions(props) {
                 type={inputTypes.CHECK}
                 name="preferIndexerFlags"
                 helpText={translate('PreferIndexerFlagsHelpText')}
-                helpLink="https://wiki.servarr.com/Definitions#Indexer_Flags"
+                helpLink="https://wiki.servarr.com/radarr/settings#indexer-flags"
                 onChange={onInputChange}
                 {...settings.preferIndexerFlags}
               />
@@ -97,7 +99,7 @@ function IndexerOptions(props) {
               <FormInputGroup
                 type={inputTypes.NUMBER}
                 name="availabilityDelay"
-                unit="Days"
+                unit="days"
                 helpText={translate('AvailabilityDelayHelpText')}
                 onChange={onInputChange}
                 {...settings.availabilityDelay}
@@ -108,7 +110,7 @@ function IndexerOptions(props) {
               advancedSettings={advancedSettings}
               isAdvanced={true}
             >
-              <FormLabel>{translate('RSSSyncInterval')}</FormLabel>
+              <FormLabel>{translate('RssSyncInterval')}</FormLabel>
 
               <FormInputGroup
                 type={inputTypes.NUMBER}
@@ -116,9 +118,9 @@ function IndexerOptions(props) {
                 min={0}
                 max={120}
                 unit="minutes"
-                helpText={translate('HelpText')}
-                helpTextWarning={translate('RSSSyncIntervalHelpTextWarning')}
-                helpLink="https://wiki.servarr.com/Radarr_FAQ#How_does_Radarr_work"
+                helpText={translate('RssSyncIntervalHelpText')}
+                helpTextWarning={translate('RssSyncIntervalHelpTextWarning')}
+                helpLink="https://wiki.servarr.com/radarr/faq#how-does-radarr-work"
                 onChange={onInputChange}
                 {...settings.rssSyncInterval}
               />
@@ -134,7 +136,7 @@ function IndexerOptions(props) {
                 type={inputTypes.TEXT_TAG}
                 name="whitelistedHardcodedSubs"
                 helpText={translate('WhitelistedHardcodedSubsHelpText')}
-                onChange={onInputChange}
+                onChange={onWhitelistedSubtitleChange}
                 {...settings.whitelistedHardcodedSubs}
               />
             </FormGroup>
@@ -165,7 +167,8 @@ IndexerOptions.propTypes = {
   error: PropTypes.object,
   settings: PropTypes.object.isRequired,
   hasSettings: PropTypes.bool.isRequired,
-  onInputChange: PropTypes.func.isRequired
+  onInputChange: PropTypes.func.isRequired,
+  onWhitelistedSubtitleChange: PropTypes.func.isRequired
 };
 
 export default IndexerOptions;

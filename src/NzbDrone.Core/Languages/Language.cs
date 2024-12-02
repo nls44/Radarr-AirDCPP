@@ -101,6 +101,27 @@ namespace NzbDrone.Core.Languages
         public static Language Thai => new Language(28, "Thai");
         public static Language Bulgarian => new Language(29, "Bulgarian");
         public static Language PortugueseBR => new Language(30, "Portuguese (Brazil)");
+        public static Language Arabic => new Language(31, "Arabic");
+        public static Language Ukrainian => new Language(32, "Ukrainian");
+        public static Language Persian => new Language(33, "Persian");
+        public static Language Bengali => new Language(34, "Bengali");
+        public static Language Slovak => new Language(35, "Slovak");
+        public static Language Latvian => new Language(36, "Latvian");
+        public static Language SpanishLatino => new Language(37, "Spanish (Latino)");
+        public static Language Catalan => new Language(38, "Catalan");
+        public static Language Croatian => new Language(39, "Croatian");
+        public static Language Serbian => new Language(40, "Serbian");
+        public static Language Bosnian => new Language(41, "Bosnian");
+        public static Language Estonian => new Language(42, "Estonian");
+        public static Language Tamil => new Language(43, "Tamil");
+        public static Language Indonesian => new Language(44, "Indonesian");
+        public static Language Telugu => new Language(45, "Telugu");
+        public static Language Macedonian => new Language(46, "Macedonian");
+        public static Language Slovenian => new Language(47, "Slovenian");
+        public static Language Malayalam => new Language(48, "Malayalam");
+        public static Language Kannada => new Language(49, "Kannada");
+        public static Language Albanian => new Language(50, "Albanian");
+        public static Language Afrikaans => new Language(51, "Afrikaans");
         public static Language Any => new Language(-1, "Any");
         public static Language Original => new Language(-2, "Original");
 
@@ -141,11 +162,34 @@ namespace NzbDrone.Core.Languages
                     Thai,
                     Bulgarian,
                     PortugueseBR,
+                    Arabic,
+                    Ukrainian,
+                    Persian,
+                    Bengali,
+                    Slovak,
+                    Latvian,
+                    SpanishLatino,
+                    Catalan,
+                    Croatian,
+                    Serbian,
+                    Bosnian,
+                    Estonian,
+                    Tamil,
+                    Indonesian,
+                    Telugu,
+                    Macedonian,
+                    Slovenian,
+                    Malayalam,
+                    Kannada,
+                    Albanian,
+                    Afrikaans,
                     Any,
                     Original
                 };
             }
         }
+
+        private static readonly Dictionary<int, Language> Lookup = All.ToDictionary(v => v.Id);
 
         public static Language FindById(int id)
         {
@@ -154,9 +198,7 @@ namespace NzbDrone.Core.Languages
                 return Unknown;
             }
 
-            Language language = All.FirstOrDefault(v => v.Id == id);
-
-            if (language == null)
+            if (!Lookup.TryGetValue(id, out var language))
             {
                 throw new ArgumentException("ID does not match a known language", nameof(id));
             }

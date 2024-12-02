@@ -3,6 +3,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { clearPendingChanges } from 'Store/Actions/baseActions';
 import EditCustomFormatModal from './EditCustomFormatModal';
+import EditCustomFormatModalContentConnector from './EditCustomFormatModalContentConnector';
 
 function mapStateToProps() {
   return {};
@@ -20,7 +21,7 @@ class EditCustomFormatModalConnector extends Component {
   onModalClose = () => {
     this.props.clearPendingChanges({ section: 'settings.customFormats' });
     this.props.onModalClose();
-  }
+  };
 
   //
   // Render
@@ -36,6 +37,7 @@ class EditCustomFormatModalConnector extends Component {
 }
 
 EditCustomFormatModalConnector.propTypes = {
+  ...EditCustomFormatModalContentConnector.propTypes,
   onModalClose: PropTypes.func.isRequired,
   clearPendingChanges: PropTypes.func.isRequired
 };

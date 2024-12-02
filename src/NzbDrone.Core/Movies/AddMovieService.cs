@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FluentValidation;
 using FluentValidation.Results;
 using NLog;
 using NzbDrone.Common.EnsureThat;
+using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Organizer;
@@ -21,18 +23,21 @@ namespace NzbDrone.Core.Movies
     public class AddMovieService : IAddMovieService
     {
         private readonly IMovieService _movieService;
+        private readonly IMovieMetadataService _movieMetadataService;
         private readonly IProvideMovieInfo _movieInfo;
         private readonly IBuildFileNames _fileNameBuilder;
         private readonly IAddMovieValidator _addMovieValidator;
         private readonly Logger _logger;
 
         public AddMovieService(IMovieService movieService,
+                                IMovieMetadataService movieMetadataService,
                                 IProvideMovieInfo movieInfo,
                                 IBuildFileNames fileNameBuilder,
                                 IAddMovieValidator addMovieValidator,
                                 Logger logger)
         {
             _movieService = movieService;
+            _movieMetadataService = movieMetadataService;
             _movieInfo = movieInfo;
             _fileNameBuilder = fileNameBuilder;
             _addMovieValidator = addMovieValidator;
@@ -47,6 +52,10 @@ namespace NzbDrone.Core.Movies
             newMovie = SetPropertiesAndValidate(newMovie);
 
             _logger.Info("Adding Movie {0} Path: [{1}]", newMovie, newMovie.Path);
+
+            _movieMetadataService.Upsert(newMovie.MovieMetadata.Value);
+            newMovie.MovieMetadataId = newMovie.MovieMetadata.Value.Id;
+
             _movieService.AddMovie(newMovie);
 
             return newMovie;
@@ -59,13 +68,22 @@ namespace NzbDrone.Core.Movies
 
             foreach (var m in newMovies)
             {
-                _logger.Info("Adding Movie {0} Path: [{1}]", m, m.Path);
+                if (m.Path.IsNullOrWhiteSpace())
+                {
+                    _logger.Info("Adding Movie {0} Root Folder Path: [{1}]", m, m.RootFolderPath);
+                }
+                else
+                {
+                    _logger.Info("Adding Movie {0} Path: [{1}]", m, m.Path);
+                }
 
                 try
                 {
                     var movie = AddSkyhookData(m);
                     movie = SetPropertiesAndValidate(movie);
+
                     movie.Added = added;
+
                     moviesToAdd.Add(movie);
                 }
                 catch (ValidationException ex)
@@ -79,16 +97,19 @@ namespace NzbDrone.Core.Movies
                 }
             }
 
+            _movieMetadataService.UpsertMany(moviesToAdd.Select(x => x.MovieMetadata.Value).ToList());
+            moviesToAdd.ForEach(x => x.MovieMetadataId = x.MovieMetadata.Value.Id);
+
             return _movieService.AddMovies(moviesToAdd);
         }
 
         private Movie AddSkyhookData(Movie newMovie)
         {
-            Movie movie;
+            var movie = new Movie();
 
             try
             {
-                movie = _movieInfo.GetMovieInfo(newMovie.TmdbId).Item1;
+                movie.MovieMetadata = _movieInfo.GetMovieInfo(newMovie.TmdbId).Item1;
             }
             catch (MovieNotFoundException)
             {
@@ -113,8 +134,8 @@ namespace NzbDrone.Core.Movies
                 newMovie.Path = Path.Combine(newMovie.RootFolderPath, folderName);
             }
 
-            newMovie.CleanTitle = newMovie.Title.CleanMovieTitle();
-            newMovie.SortTitle = MovieTitleNormalizer.Normalize(newMovie.Title, newMovie.TmdbId);
+            newMovie.MovieMetadata.Value.CleanTitle = newMovie.Title.CleanMovieTitle();
+            newMovie.MovieMetadata.Value.SortTitle = MovieTitleNormalizer.Normalize(newMovie.Title, newMovie.TmdbId);
             newMovie.Added = DateTime.UtcNow;
 
             var validationResult = _addMovieValidator.Validate(newMovie);

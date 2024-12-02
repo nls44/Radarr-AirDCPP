@@ -13,6 +13,7 @@ using NzbDrone.Core.Extras.Metadata.Files;
 using NzbDrone.Core.Extras.Others;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.Extras.Metadata
 {
@@ -131,7 +132,7 @@ namespace NzbDrone.Core.Extras.Metadata
 
             if (movieFolder.IsNullOrWhiteSpace())
             {
-                return new List<MetadataFile>();
+                return Array.Empty<MetadataFile>();
             }
 
             var files = new List<MetadataFile>();
@@ -191,9 +192,14 @@ namespace NzbDrone.Core.Extras.Metadata
             return movedFiles;
         }
 
-        public override ExtraFile Import(Movie movie, MovieFile movieFile, string path, string extension, bool readOnly)
+        public override bool CanImportFile(LocalMovie localMovie, MovieFile movieFile, string path, string extension, bool readOnly)
         {
-            return null;
+            return false;
+        }
+
+        public override IEnumerable<ExtraFile> ImportFiles(LocalMovie localMovie, MovieFile movieFile, List<string> files, bool isReadOnly)
+        {
+            return Enumerable.Empty<ExtraFile>();
         }
 
         private List<MetadataFile> GetMetadataFilesForConsumer(IMetadata consumer, List<MetadataFile> movieMetadata)
@@ -291,6 +297,7 @@ namespace NzbDrone.Core.Extras.Metadata
         private void DownloadImage(Movie movie, ImageFileResult image)
         {
             var fullPath = Path.Combine(movie.Path, image.RelativePath);
+            var downloaded = true;
 
             try
             {
@@ -298,12 +305,19 @@ namespace NzbDrone.Core.Extras.Metadata
                 {
                     _httpClient.DownloadFile(image.Url, fullPath);
                 }
-                else
+                else if (_diskProvider.FileExists(image.Url))
                 {
                     _diskProvider.CopyFile(image.Url, fullPath);
                 }
+                else
+                {
+                    downloaded = false;
+                }
 
-                _mediaFileAttributeService.SetFilePermissions(fullPath);
+                if (downloaded)
+                {
+                    _mediaFileAttributeService.SetFilePermissions(fullPath);
+                }
             }
             catch (HttpException ex)
             {
@@ -334,7 +348,7 @@ namespace NzbDrone.Core.Extras.Metadata
                 return null;
             }
 
-            //Remove duplicate metadata files from DB and disk
+            // Remove duplicate metadata files from DB and disk
             foreach (var file in matchingMetadataFiles.Skip(1))
             {
                 var path = Path.Combine(movie.Path, file.RelativePath);

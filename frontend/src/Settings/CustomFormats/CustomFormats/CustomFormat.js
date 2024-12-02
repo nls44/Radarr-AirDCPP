@@ -30,34 +30,34 @@ class CustomFormat extends Component {
 
   onEditCustomFormatPress = () => {
     this.setState({ isEditCustomFormatModalOpen: true });
-  }
+  };
 
   onEditCustomFormatModalClose = () => {
     this.setState({ isEditCustomFormatModalOpen: false });
-  }
+  };
 
   onExportCustomFormatPress = () => {
     this.setState({ isExportCustomFormatModalOpen: true });
-  }
+  };
 
   onExportCustomFormatModalClose = () => {
     this.setState({ isExportCustomFormatModalOpen: false });
-  }
+  };
 
   onDeleteCustomFormatPress = () => {
     this.setState({
       isEditCustomFormatModalOpen: false,
       isDeleteCustomFormatModalOpen: true
     });
-  }
+  };
 
   onDeleteCustomFormatModalClose = () => {
     this.setState({ isDeleteCustomFormatModalOpen: false });
-  }
+  };
 
   onConfirmDeleteCustomFormat = () => {
     this.props.onConfirmDeleteCustomFormat(this.props.id);
-  }
+  };
 
   onCloneCustomFormatPress = () => {
     const {
@@ -66,7 +66,7 @@ class CustomFormat extends Component {
     } = this.props;
 
     onCloneCustomFormatPress(id);
-  }
+  };
 
   //
   // Render
@@ -90,7 +90,7 @@ class CustomFormat extends Component {
             {name}
           </div>
 
-          <div>
+          <div className={styles.buttons}>
             <IconButton
               className={styles.cloneButton}
               title={translate('CloneCustomFormat')}
@@ -124,6 +124,7 @@ class CustomFormat extends Component {
 
               return (
                 <Label
+                  className={styles.label}
                   key={index}
                   kind={kind}
                 >
@@ -151,13 +152,7 @@ class CustomFormat extends Component {
           isOpen={this.state.isDeleteCustomFormatModalOpen}
           kind={kinds.DANGER}
           title={translate('DeleteCustomFormat')}
-          message={
-            <div>
-              <div>
-                {translate('AreYouSureYouWantToDeleteFormat', [name])}
-              </div>
-            </div>
-          }
+          message={translate('DeleteCustomFormatMessageText', { name })}
           confirmLabel={translate('Delete')}
           isSpinning={isDeleting}
           onConfirm={this.onConfirmDeleteCustomFormat}

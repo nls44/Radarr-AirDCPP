@@ -23,7 +23,7 @@ namespace NzbDrone.Core.Test.Datastore.Migration
             _serializerSettings = new JsonSerializerOptions
             {
                 AllowTrailingCommas = true,
-                IgnoreNullValues = false,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
                 PropertyNameCaseInsensitive = true,
                 DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -96,7 +96,7 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                 }
             });
 
-            var items = db.Query<new_list_server.NetImportDefinition178>("SELECT * FROM NetImport");
+            var items = db.Query<new_list_server.NetImportDefinition178>("SELECT * FROM \"NetImport\"");
 
             items.Should().HaveCount(7);
 
@@ -157,7 +157,7 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                 }
             });
 
-            var items = db.Query<new_list_server.NetImportDefinition178>("SELECT * FROM NetImport");
+            var items = db.Query<new_list_server.NetImportDefinition178>("SELECT * FROM \"NetImport\"");
 
             items.Should().HaveCount(5);
 

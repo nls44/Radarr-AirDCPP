@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Core.Datastore;
@@ -16,21 +17,21 @@ namespace NzbDrone.Core.IndexerSearch
     {
         private readonly IMovieService _movieService;
         private readonly IMovieCutoffService _movieCutoffService;
-        private readonly ISearchForNzb _nzbSearchService;
+        private readonly ISearchForReleases _releaseSearchService;
         private readonly IProcessDownloadDecisions _processDownloadDecisions;
         private readonly IQueueService _queueService;
         private readonly Logger _logger;
 
         public MovieSearchService(IMovieService movieService,
                                    IMovieCutoffService movieCutoffService,
-                                   ISearchForNzb nzbSearchService,
+                                   ISearchForReleases releaseSearchService,
                                    IProcessDownloadDecisions processDownloadDecisions,
                                    IQueueService queueService,
                                    Logger logger)
         {
             _movieService = movieService;
             _movieCutoffService = movieCutoffService;
-            _nzbSearchService = nzbSearchService;
+            _releaseSearchService = releaseSearchService;
             _processDownloadDecisions = processDownloadDecisions;
             _queueService = queueService;
             _logger = logger;
@@ -38,22 +39,13 @@ namespace NzbDrone.Core.IndexerSearch
 
         public void Execute(MoviesSearchCommand message)
         {
-            var downloadedCount = 0;
-            foreach (var movieId in message.MovieIds)
-            {
-                var movies = _movieService.GetMovie(movieId);
+            var userInvokedSearch = message.Trigger == CommandTrigger.Manual;
 
-                if (!movies.Monitored)
-                {
-                    _logger.Debug("Movie {0} is not monitored, skipping search", movies.Title);
-                    continue;
-                }
+            var movies = _movieService.GetMovies(message.MovieIds)
+                .Where(m => (m.Monitored && m.IsAvailable()) || userInvokedSearch)
+                .ToList();
 
-                var decisions = _nzbSearchService.MovieSearch(movieId, false, false); //_nzbSearchService.SeasonSearch(message.MovieId, season.SeasonNumber, false, message.Trigger == CommandTrigger.Manual);
-                downloadedCount += _processDownloadDecisions.ProcessDecisions(decisions).Grabbed.Count;
-            }
-
-            _logger.ProgressInfo("Movie search completed. {0} reports downloaded.", downloadedCount);
+            SearchForBulkMovies(movies, userInvokedSearch).GetAwaiter().GetResult();
         }
 
         public void Execute(MissingMoviesSearchCommand message)
@@ -67,12 +59,13 @@ namespace NzbDrone.Core.IndexerSearch
             };
 
             pagingSpec.FilterExpressions.Add(v => v.Monitored == true);
-            List<Movie> movies = _movieService.MoviesWithoutFiles(pagingSpec).Records.ToList();
+
+            var movies = _movieService.MoviesWithoutFiles(pagingSpec).Records.ToList();
 
             var queue = _queueService.GetQueue().Where(q => q.Movie != null).Select(q => q.Movie.Id);
             var missing = movies.Where(e => !queue.Contains(e.Id)).ToList();
 
-            SearchForMissingMovies(missing, message.Trigger == CommandTrigger.Manual);
+            SearchForBulkMovies(missing, message.Trigger == CommandTrigger.Manual).GetAwaiter().GetResult();
         }
 
         public void Execute(CutoffUnmetMoviesSearchCommand message)
@@ -87,40 +80,39 @@ namespace NzbDrone.Core.IndexerSearch
 
             pagingSpec.FilterExpressions.Add(v => v.Monitored == true);
 
-            List<Movie> movies = _movieCutoffService.MoviesWhereCutoffUnmet(pagingSpec).Records.ToList();
+            var movies = _movieCutoffService.MoviesWhereCutoffUnmet(pagingSpec).Records.ToList();
 
             var queue = _queueService.GetQueue().Where(q => q.Movie != null).Select(q => q.Movie.Id);
             var missing = movies.Where(e => !queue.Contains(e.Id)).ToList();
 
-            SearchForMissingMovies(missing, message.Trigger == CommandTrigger.Manual);
+            SearchForBulkMovies(missing, message.Trigger == CommandTrigger.Manual).GetAwaiter().GetResult();
         }
 
-        private void SearchForMissingMovies(List<Movie> movies, bool userInvokedSearch)
+        private async Task SearchForBulkMovies(List<Movie> movies, bool userInvokedSearch)
         {
-            _logger.ProgressInfo("Performing missing search for {0} movies", movies.Count);
+            _logger.ProgressInfo("Performing search for {0} movies", movies.Count);
             var downloadedCount = 0;
 
-            foreach (var movieId in movies.GroupBy(e => e.Id))
+            foreach (var movieId in movies.GroupBy(e => e.Id).OrderBy(g => g.Min(m => m.LastSearchTime ?? DateTime.MinValue)))
             {
                 List<DownloadDecision> decisions;
 
                 try
                 {
-                    decisions = _nzbSearchService.MovieSearch(movieId.Key, userInvokedSearch, false);
+                    decisions = await _releaseSearchService.MovieSearch(movieId.Key, userInvokedSearch, false);
                 }
                 catch (Exception ex)
                 {
-                    var message = string.Format("Unable to search for missing movie {0}", movieId.Key);
-                    _logger.Error(ex, message);
+                    _logger.Error(ex, "Unable to search for movie: [{0}]", movieId.Key);
                     continue;
                 }
 
-                var processed = _processDownloadDecisions.ProcessDecisions(decisions);
+                var processDecisions = await _processDownloadDecisions.ProcessDecisions(decisions);
 
-                downloadedCount += processed.Grabbed.Count;
+                downloadedCount += processDecisions.Grabbed.Count;
             }
 
-            _logger.ProgressInfo("Completed missing search for {0} movies. {1} reports downloaded.", movies.Count, downloadedCount);
+            _logger.ProgressInfo("Completed search for {0} movies. {1} reports downloaded.", movies.Count, downloadedCount);
         }
     }
 }

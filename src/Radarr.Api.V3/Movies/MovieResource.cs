@@ -1,13 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
+using NzbDrone.Common.Extensions;
+using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.DecisionEngine.Specifications;
+using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaCover;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Translations;
 using NzbDrone.Core.Parser;
 using Radarr.Api.V3.MovieFiles;
 using Radarr.Http.REST;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace Radarr.Api.V3.Movies
 {
@@ -16,15 +21,17 @@ namespace Radarr.Api.V3.Movies
         public MovieResource()
         {
             Monitored = true;
+            MinimumAvailability = MovieStatusType.Released;
         }
 
-        //Todo: Sorters should be done completely on the client
-        //Todo: Is there an easy way to keep IgnoreArticlesWhenSorting in sync between, Series, History, Missing?
-        //Todo: We should get the entire Profile instead of ID and Name separately
+        // Todo: Sorters should be done completely on the client
+        // Todo: Is there an easy way to keep IgnoreArticlesWhenSorting in sync between, Series, History, Missing?
+        // Todo: We should get the entire Profile instead of ID and Name separately
 
-        //View Only
+        // View Only
         public string Title { get; set; }
         public string OriginalTitle { get; set; }
+        public Language OriginalLanguage { get; set; }
         public List<AlternativeTitleResource> AlternateTitles { get; set; }
         public int? SecondaryYear { get; set; }
         public int SecondaryYearSourceId { get; set; }
@@ -35,22 +42,26 @@ namespace Radarr.Api.V3.Movies
         public DateTime? InCinemas { get; set; }
         public DateTime? PhysicalRelease { get; set; }
         public DateTime? DigitalRelease { get; set; }
+        public DateTime? ReleaseDate { get; set; }
         public string PhysicalReleaseNote { get; set; }
         public List<MediaCover> Images { get; set; }
         public string Website { get; set; }
 
-        //public bool Downloaded { get; set; }
+        // public bool Downloaded { get; set; }
         public string RemotePoster { get; set; }
         public int Year { get; set; }
-        public bool HasFile { get; set; }
         public string YouTubeTrailerId { get; set; }
         public string Studio { get; set; }
 
-        //View & Edit
+        // View & Edit
         public string Path { get; set; }
         public int QualityProfileId { get; set; }
 
-        //Editing Only
+        // Compatibility
+        public bool? HasFile { get; set; }
+        public int MovieFileId { get; set; }
+
+        // Editing Only
         public bool Monitored { get; set; }
         public MovieStatusType MinimumAvailability { get; set; }
         public bool IsAvailable { get; set; }
@@ -70,48 +81,63 @@ namespace Radarr.Api.V3.Movies
         public AddMovieOptions AddOptions { get; set; }
         public Ratings Ratings { get; set; }
         public MovieFileResource MovieFile { get; set; }
-        public MovieCollection Collection { get; set; }
+        public MovieCollectionResource Collection { get; set; }
+        public float Popularity { get; set; }
+        public DateTime? LastSearchTime { get; set; }
+        public MovieStatisticsResource Statistics { get; set; }
+
+        // Hiding this so people don't think its usable (only used to set the initial state)
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        [SwaggerIgnore]
+        public bool Grabbed { get; set; }
+
+        // Hiding this so people don't think its usable (only used for searches)
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        [SwaggerIgnore]
+        public bool IsExcluded { get; set; }
     }
 
     public static class MovieResourceMapper
     {
-        public static MovieResource ToResource(this Movie model, int availDelay, MovieTranslation movieTranslation = null, IUpgradableSpecification upgradableSpecification = null)
+        public static MovieResource ToResource(this Movie model, int availDelay, MovieTranslation movieTranslation = null, IUpgradableSpecification upgradableSpecification = null, ICustomFormatCalculationService formatCalculationService = null)
         {
             if (model == null)
             {
                 return null;
             }
 
-            long size = model.MovieFile?.Size ?? 0;
-
-            MovieFileResource movieFile = model.MovieFile?.ToResource(model, upgradableSpecification);
+            var movieFile = model.MovieFile?.ToResource(model, upgradableSpecification, formatCalculationService);
 
             var translatedTitle = movieTranslation?.Title ?? model.Title;
-            var translatedOverview = movieTranslation?.Overview ?? model.Overview;
+            var translatedOverview = movieTranslation?.Overview ?? model.MovieMetadata.Value.Overview;
+
+            var collection = model.MovieMetadata.Value.CollectionTmdbId > 0 ? new MovieCollectionResource { Title = model.MovieMetadata.Value.CollectionTitle, TmdbId = model.MovieMetadata.Value.CollectionTmdbId } : null;
 
             return new MovieResource
             {
                 Id = model.Id,
                 TmdbId = model.TmdbId,
                 Title = translatedTitle,
-                OriginalTitle = model.OriginalTitle,
+                OriginalTitle = model.MovieMetadata.Value.OriginalTitle,
+                OriginalLanguage = model.MovieMetadata.Value.OriginalLanguage,
                 SortTitle = translatedTitle.NormalizeTitle(),
-                InCinemas = model.InCinemas,
-                PhysicalRelease = model.PhysicalRelease,
-                DigitalRelease = model.DigitalRelease,
-                HasFile = model.HasFile,
+                InCinemas = model.MovieMetadata.Value.InCinemas,
+                PhysicalRelease = model.MovieMetadata.Value.PhysicalRelease,
+                DigitalRelease = model.MovieMetadata.Value.DigitalRelease,
+                ReleaseDate = model.GetReleaseDate(),
 
-                SizeOnDisk = size,
-                Status = model.Status,
+                Status = model.MovieMetadata.Value.Status,
                 Overview = translatedOverview,
 
-                Images = model.Images,
+                Images = model.MovieMetadata.Value.Images.JsonClone(),
 
                 Year = model.Year,
-                SecondaryYear = model.SecondaryYear,
+                SecondaryYear = model.MovieMetadata.Value.SecondaryYear,
+
+                MovieFileId = model.MovieFileId,
 
                 Path = model.Path,
-                QualityProfileId = model.ProfileId,
+                QualityProfileId = model.QualityProfileId,
 
                 Monitored = model.Monitored,
                 MinimumAvailability = model.MinimumAvailability,
@@ -119,23 +145,25 @@ namespace Radarr.Api.V3.Movies
                 IsAvailable = model.IsAvailable(availDelay),
                 FolderName = model.FolderName(),
 
-                Runtime = model.Runtime,
-                CleanTitle = model.CleanTitle,
+                Runtime = model.MovieMetadata.Value.Runtime,
+                CleanTitle = model.MovieMetadata.Value.CleanTitle,
                 ImdbId = model.ImdbId,
-                TitleSlug = model.TitleSlug,
+                TitleSlug = model.MovieMetadata.Value.TmdbId.ToString(),
                 RootFolderPath = model.RootFolderPath,
-                Certification = model.Certification,
-                Website = model.Website,
-                Genres = model.Genres,
+                Certification = model.MovieMetadata.Value.Certification,
+                Website = model.MovieMetadata.Value.Website,
+                Genres = model.MovieMetadata.Value.Genres,
                 Tags = model.Tags,
                 Added = model.Added,
                 AddOptions = model.AddOptions,
-                AlternateTitles = model.AlternativeTitles.ToResource(),
-                Ratings = model.Ratings,
+                AlternateTitles = model.MovieMetadata.Value.AlternativeTitles.ToResource(),
+                Ratings = model.MovieMetadata.Value.Ratings,
                 MovieFile = movieFile,
-                YouTubeTrailerId = model.YouTubeTrailerId,
-                Studio = model.Studio,
-                Collection = model.Collection
+                YouTubeTrailerId = model.MovieMetadata.Value.YouTubeTrailerId,
+                Studio = model.MovieMetadata.Value.Studio,
+                Collection = collection,
+                Popularity = model.MovieMetadata.Value.Popularity,
+                LastSearchTime = model.LastSearchTime,
             };
         }
 
@@ -149,56 +177,56 @@ namespace Radarr.Api.V3.Movies
             return new Movie
             {
                 Id = resource.Id,
-                TmdbId = resource.TmdbId,
 
-                Title = resource.Title,
-                OriginalTitle = resource.OriginalTitle,
-                SortTitle = resource.SortTitle,
-                InCinemas = resource.InCinemas,
-                PhysicalRelease = resource.PhysicalRelease,
-
-                Overview = resource.Overview,
-
-                Images = resource.Images,
-
-                Year = resource.Year,
-                SecondaryYear = resource.SecondaryYear,
+                MovieMetadata = new MovieMetadata
+                {
+                    TmdbId = resource.TmdbId,
+                    Title = resource.Title,
+                    Genres = resource.Genres,
+                    Images = resource.Images,
+                    OriginalTitle = resource.OriginalTitle,
+                    SortTitle = resource.SortTitle,
+                    InCinemas = resource.InCinemas,
+                    PhysicalRelease = resource.PhysicalRelease,
+                    Year = resource.Year,
+                    SecondaryYear = resource.SecondaryYear,
+                    Overview = resource.Overview,
+                    Certification = resource.Certification,
+                    Website = resource.Website,
+                    Ratings = resource.Ratings,
+                    YouTubeTrailerId = resource.YouTubeTrailerId,
+                    Studio = resource.Studio,
+                    Runtime = resource.Runtime,
+                    CleanTitle = resource.CleanTitle,
+                    ImdbId = resource.ImdbId,
+                },
 
                 Path = resource.Path,
-                ProfileId = resource.QualityProfileId,
+                QualityProfileId = resource.QualityProfileId,
 
                 Monitored = resource.Monitored,
                 MinimumAvailability = resource.MinimumAvailability,
 
-                Runtime = resource.Runtime,
-                CleanTitle = resource.CleanTitle,
-                ImdbId = resource.ImdbId,
-                TitleSlug = resource.TitleSlug,
                 RootFolderPath = resource.RootFolderPath,
-                Certification = resource.Certification,
-                Website = resource.Website,
-                Genres = resource.Genres,
-                Tags = resource.Tags,
+
+                Tags = resource.Tags ?? new HashSet<int>(),
                 Added = resource.Added,
-                AddOptions = resource.AddOptions,
-                Ratings = resource.Ratings,
-                YouTubeTrailerId = resource.YouTubeTrailerId,
-                Studio = resource.Studio
+                AddOptions = resource.AddOptions
             };
         }
 
         public static Movie ToModel(this MovieResource resource, Movie movie)
         {
-            var updatedmovie = resource.ToModel();
+            var updatedMovie = resource.ToModel();
 
-            movie.ApplyChanges(updatedmovie);
+            movie.ApplyChanges(updatedMovie);
 
             return movie;
         }
 
-        public static List<MovieResource> ToResource(this IEnumerable<Movie> movies, int availDelay, IUpgradableSpecification upgradableSpecification = null)
+        public static List<MovieResource> ToResource(this IEnumerable<Movie> movies, int availDelay, IUpgradableSpecification upgradableSpecification = null, ICustomFormatCalculationService formatCalculationService = null)
         {
-            return movies.Select(x => ToResource(x, availDelay, null, upgradableSpecification)).ToList();
+            return movies.Select(x => ToResource(x, availDelay, null, upgradableSpecification, formatCalculationService)).ToList();
         }
 
         public static List<Movie> ToModel(this IEnumerable<MovieResource> resources)

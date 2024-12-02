@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -13,7 +13,7 @@ namespace NzbDrone.Core.Datastore.Migration
     {
         protected override void MainDbUpgrade()
         {
-            if (!Schema.Schema("dbo").Table("ImportExclusions").Exists())
+            if (!Schema.Table("ImportExclusions").Exists())
             {
                 Create.TableForModel("ImportExclusions")
                     .WithColumn("TmdbId").AsInt64().NotNullable().Unique().PrimaryKey()
@@ -26,12 +26,12 @@ namespace NzbDrone.Core.Datastore.Migration
 
         private void AddExisting(IDbConnection conn, IDbTransaction tran)
         {
-            using (IDbCommand getSeriesCmd = conn.CreateCommand())
+            using (var getSeriesCmd = conn.CreateCommand())
             {
                 getSeriesCmd.Transaction = tran;
-                getSeriesCmd.CommandText = @"SELECT Key, Value FROM Config WHERE Key = 'importexclusions'";
-                TextInfo textInfo = new CultureInfo("en-US", false).TextInfo;
-                using (IDataReader seriesReader = getSeriesCmd.ExecuteReader())
+                getSeriesCmd.CommandText = @"SELECT ""Key"", ""Value"" FROM ""Config"" WHERE ""Key"" = 'importexclusions'";
+                var textInfo = new CultureInfo("en-US", false).TextInfo;
+                using (var seriesReader = getSeriesCmd.ExecuteReader())
                 {
                     while (seriesReader.Read())
                     {
@@ -45,10 +45,10 @@ namespace NzbDrone.Core.Datastore.Migration
                                 textInfo.ToTitleCase(string.Join(" ", x.Split('-').DropLast(1))));
                         }).ToList();
 
-                        using (IDbCommand updateCmd = conn.CreateCommand())
+                        using (var updateCmd = conn.CreateCommand())
                         {
                             updateCmd.Transaction = tran;
-                            updateCmd.CommandText = "INSERT INTO ImportExclusions (tmdbid, MovieTitle) VALUES " + string.Join(", ", importExclusions);
+                            updateCmd.CommandText = "INSERT INTO \"ImportExclusions\" (tmdbid, MovieTitle) VALUES " + string.Join(", ", importExclusions);
 
                             updateCmd.ExecuteNonQuery();
                         }

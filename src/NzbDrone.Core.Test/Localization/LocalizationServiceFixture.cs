@@ -24,53 +24,46 @@ namespace NzbDrone.Core.Test.Localization
         [Test]
         public void should_get_string_in_dictionary_if_lang_exists_and_string_exists()
         {
-            var localizedString = Subject.GetLocalizedString("BackupNow");
+            var localizedString = Subject.GetLocalizedString("UILanguage");
 
-            localizedString.Should().Be("Backup Now");
+            localizedString.Should().Be("UI Language");
         }
 
         [Test]
-        public void should_get_string_in_default_language_dictionary_if_no_lang_country_code_exists_and_string_exists()
+        public void should_get_string_in_french()
         {
-            var localizedString = Subject.GetLocalizedString("BackupNow", "de_de");
+            Mocker.GetMock<IConfigService>().Setup(m => m.UILanguage).Returns((int)Language.French);
 
-            localizedString.Should().Be("Jetzt sichern");
+            var localizedString = Subject.GetLocalizedString("UILanguage");
 
-            ExceptionVerification.ExpectedErrors(1);
+            localizedString.Should().Be("Langue de l'IU");
+
+            ExceptionVerification.ExpectedErrors(0);
         }
 
         [Test]
-        public void should_get_string_in_default_dictionary_if_no_lang_exists_and_string_exists()
+        public void should_get_string_in_default_dictionary_if_unknown_language_and_string_exists()
         {
-            var localizedString = Subject.GetLocalizedString("BackupNow", "an");
+            Mocker.GetMock<IConfigService>().Setup(m => m.UILanguage).Returns(0);
+            var localizedString = Subject.GetLocalizedString("UILanguage");
 
-            localizedString.Should().Be("Backup Now");
-
-            ExceptionVerification.ExpectedErrors(1);
-        }
-
-        [Test]
-        public void should_get_string_in_default_dictionary_if_lang_empty_and_string_exists()
-        {
-            var localizedString = Subject.GetLocalizedString("BackupNow", "");
-
-            localizedString.Should().Be("Backup Now");
+            localizedString.Should().Be("UI Language");
         }
 
         [Test]
         public void should_return_argument_if_string_doesnt_exists()
         {
-            var localizedString = Subject.GetLocalizedString("BadString", "en");
+            var localizedString = Subject.GetLocalizedString("badString");
 
-            localizedString.Should().Be("BadString");
+            localizedString.Should().Be("badString");
         }
 
         [Test]
         public void should_return_argument_if_string_doesnt_exists_default_lang()
         {
-            var localizedString = Subject.GetLocalizedString("BadString");
+            var localizedString = Subject.GetLocalizedString("badString");
 
-            localizedString.Should().Be("BadString");
+            localizedString.Should().Be("badString");
         }
 
         [Test]

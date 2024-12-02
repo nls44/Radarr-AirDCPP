@@ -14,9 +14,24 @@ import { inputTypes } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 
 const posterSizeOptions = [
-  { key: 'small', value: translate('Small') },
-  { key: 'medium', value: translate('Medium') },
-  { key: 'large', value: translate('Large') }
+  {
+    key: 'small',
+    get value() {
+      return translate('Small');
+    }
+  },
+  {
+    key: 'medium',
+    get value() {
+      return translate('Medium');
+    }
+  },
+  {
+    key: 'large',
+    get value() {
+      return translate('Large');
+    }
+  }
 ];
 
 class DiscoverMovieOverviewOptionsModalContent extends Component {
@@ -29,24 +44,30 @@ class DiscoverMovieOverviewOptionsModalContent extends Component {
 
     this.state = {
       size: props.size,
-      showStudio: props.showStudio,
-      showCertification: props.showCertification,
-      showRatings: props.showRatings,
       showYear: props.showYear,
+      showStudio: props.showStudio,
       showGenres: props.showGenres,
-      includeRecommendations: props.includeRecommendations
+      showTmdbRating: props.showTmdbRating,
+      showImdbRating: props.showImdbRating,
+      showCertification: props.showCertification,
+      includeRecommendations: props.includeRecommendations,
+      includeTrending: props.includeTrending,
+      includePopular: props.includePopular
     };
   }
 
   componentDidUpdate(prevProps) {
     const {
       size,
-      showStudio,
       showYear,
-      showRatings,
-      showCertification,
+      showStudio,
       showGenres,
-      includeRecommendations
+      showTmdbRating,
+      showImdbRating,
+      showCertification,
+      includeRecommendations,
+      includeTrending,
+      includePopular
     } = this.props;
 
     const state = {};
@@ -55,28 +76,40 @@ class DiscoverMovieOverviewOptionsModalContent extends Component {
       state.size = size;
     }
 
-    if (showStudio !== prevProps.showStudio) {
-      state.showStudio = showStudio;
-    }
-
     if (showYear !== prevProps.showYear) {
       state.showYear = showYear;
     }
 
-    if (showRatings !== prevProps.showRatings) {
-      state.showRatings = showRatings;
-    }
-
-    if (showCertification !== prevProps.showCertification) {
-      state.showCertification = showCertification;
+    if (showStudio !== prevProps.showStudio) {
+      state.showStudio = showStudio;
     }
 
     if (showGenres !== prevProps.showGenres) {
       state.showGenres = showGenres;
     }
 
+    if (showTmdbRating !== prevProps.showTmdbRating) {
+      state.showTmdbRating = showTmdbRating;
+    }
+
+    if (showImdbRating !== prevProps.showImdbRating) {
+      state.showImdbRating = showImdbRating;
+    }
+
+    if (showCertification !== prevProps.showCertification) {
+      state.showCertification = showCertification;
+    }
+
     if (includeRecommendations !== prevProps.includeRecommendations) {
       state.includeRecommendations = includeRecommendations;
+    }
+
+    if (includeTrending !== prevProps.includeTrending) {
+      state.includeTrending = includeTrending;
+    }
+
+    if (includePopular !== prevProps.includePopular) {
+      state.includePopular = includePopular;
     }
 
     if (!_.isEmpty(state)) {
@@ -93,7 +126,7 @@ class DiscoverMovieOverviewOptionsModalContent extends Component {
     }, () => {
       this.props.onChangeOverviewOption({ [name]: value });
     });
-  }
+  };
 
   onChangeOption = ({ name, value }) => {
     this.setState({
@@ -103,7 +136,7 @@ class DiscoverMovieOverviewOptionsModalContent extends Component {
         [name]: value
       });
     });
-  }
+  };
 
   //
   // Render
@@ -115,29 +148,57 @@ class DiscoverMovieOverviewOptionsModalContent extends Component {
 
     const {
       size,
-      showStudio,
-      showCertification,
-      showRatings,
       showYear,
+      showStudio,
       showGenres,
-      includeRecommendations
+      showTmdbRating,
+      showImdbRating,
+      showCertification,
+      includeRecommendations,
+      includeTrending,
+      includePopular
     } = this.state;
 
     return (
       <ModalContent onModalClose={onModalClose}>
         <ModalHeader>
-          Overview Options
+          {translate('OverviewOptions')}
         </ModalHeader>
 
         <ModalBody>
           <Form>
             <FormGroup>
               <FormLabel>{translate('IncludeRadarrRecommendations')}</FormLabel>
+
               <FormInputGroup
                 type={inputTypes.CHECK}
                 name="includeRecommendations"
                 value={includeRecommendations}
                 helpText={translate('IncludeRecommendationsHelpText')}
+                onChange={this.onChangeOption}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>{translate('IncludeTrending')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="includeTrending"
+                value={includeTrending}
+                helpText={translate('IncludeTrendingMoviesHelpText')}
+                onChange={this.onChangeOption}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>{translate('IncludePopular')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="includePopular"
+                value={includePopular}
+                helpText={translate('IncludePopularMoviesHelpText')}
                 onChange={this.onChangeOption}
               />
             </FormGroup>
@@ -155,12 +216,12 @@ class DiscoverMovieOverviewOptionsModalContent extends Component {
             </FormGroup>
 
             <FormGroup>
-              <FormLabel>{translate('ShowGenres')}</FormLabel>
+              <FormLabel>{translate('ShowYear')}</FormLabel>
 
               <FormInputGroup
                 type={inputTypes.CHECK}
-                name="showGenres"
-                value={showGenres}
+                name="showYear"
+                value={showYear}
                 onChange={this.onChangeOverviewOption}
               />
             </FormGroup>
@@ -177,23 +238,34 @@ class DiscoverMovieOverviewOptionsModalContent extends Component {
             </FormGroup>
 
             <FormGroup>
-              <FormLabel>{translate('ShowYear')}</FormLabel>
+              <FormLabel>{translate('ShowGenres')}</FormLabel>
 
               <FormInputGroup
                 type={inputTypes.CHECK}
-                name="showYear"
-                value={showYear}
+                name="showGenres"
+                value={showGenres}
                 onChange={this.onChangeOverviewOption}
               />
             </FormGroup>
 
             <FormGroup>
-              <FormLabel>{translate('ShowRatings')}</FormLabel>
+              <FormLabel>{translate('ShowTmdbRating')}</FormLabel>
 
               <FormInputGroup
                 type={inputTypes.CHECK}
-                name="showRatings"
-                value={showRatings}
+                name="showTmdbRating"
+                value={showTmdbRating}
+                onChange={this.onChangeOverviewOption}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>{translate('ShowImdbRating')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="showImdbRating"
+                value={showImdbRating}
                 onChange={this.onChangeOverviewOption}
               />
             </FormGroup>
@@ -225,12 +297,15 @@ class DiscoverMovieOverviewOptionsModalContent extends Component {
 
 DiscoverMovieOverviewOptionsModalContent.propTypes = {
   size: PropTypes.string.isRequired,
-  showStudio: PropTypes.bool.isRequired,
   showYear: PropTypes.bool.isRequired,
-  showRatings: PropTypes.bool.isRequired,
-  showCertification: PropTypes.bool.isRequired,
+  showStudio: PropTypes.bool.isRequired,
   showGenres: PropTypes.bool.isRequired,
+  showTmdbRating: PropTypes.bool.isRequired,
+  showImdbRating: PropTypes.bool.isRequired,
+  showCertification: PropTypes.bool.isRequired,
   includeRecommendations: PropTypes.bool.isRequired,
+  includeTrending: PropTypes.bool.isRequired,
+  includePopular: PropTypes.bool.isRequired,
   onChangeOverviewOption: PropTypes.func.isRequired,
   onChangeOption: PropTypes.func.isRequired,
   onModalClose: PropTypes.func.isRequired

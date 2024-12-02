@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Xml;
 using FluentAssertions;
 using Moq;
@@ -6,7 +6,6 @@ using NUnit.Framework;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.Indexers.Newznab;
 using NzbDrone.Core.Test.Framework;
-using NzbDrone.Test.Common;
 
 namespace NzbDrone.Core.Test.IndexerTests.NewznabTests
 {
@@ -94,6 +93,29 @@ namespace NzbDrone.Core.Test.IndexerTests.NewznabTests
             var result = Subject.GetCapabilities(_settings);
 
             result.Should().NotBeNull();
+        }
+
+        [Test]
+        public void should_use_default_searchengine_if_missing()
+        {
+            GivenCapsResponse(_caps);
+
+            var caps = Subject.GetCapabilities(_settings);
+
+            caps.TextSearchEngine.Should().Be("sphinx");
+            caps.MovieTextSearchEngine.Should().Be("sphinx");
+        }
+
+        [Test]
+        public void should_use_specified_searchengine()
+        {
+            GivenCapsResponse(_caps.Replace("<search ", "<search searchEngine=\"raw\" ")
+                                   .Replace("<movie-search ", "<movie-search searchEngine=\"raw2\" "));
+
+            var caps = Subject.GetCapabilities(_settings);
+
+            caps.TextSearchEngine.Should().Be("raw");
+            caps.MovieTextSearchEngine.Should().Be("raw2");
         }
     }
 }

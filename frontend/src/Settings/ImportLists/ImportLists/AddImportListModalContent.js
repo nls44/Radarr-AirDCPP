@@ -32,47 +32,51 @@ class AddImportListModalContent extends Component {
     return (
       <ModalContent onModalClose={onModalClose}>
         <ModalHeader>
-          {translate('AddList')}
+          {translate('AddImportList')}
         </ModalHeader>
 
         <ModalBody>
           {
-            isSchemaFetching &&
-              <LoadingIndicator />
+            isSchemaFetching ?
+              <LoadingIndicator /> :
+              null
           }
 
           {
-            !isSchemaFetching && !!schemaError &&
-              <div>
-                {translate('UnableToAddANewListPleaseTryAgain')}
-              </div>
+            !isSchemaFetching && !!schemaError ?
+              <Alert kind={kinds.DANGER}>
+                {translate('AddListError')}
+              </Alert> :
+              null
           }
 
           {
-            isSchemaPopulated && !schemaError &&
+            isSchemaPopulated && !schemaError ?
               <div>
 
                 <Alert kind={kinds.INFO}>
                   <div>
-                    {translate('RadarrSupportsAnyRSSMovieListsAsWellAsTheOneStatedBelow')}
+                    {translate('SupportedListsMovie')}
                   </div>
                   <div>
-                    {translate('ForMoreInformationOnTheIndividualImportListsClinkOnTheInfoButtons')}
+                    {translate('SupportedListsMoreInfo')}
                   </div>
                 </Alert>
-
                 {
                   Object.keys(listGroups).map((key) => {
                     return (
-                      <FieldSet legend={`${titleCase(key)} List`} key={key}>
-                        <div className={styles.importLists}>
+                      <FieldSet key={key} legend={translate('TypeOfList', {
+                        typeOfList: titleCase(key)
+                      })}
+                      >
+                        <div className={styles.lists}>
                           {
-                            listGroups[key].map((importList) => {
+                            listGroups[key].map((list) => {
                               return (
                                 <AddImportListItem
-                                  key={importList.implementation}
-                                  implementation={importList.implementation}
-                                  {...importList}
+                                  key={list.implementation}
+                                  implementation={list.implementation}
+                                  {...list}
                                   onImportListSelect={onImportListSelect}
                                 />
                               );
@@ -83,7 +87,8 @@ class AddImportListModalContent extends Component {
                     );
                   })
                 }
-              </div>
+              </div> :
+              null
           }
         </ModalBody>
         <ModalFooter>

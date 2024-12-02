@@ -14,6 +14,7 @@ import NoMovie from 'Movie/NoMovie';
 import getErrorMessage from 'Utilities/Object/getErrorMessage';
 import translate from 'Utilities/String/translate';
 import CalendarConnector from './CalendarConnector';
+import CalendarFilterModal from './CalendarFilterModal';
 import CalendarLinkModal from './iCal/CalendarLinkModal';
 import LegendConnector from './Legend/LegendConnector';
 import CalendarOptionsModal from './Options/CalendarOptionsModal';
@@ -44,23 +45,23 @@ class CalendarPage extends Component {
     const days = Math.max(3, Math.min(7, Math.floor(width / MINIMUM_DAY_WIDTH)));
 
     this.props.onDaysCountChange(days);
-  }
+  };
 
   onGetCalendarLinkPress = () => {
     this.setState({ isCalendarLinkModalOpen: true });
-  }
+  };
 
   onGetCalendarLinkModalClose = () => {
     this.setState({ isCalendarLinkModalOpen: false });
-  }
+  };
 
   onOptionsPress = () => {
     this.setState({ isOptionsModalOpen: true });
-  }
+  };
 
   onOptionsModalClose = () => {
     this.setState({ isOptionsModalOpen: false });
-  }
+  };
 
   onSearchMissingPress = () => {
     const {
@@ -69,7 +70,7 @@ class CalendarPage extends Component {
     } = this.props;
 
     onSearchMissingPress(missingMovieIds);
-  }
+  };
 
   //
   // Render
@@ -83,6 +84,7 @@ class CalendarPage extends Component {
       movieIsFetching,
       movieIsPopulated,
       missingMovieIds,
+      customFilters,
       isRssSyncExecuting,
       isSearchingForMissing,
       useCurrentPage,
@@ -102,7 +104,7 @@ class CalendarPage extends Component {
         <PageToolbar>
           <PageToolbarSection>
             <PageToolbarButton
-              label={translate('iCalLink')}
+              label={translate('ICalLink')}
               iconName={icons.CALENDAR}
               onPress={this.onGetCalendarLinkPress}
             />
@@ -110,7 +112,7 @@ class CalendarPage extends Component {
             <PageToolbarSeparator />
 
             <PageToolbarButton
-              label={translate('RSSSync')}
+              label={translate('RssSync')}
               iconName={icons.RSS}
               isSpinning={isRssSyncExecuting}
               onPress={onRssSyncPress}
@@ -137,7 +139,8 @@ class CalendarPage extends Component {
               isDisabled={!hasMovie}
               selectedFilterKey={selectedFilterKey}
               filters={filters}
-              customFilters={[]}
+              customFilters={customFilters}
+              filterModalConnectorComponent={CalendarFilterModal}
               onFilterSelect={onFilterSelect}
             />
           </PageToolbarSection>
@@ -177,7 +180,7 @@ class CalendarPage extends Component {
 
           {
             !movieError && movieIsPopulated && !hasMovie &&
-              <NoMovie />
+              <NoMovie totalItems={0} />
           }
 
           {
@@ -208,6 +211,7 @@ CalendarPage.propTypes = {
   movieIsFetching: PropTypes.bool.isRequired,
   movieIsPopulated: PropTypes.bool.isRequired,
   missingMovieIds: PropTypes.arrayOf(PropTypes.number).isRequired,
+  customFilters: PropTypes.arrayOf(PropTypes.object).isRequired,
   isRssSyncExecuting: PropTypes.bool.isRequired,
   isSearchingForMissing: PropTypes.bool.isRequired,
   useCurrentPage: PropTypes.bool.isRequired,

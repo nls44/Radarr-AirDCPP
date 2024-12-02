@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using FluentValidation.Results;
 using NLog;
 using NzbDrone.Common.Disk;
@@ -8,6 +9,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Indexers;
+using NzbDrone.Core.Localization;
 using NzbDrone.Core.Organizer;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.RemotePathMappings;
@@ -20,11 +22,11 @@ namespace NzbDrone.Core.Download.Clients.Pneumatic
 
         public Pneumatic(IHttpClient httpClient,
                          IConfigService configService,
-                         INamingConfigService namingConfigService,
                          IDiskProvider diskProvider,
                          IRemotePathMappingService remotePathMappingService,
-                         Logger logger)
-            : base(configService, namingConfigService, diskProvider, remotePathMappingService, logger)
+                         Logger logger,
+                         ILocalizationService localizationService)
+            : base(configService, diskProvider, remotePathMappingService, logger, localizationService)
         {
             _httpClient = httpClient;
         }
@@ -33,23 +35,23 @@ namespace NzbDrone.Core.Download.Clients.Pneumatic
 
         public override DownloadProtocol Protocol => DownloadProtocol.Usenet;
 
-        public override string Download(RemoteMovie remoteMovie)
+        public override async Task<string> Download(RemoteMovie remoteMovie, IIndexer indexer)
         {
             var url = remoteMovie.Release.DownloadUrl;
             var title = remoteMovie.Release.Title;
 
             // We don't have full seasons in movies.
-            //if (remoteMovie.ParsedEpisodeInfo.FullSeason)
-            //{
+            // if (remoteMovie.ParsedEpisodeInfo.FullSeason)
+            // {
             //    throw new NotSupportedException("Full season releases are not supported with Pneumatic.");
-            //}
+            // }
             title = FileNameBuilder.CleanFileName(title);
 
-            //Save to the Pneumatic directory (The user will need to ensure its accessible by XBMC)
+            // Save to the Pneumatic directory (The user will need to ensure its accessible by XBMC)
             var nzbFile = Path.Combine(Settings.NzbFolder, title + ".nzb");
 
             _logger.Debug("Downloading NZB from: {0} to: {1}", url, nzbFile);
-            _httpClient.DownloadFile(url, nzbFile);
+            await _httpClient.DownloadFileAsync(url, nzbFile);
 
             _logger.Debug("NZB Download succeeded, saved to: {0}", nzbFile);
 
@@ -62,7 +64,7 @@ namespace NzbDrone.Core.Download.Clients.Pneumatic
 
         public override IEnumerable<DownloadClientItem> GetItems()
         {
-            foreach (var file in _diskProvider.GetFiles(Settings.StrmFolder, SearchOption.TopDirectoryOnly))
+            foreach (var file in _diskProvider.GetFiles(Settings.StrmFolder, false))
             {
                 if (Path.GetExtension(file) != ".strm")
                 {
@@ -73,7 +75,7 @@ namespace NzbDrone.Core.Download.Clients.Pneumatic
 
                 var historyItem = new DownloadClientItem
                 {
-                    DownloadClientInfo = DownloadClientItemClientInfo.FromDownloadClient(this),
+                    DownloadClientInfo = DownloadClientItemClientInfo.FromDownloadClient(this, false),
                     DownloadId = GetDownloadClientId(file),
                     Title = title,
 
@@ -98,7 +100,7 @@ namespace NzbDrone.Core.Download.Clients.Pneumatic
             }
         }
 
-        public override void RemoveItem(string downloadId, bool deleteData)
+        public override void RemoveItem(DownloadClientItem item, bool deleteData)
         {
             throw new NotSupportedException();
         }

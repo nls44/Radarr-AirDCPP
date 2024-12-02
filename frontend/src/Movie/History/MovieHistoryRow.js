@@ -4,13 +4,14 @@ import HistoryDetailsModal from 'Activity/History/Details/HistoryDetailsModal';
 import HistoryEventTypeCell from 'Activity/History/HistoryEventTypeCell';
 import IconButton from 'Components/Link/IconButton';
 import ConfirmModal from 'Components/Modal/ConfirmModal';
-import RelativeDateCellConnector from 'Components/Table/Cells/RelativeDateCellConnector';
+import RelativeDateCell from 'Components/Table/Cells/RelativeDateCell';
 import TableRowCell from 'Components/Table/Cells/TableRowCell';
 import TableRow from 'Components/Table/TableRow';
 import { icons, kinds } from 'Helpers/Props';
 import MovieFormats from 'Movie/MovieFormats';
-import MovieLanguage from 'Movie/MovieLanguage';
+import MovieLanguages from 'Movie/MovieLanguages';
 import MovieQuality from 'Movie/MovieQuality';
+import formatCustomFormatScore from 'Utilities/Number/formatCustomFormatScore';
 import translate from 'Utilities/String/translate';
 import styles from './MovieHistoryRow.css';
 
@@ -33,24 +34,24 @@ class MovieHistoryRow extends Component {
 
   onMarkAsFailedPress = () => {
     this.setState({ isMarkAsFailedModalOpen: true });
-  }
+  };
 
   onConfirmMarkAsFailed = () => {
     this.props.onMarkAsFailedPress(this.props.id);
     this.setState({ isMarkAsFailedModalOpen: false });
-  }
+  };
 
   onMarkAsFailedModalClose = () => {
     this.setState({ isMarkAsFailedModalOpen: false });
-  }
+  };
 
   onDetailsPress = () => {
     this.setState({ isDetailsModalOpen: true });
-  }
+  };
 
   onDetailsModalClose = () => {
     this.setState({ isDetailsModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -61,14 +62,15 @@ class MovieHistoryRow extends Component {
       sourceTitle,
       quality,
       customFormats,
+      customFormatScore,
       languages,
       qualityCutoffNotMet,
       date,
       data,
+      downloadId,
       isMarkingAsFailed,
       shortDateFormat,
-      timeFormat,
-      onMarkAsFailedPress
+      timeFormat
     } = this.props;
 
     const {
@@ -87,7 +89,7 @@ class MovieHistoryRow extends Component {
         </TableRowCell>
 
         <TableRowCell>
-          <MovieLanguage
+          <MovieLanguages
             languages={languages}
           />
         </TableRowCell>
@@ -99,14 +101,18 @@ class MovieHistoryRow extends Component {
           />
         </TableRowCell>
 
-        <TableRowCell key={name}>
-          <MovieFormats
-            formats={customFormats}
-          />
+        <TableRowCell>
+          <MovieFormats formats={customFormats} />
         </TableRowCell>
 
-        <RelativeDateCellConnector
+        <TableRowCell className={styles.customFormatScore}>
+          {formatCustomFormatScore(customFormatScore, customFormats.length)}
+        </TableRowCell>
+
+        <RelativeDateCell
           date={date}
+          includeSeconds={true}
+          includeTime={true}
         />
 
         <TableRowCell className={styles.actions}>
@@ -120,6 +126,7 @@ class MovieHistoryRow extends Component {
               <IconButton
                 title={translate('MarkAsFailed')}
                 name={icons.REMOVE}
+                size={14}
                 onPress={this.onMarkAsFailedPress}
               />
           }
@@ -140,10 +147,11 @@ class MovieHistoryRow extends Component {
           eventType={eventType}
           sourceTitle={sourceTitle}
           data={data}
+          downloadId={downloadId}
           isMarkingAsFailed={isMarkingAsFailed}
           shortDateFormat={shortDateFormat}
           timeFormat={timeFormat}
-          onMarkAsFailedPress={onMarkAsFailedPress}
+          onMarkAsFailedPress={this.onMarkAsFailedPress}
           onModalClose={this.onDetailsModalClose}
         />
       </TableRow>
@@ -157,10 +165,12 @@ MovieHistoryRow.propTypes = {
   sourceTitle: PropTypes.string.isRequired,
   languages: PropTypes.arrayOf(PropTypes.object).isRequired,
   quality: PropTypes.object.isRequired,
-  customFormats: PropTypes.arrayOf(PropTypes.object).isRequired,
+  customFormats: PropTypes.arrayOf(PropTypes.object),
+  customFormatScore: PropTypes.number.isRequired,
   qualityCutoffNotMet: PropTypes.bool.isRequired,
   date: PropTypes.string.isRequired,
   data: PropTypes.object.isRequired,
+  downloadId: PropTypes.string,
   isMarkingAsFailed: PropTypes.bool,
   movie: PropTypes.object.isRequired,
   shortDateFormat: PropTypes.string.isRequired,

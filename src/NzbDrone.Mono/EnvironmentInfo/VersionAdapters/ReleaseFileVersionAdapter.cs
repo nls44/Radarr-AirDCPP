@@ -1,4 +1,3 @@
-using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using NzbDrone.Common.Disk;
@@ -22,13 +21,13 @@ namespace NzbDrone.Mono.EnvironmentInfo.VersionAdapters
                 return null;
             }
 
-            var releaseFiles = _diskProvider.GetFiles("/etc/", SearchOption.TopDirectoryOnly).Where(c => c.EndsWith("release")).ToList();
+            var releaseFiles = _diskProvider.GetFiles("/etc/", false).Where(c => c.EndsWith("release")).ToList();
 
             var name = "Linux";
             var fullName = "";
             var version = "";
 
-            bool success = false;
+            var success = false;
 
             foreach (var releaseFile in releaseFiles)
             {

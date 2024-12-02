@@ -19,7 +19,7 @@ class TagInputInput extends Component {
     }
 
     onInputContainerPress();
-  }
+  };
 
   render() {
     const {
@@ -28,15 +28,16 @@ class TagInputInput extends Component {
       tags,
       inputProps,
       kind,
+      canEdit,
       tagComponent: TagComponent,
-      onTagDelete
+      onTagDelete,
+      onTagEdit
     } = this.props;
 
     return (
       <div
         ref={forwardedRef}
         className={className}
-        component="div"
         onMouseDown={this.onMouseDown}
       >
         {
@@ -47,8 +48,10 @@ class TagInputInput extends Component {
                 index={index}
                 tag={tag}
                 kind={kind}
+                canEdit={canEdit}
                 isLastTag={index === tags.length - 1}
                 onDelete={onTagDelete}
+                onEdit={onTagEdit}
               />
             );
           })
@@ -67,8 +70,10 @@ TagInputInput.propTypes = {
   inputProps: PropTypes.object.isRequired,
   kind: PropTypes.oneOf(kinds.all).isRequired,
   isFocused: PropTypes.bool.isRequired,
+  canEdit: PropTypes.bool.isRequired,
   tagComponent: PropTypes.elementType.isRequired,
   onTagDelete: PropTypes.func.isRequired,
+  onTagEdit: PropTypes.func.isRequired,
   onInputContainerPress: PropTypes.func.isRequired
 };
 

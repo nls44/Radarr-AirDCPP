@@ -6,13 +6,6 @@ namespace NzbDrone.Common.Extensions
 {
     public static class EnumerableExtensions
     {
-        public static IEnumerable<TSource> DistinctBy<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector)
-        {
-            var knownKeys = new HashSet<TKey>();
-
-            return source.Where(element => knownKeys.Add(keySelector(element)));
-        }
-
         public static IEnumerable<TFirst> IntersectBy<TFirst, TSecond, TKey>(this IEnumerable<TFirst> first,
                                                                              Func<TFirst, TKey> firstKeySelector,
                                                                              IEnumerable<TSecond> second,
@@ -133,9 +126,9 @@ namespace NzbDrone.Common.Extensions
 
         private static IEnumerable<T> InternalDropLast<T>(IEnumerable<T> source, int n)
         {
-            Queue<T> buffer = new Queue<T>(n + 1);
+            var buffer = new Queue<T>(n + 1);
 
-            foreach (T x in source)
+            foreach (var x in source)
             {
                 buffer.Enqueue(x);
 

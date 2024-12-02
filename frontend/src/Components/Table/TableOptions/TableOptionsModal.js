@@ -1,8 +1,8 @@
 import _ from 'lodash';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+import { DndProvider } from 'react-dnd-multi-backend';
+import HTML5toTouch from 'react-dnd-multi-backend/dist/esm/HTML5toTouch';
 import Form from 'Components/Form/Form';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputGroup from 'Components/Form/FormInputGroup';
@@ -49,11 +49,12 @@ class TableOptionsModal extends Component {
 
   onPageSizeChange = ({ value }) => {
     let pageSizeError = null;
+    const maxPageSize = this.props.maxPageSize ?? 250;
 
     if (value < 5) {
-      pageSizeError = 'Page size must be at least 5';
-    } else if (value > 250) {
-      pageSizeError = 'Page size must not exceed 250';
+      pageSizeError = translate('TablePageSizeMinimum', { minimumValue: '5' });
+    } else if (value > maxPageSize) {
+      pageSizeError = translate('TablePageSizeMaximum', { maximumValue: `${maxPageSize}` });
     } else {
       this.props.onTableOptionChange({ pageSize: value });
     }
@@ -62,7 +63,7 @@ class TableOptionsModal extends Component {
       pageSize: value,
       pageSizeError
     });
-  }
+  };
 
   onVisibleChange = ({ name, value }) => {
     const columns = _.cloneDeep(this.props.columns);
@@ -71,7 +72,7 @@ class TableOptionsModal extends Component {
     column.isVisible = value;
 
     this.props.onTableOptionChange({ columns });
-  }
+  };
 
   onColumnDragMove = (dragIndex, dropIndex) => {
     if (this.state.dragIndex !== dragIndex || this.state.dropIndex !== dropIndex) {
@@ -80,7 +81,7 @@ class TableOptionsModal extends Component {
         dropIndex
       });
     }
-  }
+  };
 
   onColumnDragEnd = ({ id }, didDrop) => {
     const {
@@ -100,7 +101,7 @@ class TableOptionsModal extends Component {
       dragIndex: null,
       dropIndex: null
     });
-  }
+  };
 
   //
   // Render
@@ -128,7 +129,7 @@ class TableOptionsModal extends Component {
     const isDraggingDown = isDragging && dropIndex > dragIndex;
 
     return (
-      <DndProvider backend={HTML5Backend}>
+      <DndProvider options={HTML5toTouch}>
         <Modal
           isOpen={isOpen}
           onModalClose={onModalClose}
@@ -145,13 +146,13 @@ class TableOptionsModal extends Component {
                     {
                       hasPageSize ?
                         <FormGroup>
-                          <FormLabel>{translate('PageSize')}</FormLabel>
+                          <FormLabel>{translate('TablePageSize')}</FormLabel>
 
                           <FormInputGroup
                             type={inputTypes.NUMBER}
                             name="pageSize"
                             value={pageSize || 0}
-                            helpText={translate('PageSizeHelpText')}
+                            helpText={translate('TablePageSizeHelpText')}
                             errors={pageSizeError ? [{ message: pageSizeError }] : undefined}
                             onChange={this.onPageSizeChange}
                           />
@@ -192,7 +193,7 @@ class TableOptionsModal extends Component {
                                       <TableOptionsColumnDragSource
                                         key={name}
                                         name={name}
-                                        label={label || columnLabel}
+                                        label={columnLabel || label}
                                         isVisible={isVisible}
                                         isModifiable={true}
                                         index={index}
@@ -210,7 +211,7 @@ class TableOptionsModal extends Component {
                                     <TableOptionsColumn
                                       key={name}
                                       name={name}
-                                      label={label || columnLabel}
+                                      label={columnLabel || label}
                                       isVisible={isVisible}
                                       index={index}
                                       isModifiable={false}
@@ -248,6 +249,7 @@ TableOptionsModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   columns: PropTypes.arrayOf(PropTypes.object).isRequired,
   pageSize: PropTypes.number,
+  maxPageSize: PropTypes.number,
   canModifyColumns: PropTypes.bool.isRequired,
   optionsComponent: PropTypes.elementType,
   onTableOptionChange: PropTypes.func.isRequired,

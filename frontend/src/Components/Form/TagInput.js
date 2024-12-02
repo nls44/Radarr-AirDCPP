@@ -49,7 +49,7 @@ class TagInput extends Component {
 
   _setAutosuggestRef = (ref) => {
     this._autosuggestRef = ref;
-  }
+  };
 
   getSuggestionValue({ name }) {
     return name;
@@ -57,7 +57,7 @@ class TagInput extends Component {
 
   shouldRenderSuggestions = (value) => {
     return value.length >= this.props.minQueryLength;
-  }
+  };
 
   renderSuggestion({ name }) {
     return name;
@@ -70,14 +70,26 @@ class TagInput extends Component {
       value: '',
       suggestions: []
     });
-  }, 250, { leading: true, trailing: false })
+  }, 250, { leading: true, trailing: false });
 
   //
   // Listeners
 
+  onTagEdit = ({ value, ...otherProps }) => {
+    const currentValue = this.state.value;
+
+    if (currentValue && this.props.onTagReplace) {
+      this.props.onTagReplace(otherProps, { name: currentValue });
+    } else {
+      this.props.onTagDelete(otherProps);
+    }
+
+    this.setState({ value });
+  };
+
   onInputContainerPress = () => {
     this._autosuggestRef.input.focus();
-  }
+  };
 
   onInputChange = (event, { newValue, method }) => {
     const value = _.isObject(newValue) ? newValue.name : newValue;
@@ -85,7 +97,7 @@ class TagInput extends Component {
     if (method === 'type') {
       this.setState({ value });
     }
-  }
+  };
 
   onInputKeyDown = (event) => {
     const {
@@ -125,11 +137,11 @@ class TagInput extends Component {
         event.preventDefault();
       }
     }
-  }
+  };
 
   onInputFocus = () => {
     this.setState({ isFocused: true });
-  }
+  };
 
   onInputBlur = () => {
     this.setState({ isFocused: false });
@@ -153,7 +165,7 @@ class TagInput extends Component {
     if (tag) {
       this.addTag(tag);
     }
-  }
+  };
 
   onSuggestionsFetchRequested = ({ value }) => {
     const lowerCaseValue = value.toLowerCase();
@@ -170,16 +182,16 @@ class TagInput extends Component {
     });
 
     this.setState({ suggestions });
-  }
+  };
 
   onSuggestionsClearRequested = () => {
     // Required because props aren't always rendered, but no-op
     // because we don't want to reset the paths after a path is selected.
-  }
+  };
 
   onSuggestionSelected = (event, { suggestion }) => {
     this.addTag(suggestion);
-  }
+  };
 
   //
   // Render
@@ -188,6 +200,7 @@ class TagInput extends Component {
     const {
       tags,
       kind,
+      canEdit,
       tagComponent,
       onTagDelete
     } = this.props;
@@ -199,17 +212,21 @@ class TagInput extends Component {
         kind={kind}
         inputProps={inputProps}
         isFocused={this.state.isFocused}
+        canEdit={canEdit}
         tagComponent={tagComponent}
         onTagDelete={onTagDelete}
+        onTagEdit={this.onTagEdit}
         onInputContainerPress={this.onInputContainerPress}
       />
     );
-  }
+  };
 
   render() {
     const {
       className,
       inputContainerClassName,
+      hasError,
+      hasWarning,
       ...otherProps
     } = this.props;
 
@@ -223,10 +240,12 @@ class TagInput extends Component {
       <AutoSuggestInput
         {...otherProps}
         forwardedRef={this._setAutosuggestRef}
-        className={styles.internalInput}
+        className={className}
         inputContainerClassName={classNames(
           inputContainerClassName,
-          isFocused && styles.isFocused
+          isFocused && styles.isFocused,
+          hasError && styles.hasError,
+          hasWarning && styles.hasWarning
         )}
         value={value}
         suggestions={suggestions}
@@ -258,11 +277,13 @@ TagInput.propTypes = {
   placeholder: PropTypes.string.isRequired,
   delimiters: PropTypes.arrayOf(PropTypes.string).isRequired,
   minQueryLength: PropTypes.number.isRequired,
+  canEdit: PropTypes.bool,
   hasError: PropTypes.bool,
   hasWarning: PropTypes.bool,
   tagComponent: PropTypes.elementType.isRequired,
   onTagAdd: PropTypes.func.isRequired,
-  onTagDelete: PropTypes.func.isRequired
+  onTagDelete: PropTypes.func.isRequired,
+  onTagReplace: PropTypes.func
 };
 
 TagInput.defaultProps = {
@@ -273,6 +294,7 @@ TagInput.defaultProps = {
   placeholder: '',
   delimiters: ['Tab', 'Enter', ' ', ','],
   minQueryLength: 1,
+  canEdit: false,
   tagComponent: TagInputTag
 };
 

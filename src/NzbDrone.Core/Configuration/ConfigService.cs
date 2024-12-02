@@ -5,7 +5,6 @@ using System.Linq;
 using NLog;
 using NzbDrone.Common.EnsureThat;
 using NzbDrone.Common.Http.Proxy;
-using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Configuration.Events;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaFiles;
@@ -58,8 +57,7 @@ namespace NzbDrone.Core.Configuration
 
             foreach (var configValue in configValues)
             {
-                object currentValue;
-                allWithDefaults.TryGetValue(configValue.Key, out currentValue);
+                allWithDefaults.TryGetValue(configValue.Key, out var currentValue);
                 if (currentValue == null || configValue.Value == null)
                 {
                     continue;
@@ -107,7 +105,7 @@ namespace NzbDrone.Core.Configuration
 
         public int RssSyncInterval
         {
-            get { return GetValueInt("RssSyncInterval", 60); }
+            get { return GetValueInt("RssSyncInterval", 30); }
 
             set { SetValue("RssSyncInterval", value); }
         }
@@ -116,13 +114,6 @@ namespace NzbDrone.Core.Configuration
         {
             get { return GetValueInt("AvailabilityDelay", 0); }
             set { SetValue("AvailabilityDelay", value); }
-        }
-
-        public int ImportListSyncInterval
-        {
-            get { return GetValueInt("ImportListSyncInterval", 24); }
-
-            set { SetValue("ImportListSyncInterval", value); }
         }
 
         public string ListSyncLevel
@@ -192,13 +183,6 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("WhitelistedHardcodedSubs", value); }
         }
 
-        public bool RemoveCompletedDownloads
-        {
-            get { return GetValueBoolean("RemoveCompletedDownloads", false); }
-
-            set { SetValue("RemoveCompletedDownloads", value); }
-        }
-
         public bool AutoRedownloadFailed
         {
             get { return GetValueBoolean("AutoRedownloadFailed", true); }
@@ -206,11 +190,11 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("AutoRedownloadFailed", value); }
         }
 
-        public bool RemoveFailedDownloads
+        public bool AutoRedownloadFailedFromInteractiveSearch
         {
-            get { return GetValueBoolean("RemoveFailedDownloads", true); }
+            get { return GetValueBoolean("AutoRedownloadFailedFromInteractiveSearch", true); }
 
-            set { SetValue("RemoveFailedDownloads", value); }
+            set { SetValue("AutoRedownloadFailedFromInteractiveSearch", value); }
         }
 
         public bool CreateEmptyMovieFolders
@@ -254,6 +238,7 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("DownloadClientHistoryLimit", value); }
         }
 
+        // TODO: Rename to 'Skip Free Space Check'
         public bool SkipFreeSpaceCheckWhenImporting
         {
             get { return GetValueBoolean("SkipFreeSpaceCheckWhenImporting", false); }
@@ -287,6 +272,20 @@ namespace NzbDrone.Core.Configuration
             get { return GetValueBoolean("EnableMediaInfo", true); }
 
             set { SetValue("EnableMediaInfo", value); }
+        }
+
+        public bool UseScriptImport
+        {
+            get { return GetValueBoolean("UseScriptImport", false); }
+
+            set { SetValue("UseScriptImport", value); }
+        }
+
+        public string ScriptImportPath
+        {
+            get { return GetValue("ScriptImportPath"); }
+
+            set { SetValue("ScriptImportPath", value); }
         }
 
         public bool ImportExtraFiles
@@ -450,6 +449,8 @@ namespace NzbDrone.Core.Configuration
         public CertificateValidationType CertificateValidation =>
             GetValueEnum("CertificateValidation", CertificateValidationType.Enabled);
 
+        public string ApplicationUrl => GetValue("ApplicationUrl", string.Empty);
+
         private string GetValue(string key)
         {
             return GetValue(key, string.Empty);
@@ -477,9 +478,7 @@ namespace NzbDrone.Core.Configuration
 
             EnsureCache();
 
-            string dbValue;
-
-            if (_cache.TryGetValue(key, out dbValue) && dbValue != null && !string.IsNullOrEmpty(dbValue))
+            if (_cache.TryGetValue(key, out var dbValue) && dbValue != null && !string.IsNullOrEmpty(dbValue))
             {
                 return dbValue;
             }

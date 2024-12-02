@@ -1,4 +1,3 @@
-using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using NLog;
@@ -34,7 +33,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Specifications
             if (MovieMultiPartRegex.Any(v => v.IsMatch(localMovie.Path)))
             {
                 var parentPath = localMovie.Path.GetParentPath();
-                var filesInDirectory = _diskProvider.GetFiles(localMovie.Path.GetParentPath(), SearchOption.TopDirectoryOnly);
+                var filesInDirectory = _diskProvider.GetFiles(localMovie.Path.GetParentPath(), false);
 
                 foreach (var regex in MovieMultiPartRegex)
                 {
@@ -42,7 +41,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Specifications
                     {
                         _logger.Debug("Rejected Multi-Part File: {0}", localMovie.Path);
 
-                        return Decision.Reject("File is suspected multi-part file, Radarr doesn't support");
+                        return Decision.Reject("File is suspected multi-part file, Radarr doesn't support this");
                     }
                 }
             }

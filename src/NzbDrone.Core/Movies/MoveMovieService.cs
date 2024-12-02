@@ -1,6 +1,7 @@
 using System.IO;
 using NLog;
 using NzbDrone.Common.Disk;
+using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Messaging.Events;
@@ -36,6 +37,12 @@ namespace NzbDrone.Core.Movies
 
         private void MoveSingleMovie(Movie movie, string sourcePath, string destinationPath, int? index = null, int? total = null)
         {
+            if (!sourcePath.IsPathValid(PathValidationType.CurrentOs))
+            {
+                _logger.Warn("Folder '{0}' for '{1}' is invalid, unable to move movie. Try moving files manually", sourcePath, movie.Title);
+                return;
+            }
+
             if (!_diskProvider.FolderExists(sourcePath))
             {
                 _logger.Debug("Folder '{0}' for '{1}' does not exist, not moving.", sourcePath, movie.Title);
@@ -51,12 +58,18 @@ namespace NzbDrone.Core.Movies
                 _logger.ProgressInfo("Moving {0} from '{1}' to '{2}'", movie.Title, sourcePath, destinationPath);
             }
 
+            if (sourcePath.PathEquals(destinationPath))
+            {
+                _logger.ProgressInfo("{0} is already in the specified location '{1}'.", movie, destinationPath);
+                return;
+            }
+
             try
             {
                 _diskProvider.CreateFolder(new DirectoryInfo(destinationPath).Parent.FullName);
                 _diskTransferService.TransferFolder(sourcePath, destinationPath, TransferMode.Move);
 
-                _logger.ProgressInfo("{0} moved successfully to {1}", movie.Title, movie.Path);
+                _logger.ProgressInfo("{0} moved successfully to {1}", movie.Title, destinationPath);
 
                 _eventAggregator.PublishEvent(new MovieMovedEvent(movie, sourcePath, destinationPath));
             }

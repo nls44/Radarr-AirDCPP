@@ -1,8 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using FluentAssertions;
 using NUnit.Framework;
 using NzbDrone.Common.Serializer;
@@ -36,7 +33,7 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                 Items = items.ToJson(),
                 Language = (int)Language.English,
                 MinFormatScore = 0,
-                CutOffFormatScore = 0
+                CutoffFormatScore = 0
             };
 
             m.Insert.IntoTable("Profiles").Row(profile);
@@ -50,8 +47,8 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                 Monitored = true,
                 Title = movieTitle,
                 CleanTitle = movieTitle,
-                Status = MovieStatusType.Announced,
-                MinimumAvailability = MovieStatusType.Announced,
+                Status = (int)MovieStatusType.Announced,
+                MinimumAvailability = (int)MovieStatusType.Announced,
                 Images = new[] { new { CoverType = "Poster" } }.ToJson(),
                 Recommendations = new[] { 1 }.ToJson(),
                 HasPreDBEntry = false,
@@ -89,8 +86,8 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                 AddMovie(c, "movie", 123456, profileId);
             });
 
-            var items = db.Query<Movie179>("SELECT Id, ProfileId FROM Movies");
-            var profiles = db.Query<Profile179>("SELECT Id FROM Profiles");
+            var items = db.Query<Movie179>("SELECT \"Id\", \"ProfileId\" FROM \"Movies\"");
+            var profiles = db.Query<Profile179>("SELECT \"Id\" FROM \"Profiles\"");
 
             items.Should().HaveCount(1);
             profiles.Should().HaveCount(6);
@@ -108,8 +105,8 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                 AddMovie(c, "movie", 123456, 17);
             });
 
-            var items = db.Query<Movie179>("SELECT Id, ProfileId FROM Movies");
-            var profiles = db.Query<Profile179>("SELECT Id FROM Profiles");
+            var items = db.Query<Movie179>("SELECT \"Id\", \"ProfileId\" FROM \"Movies\"");
+            var profiles = db.Query<Profile179>("SELECT \"Id\" FROM \"Profiles\"");
 
             items.Should().HaveCount(1);
             profiles.Should().HaveCount(1);
@@ -128,8 +125,8 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                 AddMovie(c, "movie", 123456, profileId);
             });
 
-            var items = db.Query<Movie179>("SELECT Id, ProfileId FROM Movies");
-            var profiles = db.Query<Profile179>("SELECT Id, FormatItems FROM Profiles");
+            var items = db.Query<Movie179>("SELECT \"Id\", \"ProfileId\" FROM \"Movies\"");
+            var profiles = db.Query<Profile179>("SELECT \"Id\", \"FormatItems\" FROM \"Profiles\"");
 
             items.Should().HaveCount(1);
             profiles.Should().HaveCount(6);
@@ -149,7 +146,7 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                 AddMovie(c, "movie", 123456, profileId);
             });
 
-            var items = db.Query<Movie179>("SELECT Id, ProfileId FROM Movies");
+            var items = db.Query<Movie179>("SELECT \"Id\", \"ProfileId\" FROM \"Movies\"");
 
             items.Should().HaveCount(1);
             items.First().ProfileId.Should().Be(profileId);
@@ -166,7 +163,7 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                 AddMovie(c, "movie", 123456, 1);
             });
 
-            var items = db.Query<Movie179>("SELECT Id, ProfileId FROM Movies");
+            var items = db.Query<Movie179>("SELECT \"Id\", \"ProfileId\" FROM \"Movies\"");
 
             items.Should().HaveCount(1);
             items.First().ProfileId.Should().Be(profileId);
@@ -193,7 +190,7 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                 AddMovie(c, "movie9", 123459, otherProfileId);
             });
 
-            var items = db.Query<Movie179>("SELECT Id, ProfileId FROM Movies");
+            var items = db.Query<Movie179>("SELECT \"Id\", \"ProfileId\" FROM \"Movies\"");
 
             items.Should().HaveCount(9);
             items.Where(x => x.ProfileId == commonProfileId).Should().HaveCount(7);

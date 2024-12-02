@@ -29,9 +29,10 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IDiskTransferService _diskTransferService;
         private readonly IDiskProvider _diskProvider;
         private readonly IMediaFileAttributeService _mediaFileAttributeService;
+        private readonly IImportScript _scriptImportDecider;
+        private readonly IRootFolderService _rootFolderService;
         private readonly IEventAggregator _eventAggregator;
         private readonly IConfigService _configService;
-        private readonly IRootFolderService _rootFolderService;
         private readonly Logger _logger;
 
         public MovieFileMovingService(IUpdateMovieFileService updateMovieFileService,
@@ -39,9 +40,10 @@ namespace NzbDrone.Core.MediaFiles
                                 IDiskTransferService diskTransferService,
                                 IDiskProvider diskProvider,
                                 IMediaFileAttributeService mediaFileAttributeService,
+                                IImportScript scriptImportDecider,
+                                IRootFolderService rootFolderService,
                                 IEventAggregator eventAggregator,
                                 IConfigService configService,
-                                IRootFolderService rootFolderService,
                                 Logger logger)
         {
             _updateMovieFileService = updateMovieFileService;
@@ -49,9 +51,10 @@ namespace NzbDrone.Core.MediaFiles
             _diskTransferService = diskTransferService;
             _diskProvider = diskProvider;
             _mediaFileAttributeService = mediaFileAttributeService;
+            _scriptImportDecider = scriptImportDecider;
+            _rootFolderService = rootFolderService;
             _eventAggregator = eventAggregator;
             _configService = configService;
-            _rootFolderService = rootFolderService;
             _logger = logger;
         }
 
@@ -69,19 +72,19 @@ namespace NzbDrone.Core.MediaFiles
 
         public MovieFile MoveMovieFile(MovieFile movieFile, LocalMovie localMovie)
         {
-            var newFileName = _buildFileNames.BuildFileName(localMovie.Movie, movieFile);
+            var newFileName = _buildFileNames.BuildFileName(localMovie.Movie, movieFile, null, localMovie.CustomFormats);
             var filePath = _buildFileNames.BuildFilePath(localMovie.Movie, newFileName, Path.GetExtension(localMovie.Path));
 
             EnsureMovieFolder(movieFile, localMovie, filePath);
 
             _logger.Debug("Moving movie file: {0} to {1}", movieFile.Path, filePath);
 
-            return TransferFile(movieFile, localMovie.Movie, filePath, TransferMode.Move);
+            return TransferFile(movieFile, localMovie.Movie, filePath, TransferMode.Move, localMovie);
         }
 
         public MovieFile CopyMovieFile(MovieFile movieFile, LocalMovie localMovie)
         {
-            var newFileName = _buildFileNames.BuildFileName(localMovie.Movie, movieFile);
+            var newFileName = _buildFileNames.BuildFileName(localMovie.Movie, movieFile, null, localMovie.CustomFormats);
             var filePath = _buildFileNames.BuildFilePath(localMovie.Movie, newFileName, Path.GetExtension(localMovie.Path));
 
             EnsureMovieFolder(movieFile, localMovie, filePath);
@@ -94,19 +97,19 @@ namespace NzbDrone.Core.MediaFiles
 
             if (_configService.CopyUsingHardlinks)
             {
-                _logger.Debug("Hardlinking movie file: {0} to {1}", movieFile.Path, filePath);
-                return TransferFile(movieFile, localMovie.Movie, filePath, TransferMode.HardLinkOrCopy);
+                _logger.Debug("Attempting to hardlink movie file: {0} to {1}", movieFile.Path, filePath);
+                return TransferFile(movieFile, localMovie.Movie, filePath, TransferMode.HardLinkOrCopy, localMovie);
             }
 
             _logger.Debug("Copying movie file: {0} to {1}", movieFile.Path, filePath);
-            return TransferFile(movieFile, localMovie.Movie, filePath, TransferMode.Copy);
+            return TransferFile(movieFile, localMovie.Movie, filePath, TransferMode.Copy, localMovie);
         }
 
-        private MovieFile TransferFile(MovieFile movieFile, Movie movie, string destinationFilePath, TransferMode mode)
+        private MovieFile TransferFile(MovieFile movieFile, Movie movie, string destinationFilePath, TransferMode mode, LocalMovie localMovie = null)
         {
             Ensure.That(movieFile, () => movieFile).IsNotNull();
             Ensure.That(movie, () => movie).IsNotNull();
-            Ensure.That(destinationFilePath, () => destinationFilePath).IsValidPath();
+            Ensure.That(destinationFilePath, () => destinationFilePath).IsValidPath(PathValidationType.CurrentOs);
 
             var movieFilePath = movieFile.Path ?? Path.Combine(movie.Path, movieFile.RelativePath);
 
@@ -120,9 +123,31 @@ namespace NzbDrone.Core.MediaFiles
                 throw new SameFilenameException("File not moved, source and destination are the same", movieFilePath);
             }
 
-            _diskTransferService.TransferFile(movieFilePath, destinationFilePath, mode);
-
             movieFile.RelativePath = movie.Path.GetRelativePath(destinationFilePath);
+
+            if (localMovie is not null)
+            {
+                localMovie.FileNameBeforeRename = movieFile.RelativePath;
+            }
+
+            if (localMovie is not null && _scriptImportDecider.TryImport(movieFilePath, destinationFilePath, localMovie, movieFile, mode) is var scriptImportDecision && scriptImportDecision != ScriptImportDecision.DeferMove)
+            {
+                if (scriptImportDecision == ScriptImportDecision.RenameRequested)
+                {
+                    try
+                    {
+                        MoveMovieFile(movieFile, movie);
+                    }
+                    catch (SameFilenameException)
+                    {
+                        _logger.Debug("No rename was required. File already exists at destination.");
+                    }
+                }
+            }
+            else
+            {
+                _diskTransferService.TransferFile(movieFilePath, destinationFilePath, mode);
+            }
 
             _updateMovieFileService.ChangeFileDateForFile(movieFile, movie);
 
@@ -148,13 +173,17 @@ namespace NzbDrone.Core.MediaFiles
         private void EnsureMovieFolder(MovieFile movieFile, Movie movie, string filePath)
         {
             var movieFileFolder = Path.GetDirectoryName(filePath);
-
             var movieFolder = movie.Path;
             var rootFolder = _rootFolderService.GetBestRootFolderPath(movieFolder);
 
+            if (rootFolder.IsNullOrWhiteSpace())
+            {
+                throw new RootFolderNotFoundException($"Root folder was not found, '{movieFolder}' is not a subdirectory of a defined root folder.");
+            }
+
             if (!_diskProvider.FolderExists(rootFolder))
             {
-                throw new RootFolderNotFoundException(string.Format("Root folder '{0}' was not found.", rootFolder));
+                throw new RootFolderNotFoundException($"Root folder '{rootFolder}' was not found.");
             }
 
             var changed = false;

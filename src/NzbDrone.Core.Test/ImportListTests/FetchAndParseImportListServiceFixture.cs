@@ -27,7 +27,7 @@ namespace NzbDrone.Core.Test.ImportListTests
             _blockedLists = new List<ImportListStatus>();
 
             Mocker.GetMock<IImportListFactory>()
-                  .Setup(v => v.Enabled())
+                  .Setup(v => v.Enabled(It.IsAny<bool>()))
                   .Returns(_importLists);
 
             Mocker.GetMock<IImportListStatusService>()
@@ -38,8 +38,8 @@ namespace NzbDrone.Core.Test.ImportListTests
                 .Build().ToList();
 
             Mocker.GetMock<ISearchForNewMovie>()
-                .Setup(v => v.MapMovieToTmdbMovie(It.IsAny<Movie>()))
-                .Returns<Movie>(m => new Movie { TmdbId = m.TmdbId });
+                .Setup(v => v.MapMovieToTmdbMovie(It.IsAny<MovieMetadata>()))
+                .Returns<MovieMetadata>(m => new MovieMetadata { TmdbId = m.TmdbId });
         }
 
         private void GivenList(int id, bool enabled, bool enabledAuto, ImportListFetchResult fetchResult)
@@ -183,7 +183,7 @@ namespace NzbDrone.Core.Test.ImportListTests
 
             var listResult = Subject.Fetch();
             listResult.AnyFailure.Should().BeFalse();
-            listResult.Movies.Count.Should().Be(10);
+            listResult.Movies.Count.Should().Be(5);
         }
     }
 }

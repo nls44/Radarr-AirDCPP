@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Parser.Model;
@@ -71,10 +72,10 @@ namespace NzbDrone.Core.DecisionEngine
         {
             if (_configService.DownloadPropersAndRepacks == ProperDownloadTypes.DoNotPrefer)
             {
-                return CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => remoteMovie.Movie.Profile.GetIndex(remoteMovie.ParsedMovieInfo.Quality.Quality));
+                return CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => remoteMovie.Movie.QualityProfile.GetIndex(remoteMovie.ParsedMovieInfo.Quality.Quality));
             }
 
-            return CompareAll(CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => remoteMovie.Movie.Profile.GetIndex(remoteMovie.ParsedMovieInfo.Quality.Quality)),
+            return CompareAll(CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => remoteMovie.Movie.QualityProfile.GetIndex(remoteMovie.ParsedMovieInfo.Quality.Quality)),
                               CompareBy(x.RemoteMovie, y.RemoteMovie, remoteMovie => remoteMovie.ParsedMovieInfo.Quality.Revision));
         }
 
@@ -85,17 +86,12 @@ namespace NzbDrone.Core.DecisionEngine
 
         private int CompareIndexerFlags(DownloadDecision x, DownloadDecision y)
         {
-            var releaseX = x.RemoteMovie.Release;
-            var releaseY = y.RemoteMovie.Release;
-
-            if (_configService.PreferIndexerFlags)
-            {
-                return CompareBy(x.RemoteMovie.Release, y.RemoteMovie.Release, release => ScoreFlags(release.IndexerFlags));
-            }
-            else
+            if (!_configService.PreferIndexerFlags)
             {
                 return 0;
             }
+
+            return CompareBy(x.RemoteMovie.Release, y.RemoteMovie.Release, release => ScoreFlags(release.IndexerFlags));
         }
 
         private int CompareProtocol(DownloadDecision x, DownloadDecision y)
@@ -113,7 +109,7 @@ namespace NzbDrone.Core.DecisionEngine
         private int ComparePeersIfTorrent(DownloadDecision x, DownloadDecision y)
         {
             // Different protocols should get caught when checking the preferred protocol,
-            // since we're dealing with the same movie in our comparisions
+            // since we're dealing with the same movie in our comparisons
             if (x.RemoteMovie.Release.DownloadProtocol != DownloadProtocol.Torrent ||
                 y.RemoteMovie.Release.DownloadProtocol != DownloadProtocol.Torrent)
             {
@@ -174,9 +170,9 @@ namespace NzbDrone.Core.DecisionEngine
                 var preferredSize = _qualityDefinitionService.Get(remoteMovie.ParsedMovieInfo.Quality.Quality).PreferredSize;
 
                 // If no value for preferred it means unlimited so fallback to sort largest is best
-                if (preferredSize.HasValue && remoteMovie.Movie.Runtime > 0)
+                if (preferredSize.HasValue && remoteMovie.Movie.MovieMetadata.Value.Runtime > 0)
                 {
-                    var preferredMovieSize = remoteMovie.Movie.Runtime * preferredSize.Value.Megabytes();
+                    var preferredMovieSize = remoteMovie.Movie.MovieMetadata.Value.Runtime * preferredSize.Value.Megabytes();
 
                     // Calculate closest to the preferred size
                     return Math.Abs((remoteMovie.Release.Size - preferredMovieSize).Round(200.Megabytes())) * (-1);
@@ -206,12 +202,10 @@ namespace NzbDrone.Core.DecisionEngine
                         case IndexerFlags.G_Freeleech:
                         case IndexerFlags.PTP_Approved:
                         case IndexerFlags.PTP_Golden:
-                        case IndexerFlags.HDB_Internal:
-                        case IndexerFlags.AHD_Internal:
+                        case IndexerFlags.G_Internal:
                             score += 2;
                             break;
                         case IndexerFlags.G_Halfleech:
-                        case IndexerFlags.AHD_UserRelease:
                             score += 1;
                             break;
                     }

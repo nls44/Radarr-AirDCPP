@@ -1,9 +1,16 @@
 import _ from 'lodash';
+import React from 'react';
 import { createAction } from 'redux-actions';
 import { batchActions } from 'redux-batched-actions';
+import Icon from 'Components/Icon';
+import IconButton from 'Components/Link/IconButton';
+import { icons, sortDirections } from 'Helpers/Props';
 import movieEntities from 'Movie/movieEntities';
+import createSetClientSideCollectionSortReducer from 'Store/Actions/Creators/Reducers/createSetClientSideCollectionSortReducer';
+import createSetTableOptionReducer from 'Store/Actions/Creators/Reducers/createSetTableOptionReducer';
 import { createThunk, handleThunks } from 'Store/thunks';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
+import translate from 'Utilities/String/translate';
 import { removeItem, set, updateItem } from './baseActions';
 import createFetchHandler from './Creators/createFetchHandler';
 import createHandleActions from './Creators/createHandleActions';
@@ -25,8 +32,108 @@ export const defaultState = {
   deleteError: null,
   isSaving: false,
   saveError: null,
-  items: []
+  sortKey: 'relativePath',
+  sortDirection: sortDirections.ASCENDING,
+  items: [],
+
+  columns: [
+    {
+      name: 'relativePath',
+      label: () => translate('RelativePath'),
+      isVisible: true,
+      isSortable: true
+    },
+    {
+      name: 'videoCodec',
+      label: () => translate('VideoCodec'),
+      isVisible: true
+    },
+    {
+      name: 'videoDynamicRangeType',
+      label: () => translate('VideoDynamicRange'),
+      isVisible: false
+    },
+    {
+      name: 'audioInfo',
+      label: () => translate('AudioInfo'),
+      isVisible: true
+    },
+    {
+      name: 'audioLanguages',
+      label: () => translate('AudioLanguages'),
+      isVisible: false
+    },
+    {
+      name: 'subtitleLanguages',
+      label: () => translate('SubtitleLanguages'),
+      isVisible: false
+    },
+    {
+      name: 'size',
+      label: () => translate('Size'),
+      isVisible: true,
+      isSortable: true
+    },
+    {
+      name: 'languages',
+      label: () => translate('Languages'),
+      isVisible: true
+    },
+    {
+      name: 'quality',
+      label: () => translate('Quality'),
+      isVisible: true
+    },
+    {
+      name: 'releaseGroup',
+      label: () => translate('ReleaseGroup'),
+      isVisible: true
+    },
+    {
+      name: 'customFormats',
+      label: () => translate('Formats'),
+      isVisible: true
+    },
+    {
+      name: 'customFormatScore',
+      columnLabel: () => translate('CustomFormatScore'),
+      label: React.createElement(Icon, {
+        name: icons.SCORE,
+        title: () => translate('CustomFormatScore')
+      }),
+      isVisible: true,
+      isSortable: true
+    },
+    {
+      name: 'indexerFlags',
+      columnLabel: () => translate('IndexerFlags'),
+      label: React.createElement(Icon, {
+        name: icons.FLAG,
+        title: () => translate('IndexerFlags')
+      }),
+      isVisible: false
+    },
+    {
+      name: 'dateAdded',
+      label: () => translate('Added'),
+      isVisible: false,
+      isSortable: true
+    },
+    {
+      name: 'actions',
+      columnLabel: () => translate('Actions'),
+      label: React.createElement(IconButton, { name: icons.ADVANCED_SETTINGS }),
+      isVisible: true,
+      isModifiable: false
+    }
+  ]
 };
+
+export const persistState = [
+  'movieFiles.columns',
+  'movieFiles.sortDirection',
+  'movieFiles.sortKey'
+];
 
 //
 // Actions Types
@@ -36,6 +143,8 @@ export const DELETE_MOVIE_FILE = 'movieFiles/deleteMovieFile';
 export const DELETE_MOVIE_FILES = 'movieFiles/deleteMovieFiles';
 export const UPDATE_MOVIE_FILES = 'movieFiles/updateMovieFiles';
 export const CLEAR_MOVIE_FILES = 'movieFiles/clearMovieFiles';
+export const SET_MOVIE_FILES_SORT = 'movieFiles/setMovieFilesSort';
+export const SET_MOVIE_FILES_TABLE_OPTION = 'movieFiles/setMovieFilesTableOption';
 
 //
 // Action Creators
@@ -45,6 +154,8 @@ export const deleteMovieFile = createThunk(DELETE_MOVIE_FILE);
 export const deleteMovieFiles = createThunk(DELETE_MOVIE_FILES);
 export const updateMovieFiles = createThunk(UPDATE_MOVIE_FILES);
 export const clearMovieFiles = createAction(CLEAR_MOVIE_FILES);
+export const setMovieFilesSort = createAction(SET_MOVIE_FILES_SORT);
+export const setMovieFilesTableOption = createAction(SET_MOVIE_FILES_TABLE_OPTION);
 
 //
 // Helpers
@@ -165,11 +276,11 @@ export const actionHandlers = handleThunks({
       requestData.quality = quality;
     }
 
-    if (releaseGroup) {
+    if (releaseGroup !== undefined) {
       requestData.releaseGroup = releaseGroup;
     }
 
-    if (edition) {
+    if (edition !== undefined) {
       requestData.edition = edition;
     }
 
@@ -183,17 +294,19 @@ export const actionHandlers = handleThunks({
     promise.done((data) => {
       dispatch(batchActions([
         ...movieFileIds.map((id) => {
-          const props = {};
-
           const movieFile = data.find((file) => file.id === id);
 
-          props.qualityCutoffNotMet = movieFile.qualityCutoffNotMet;
+          const props = {
+            customFormats: movieFile.customFormats,
+            customFormatScore: movieFile.customFormatScore,
+            qualityCutoffNotMet: movieFile.qualityCutoffNotMet
+          };
 
           if (languages) {
             props.languages = languages;
           }
 
-          if (indexerFlags) {
+          if (indexerFlags !== undefined) {
             props.indexerFlags = indexerFlags;
           }
 
@@ -201,11 +314,11 @@ export const actionHandlers = handleThunks({
             props.quality = quality;
           }
 
-          if (edition) {
+          if (edition !== undefined) {
             props.edition = edition;
           }
 
-          if (releaseGroup) {
+          if (releaseGroup !== undefined) {
             props.releaseGroup = releaseGroup;
           }
 
@@ -235,8 +348,21 @@ export const actionHandlers = handleThunks({
 
 export const reducers = createHandleActions({
 
+  [SET_MOVIE_FILES_TABLE_OPTION]: createSetTableOptionReducer(section),
+
   [CLEAR_MOVIE_FILES]: (state) => {
-    return Object.assign({}, state, defaultState);
-  }
+    return Object.assign({}, state, {
+      isFetching: false,
+      isPopulated: false,
+      error: null,
+      isDeleting: false,
+      deleteError: null,
+      isSaving: false,
+      saveError: null,
+      items: []
+    });
+  },
+
+  [SET_MOVIE_FILES_SORT]: createSetClientSideCollectionSortReducer(section)
 
 }, defaultState, section);

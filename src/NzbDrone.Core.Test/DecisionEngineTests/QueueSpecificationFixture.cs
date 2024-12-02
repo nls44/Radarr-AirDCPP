@@ -4,12 +4,14 @@ using FizzWare.NBuilder;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Download.TrackedDownloads;
+using NzbDrone.Core.Languages;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
-using NzbDrone.Core.Profiles;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Queue;
 using NzbDrone.Core.Test.CustomFormats;
@@ -32,13 +34,13 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         {
             Mocker.Resolve<UpgradableSpecification>();
 
-            CustomFormatsFixture.GivenCustomFormats();
+            CustomFormatsTestHelpers.GivenCustomFormats();
 
             _movie = Builder<Movie>.CreateNew()
-                                     .With(e => e.Profile = new Profile
+                                     .With(e => e.QualityProfile = new QualityProfile
                                      {
                                          Items = Qualities.QualityFixture.GetDefaultQualities(),
-                                         FormatItems = CustomFormatsFixture.GetSampleFormatItems(),
+                                         FormatItems = CustomFormatsTestHelpers.GetSampleFormatItems(),
                                          MinFormatScore = 0,
                                          UpgradeAllowed = true
                                      })
@@ -58,7 +60,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
                 .Build();
 
             Mocker.GetMock<ICustomFormatCalculationService>()
-                .Setup(x => x.ParseCustomFormat(It.IsAny<ParsedMovieInfo>()))
+                .Setup(x => x.ParseCustomFormat(It.IsAny<RemoteMovie>(), It.IsAny<long>()))
                 .Returns(new List<CustomFormat>());
         }
 
@@ -103,7 +105,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_return_true_when_quality_in_queue_is_lower()
         {
-            _movie.Profile.Cutoff = Quality.Bluray1080p.Id;
+            _movie.QualityProfile.Cutoff = Quality.Bluray1080p.Id;
 
             var remoteMovie = Builder<RemoteMovie>.CreateNew()
                 .With(r => r.Movie = _movie)
@@ -136,7 +138,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_return_false_when_quality_in_queue_is_better()
         {
-            _movie.Profile.Cutoff = Quality.Bluray1080p.Id;
+            _movie.QualityProfile.Cutoff = Quality.Bluray1080p.Id;
 
             var remoteMovie = Builder<RemoteMovie>.CreateNew()
                                                       .With(r => r.Movie = _movie)
@@ -153,7 +155,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_return_false_if_quality_in_queue_meets_cutoff()
         {
-            _movie.Profile.Cutoff = _remoteMovie.ParsedMovieInfo.Quality.Quality.Id;
+            _movie.QualityProfile.Cutoff = _remoteMovie.ParsedMovieInfo.Quality.Quality.Id;
 
             var remoteMovie = Builder<RemoteMovie>.CreateNew()
                                                       .With(r => r.Movie = _movie)
@@ -171,8 +173,8 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_return_false_when_quality_is_better_and_upgrade_allowed_is_false_for_quality_profile()
         {
-            _movie.Profile.Cutoff = Quality.Bluray1080p.Id;
-            _movie.Profile.UpgradeAllowed = false;
+            _movie.QualityProfile.Cutoff = Quality.Bluray1080p.Id;
+            _movie.QualityProfile.UpgradeAllowed = false;
 
             var remoteMovie = Builder<RemoteMovie>.CreateNew()
                 .With(r => r.Movie = _movie)
@@ -189,7 +191,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_return_true_if_everything_is_the_same_for_failed_pending()
         {
-            _movie.Profile.Cutoff = Quality.Bluray1080p.Id;
+            _movie.QualityProfile.Cutoff = Quality.Bluray1080p.Id;
 
             var remoteMovie = Builder<RemoteMovie>.CreateNew()
                 .With(r => r.Movie = _movie)
@@ -203,6 +205,32 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             GivenQueue(new List<RemoteMovie> { remoteMovie }, TrackedDownloadState.FailedPending);
 
             Subject.IsSatisfiedBy(_remoteMovie, null).Accepted.Should().BeTrue();
+        }
+
+        [Test]
+        public void should_return_false_if_same_quality_non_proper_in_queue_and_download_propers_is_do_not_upgrade()
+        {
+            _remoteMovie.ParsedMovieInfo.Quality = new QualityModel(Quality.HDTV720p, new Revision(2));
+            _movie.QualityProfile.Cutoff = _remoteMovie.ParsedMovieInfo.Quality.Quality.Id;
+
+            Mocker.GetMock<IConfigService>()
+                .Setup(s => s.DownloadPropersAndRepacks)
+                .Returns(ProperDownloadTypes.DoNotUpgrade);
+
+            var remoteMovie = Builder<RemoteMovie>.CreateNew()
+                .With(r => r.Movie = _movie)
+                .With(r => r.ParsedMovieInfo = new ParsedMovieInfo
+                {
+                    Quality = new QualityModel(Quality.HDTV720p),
+                    Languages = new List<Language> { Language.English }
+                })
+                .With(r => r.Release = _releaseInfo)
+                .With(r => r.CustomFormats = new List<CustomFormat>())
+                .Build();
+
+            GivenQueue(new List<RemoteMovie> { remoteMovie });
+
+            Subject.IsSatisfiedBy(_remoteMovie, null).Accepted.Should().BeFalse();
         }
     }
 }

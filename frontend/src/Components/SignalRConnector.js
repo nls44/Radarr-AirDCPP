@@ -9,6 +9,7 @@ import { fetchCommands, finishCommand, updateCommand } from 'Store/Actions/comma
 import { fetchMovies } from 'Store/Actions/movieActions';
 import { fetchQueue, fetchQueueDetails } from 'Store/Actions/queueActions';
 import { fetchRootFolders } from 'Store/Actions/rootFolderActions';
+import { fetchQualityDefinitions } from 'Store/Actions/settingsActions';
 import { fetchHealth } from 'Store/Actions/systemActions';
 import { fetchTagDetails, fetchTags } from 'Store/Actions/tagActions';
 import { repopulatePage } from 'Utilities/pagePopulator';
@@ -46,6 +47,7 @@ const mapDispatchToProps = {
   dispatchUpdateItem: updateItem,
   dispatchRemoveItem: removeItem,
   dispatchFetchHealth: fetchHealth,
+  dispatchFetchQualityDefinitions: fetchQualityDefinitions,
   dispatchFetchQueue: fetchQueue,
   dispatchFetchQueueDetails: fetchQueueDetails,
   dispatchFetchRootFolders: fetchRootFolders,
@@ -59,7 +61,7 @@ function Logger(minimumLogLevel) {
 }
 
 Logger.prototype.cleanse = function(message) {
-  const apikey = new RegExp(`access_token=${window.Radarr.apiKey}`, 'g');
+  const apikey = new RegExp(`access_token=${encodeURIComponent(window.Radarr.apiKey)}`, 'g');
   return message.replace(apikey, 'access_token=(removed)');
 };
 
@@ -103,7 +105,7 @@ class SignalRConnector extends Component {
 
     this.connection = new signalR.HubConnectionBuilder()
       .configureLogging(new Logger(signalR.LogLevel.Information))
-      .withUrl(`${url}?access_token=${window.Radarr.apiKey}`)
+      .withUrl(`${url}?access_token=${encodeURIComponent(window.Radarr.apiKey)}`)
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {
           if (retryContext.elapsedMilliseconds > 180000) {
@@ -144,7 +146,7 @@ class SignalRConnector extends Component {
     }
 
     console.error(`signalR: Unable to find handler for ${name}`);
-  }
+  };
 
   handleCalendar = (body) => {
     if (body.action === 'updated') {
@@ -154,7 +156,7 @@ class SignalRConnector extends Component {
         ...body.resource
       });
     }
-  }
+  };
 
   handleCommand = (body) => {
     if (body.action === 'sync') {
@@ -165,15 +167,15 @@ class SignalRConnector extends Component {
     const resource = body.resource;
     const status = resource.status;
 
-    // Both sucessful and failed commands need to be
-    // completed, otherwise they spin until they timeout.
+    // Both successful and failed commands need to be
+    // completed, otherwise they spin until they time out.
 
     if (status === 'completed' || status === 'failed') {
       this.props.dispatchFinishCommand(resource);
     } else {
       this.props.dispatchUpdateCommand(resource);
     }
-  }
+  };
 
   handleMoviefile = (body) => {
     const section = 'movieFiles';
@@ -185,12 +187,62 @@ class SignalRConnector extends Component {
       repopulatePage('movieFileUpdated');
     } else if (body.action === 'deleted') {
       this.props.dispatchRemoveItem({ section, id: body.resource.id });
+
+      repopulatePage('movieFileDeleted');
     }
-  }
+  };
+
+  handleDownloadclient = ({ action, resource }) => {
+    const section = 'settings.downloadClients';
+
+    if (action === 'created' || action === 'updated') {
+      this.props.dispatchUpdateItem({ section, ...resource });
+    } else if (action === 'deleted') {
+      this.props.dispatchRemoveItem({ section, id: resource.id });
+    }
+  };
 
   handleHealth = () => {
     this.props.dispatchFetchHealth();
-  }
+  };
+
+  handleImportlist = ({ action, resource }) => {
+    const section = 'settings.importLists';
+
+    if (action === 'created' || action === 'updated') {
+      this.props.dispatchUpdateItem({ section, ...resource });
+    } else if (action === 'deleted') {
+      this.props.dispatchRemoveItem({ section, id: resource.id });
+    }
+  };
+
+  handleIndexer = ({ action, resource }) => {
+    const section = 'settings.indexers';
+
+    if (action === 'created' || action === 'updated') {
+      this.props.dispatchUpdateItem({ section, ...resource });
+    } else if (action === 'deleted') {
+      this.props.dispatchRemoveItem({ section, id: resource.id });
+    }
+  };
+
+  handleMetadata = ({ action, resource }) => {
+    const section = 'settings.metadata';
+
+    if (action === 'updated') {
+      this.props.dispatchUpdateItem({ section, ...resource });
+    }
+  };
+
+  handleNotification = ({ action, resource }) => {
+    const section = 'settings.notifications';
+
+    if (action === 'created' || action === 'updated') {
+      this.props.dispatchUpdateItem({ section, ...resource });
+    } else if (action === 'deleted') {
+      this.props.dispatchRemoveItem({ section, id: resource.id });
+    }
+  };
 
   handleMovie = (body) => {
     const action = body.action;
@@ -198,38 +250,77 @@ class SignalRConnector extends Component {
 
     if (action === 'updated') {
       this.props.dispatchUpdateItem({ section, ...body.resource });
+
+      repopulatePage('movieUpdated');
     } else if (action === 'deleted') {
       this.props.dispatchRemoveItem({ section, id: body.resource.id });
     }
-  }
+  };
+
+  handleCollection = (body) => {
+    const action = body.action;
+    const section = 'movieCollections';
+
+    console.log(body);
+
+    if (action === 'updated') {
+      this.props.dispatchUpdateItem({ section, ...body.resource });
+    } else if (action === 'deleted') {
+      this.props.dispatchRemoveItem({ section, id: body.resource.id });
+    }
+  };
+
+  handleQualitydefinition = () => {
+    this.props.dispatchFetchQualityDefinitions();
+  };
 
   handleQueue = () => {
     if (this.props.isQueuePopulated) {
       this.props.dispatchFetchQueue();
     }
-  }
+  };
 
   handleQueueDetails = () => {
     this.props.dispatchFetchQueueDetails();
-  }
+  };
 
   handleQueueStatus = (body) => {
     this.props.dispatchUpdate({ section: 'queue.status', data: body.resource });
-  }
+  };
 
   handleVersion = (body) => {
     const version = body.version;
 
     this.props.dispatchSetVersion({ version });
-  }
+  };
+
+  handleWantedCutoff = (body) => {
+    if (body.action === 'updated') {
+      this.props.dispatchUpdateItem({
+        section: 'wanted.cutoffUnmet',
+        updateOnly: true,
+        ...body.resource
+      });
+    }
+  };
+
+  handleWantedMissing = (body) => {
+    if (body.action === 'updated') {
+      this.props.dispatchUpdateItem({
+        section: 'wanted.missing',
+        updateOnly: true,
+        ...body.resource
+      });
+    }
+  };
 
   handleSystemTask = () => {
     this.props.dispatchFetchCommands();
-  }
+  };
 
   handleRootfolder = () => {
     this.props.dispatchFetchRootFolders();
-  }
+  };
 
   handleTag = (body) => {
     if (body.action === 'sync') {
@@ -237,7 +328,7 @@ class SignalRConnector extends Component {
       this.props.dispatchFetchTagDetails();
       return;
     }
-  }
+  };
 
   //
   // Listeners
@@ -252,7 +343,7 @@ class SignalRConnector extends Component {
       isDisconnected: false,
       isRestarting: false
     });
-  }
+  };
 
   onStart = () => {
     console.debug('[signalR] connected');
@@ -263,11 +354,11 @@ class SignalRConnector extends Component {
       isDisconnected: false,
       isRestarting: false
     });
-  }
+  };
 
   onReconnecting = () => {
     this.props.dispatchSetAppValue({ isReconnecting: true });
-  }
+  };
 
   onReconnected = () => {
 
@@ -289,17 +380,17 @@ class SignalRConnector extends Component {
     dispatchFetchMovies();
     dispatchFetchCommands();
     repopulatePage();
-  }
+  };
 
   onClose = () => {
     console.debug('[signalR] connection closed');
-  }
+  };
 
   onReceiveMessage = (message) => {
     console.debug('[signalR] received', message.name, message.body);
 
     this.handleMessage(message);
-  }
+  };
 
   //
   // Render
@@ -322,6 +413,7 @@ SignalRConnector.propTypes = {
   dispatchUpdateItem: PropTypes.func.isRequired,
   dispatchRemoveItem: PropTypes.func.isRequired,
   dispatchFetchHealth: PropTypes.func.isRequired,
+  dispatchFetchQualityDefinitions: PropTypes.func.isRequired,
   dispatchFetchQueue: PropTypes.func.isRequired,
   dispatchFetchQueueDetails: PropTypes.func.isRequired,
   dispatchFetchRootFolders: PropTypes.func.isRequired,

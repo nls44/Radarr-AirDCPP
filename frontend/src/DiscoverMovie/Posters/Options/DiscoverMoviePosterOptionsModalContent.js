@@ -14,9 +14,24 @@ import { inputTypes } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 
 const posterSizeOptions = [
-  { key: 'small', value: translate('Small') },
-  { key: 'medium', value: translate('Medium') },
-  { key: 'large', value: translate('Large') }
+  {
+    key: 'small',
+    get value() {
+      return translate('Small');
+    }
+  },
+  {
+    key: 'medium',
+    get value() {
+      return translate('Medium');
+    }
+  },
+  {
+    key: 'large',
+    get value() {
+      return translate('Large');
+    }
+  }
 ];
 
 class DiscoverMoviePosterOptionsModalContent extends Component {
@@ -30,7 +45,13 @@ class DiscoverMoviePosterOptionsModalContent extends Component {
     this.state = {
       size: props.size,
       showTitle: props.showTitle,
-      includeRecommendations: props.includeRecommendations
+      showTmdbRating: props.showTmdbRating,
+      showImdbRating: props.showImdbRating,
+      showRottenTomatoesRating: props.showRottenTomatoesRating,
+      showTraktRating: props.showTraktRating,
+      includeRecommendations: props.includeRecommendations,
+      includeTrending: props.includeTrending,
+      includePopular: props.includePopular
     };
   }
 
@@ -38,7 +59,13 @@ class DiscoverMoviePosterOptionsModalContent extends Component {
     const {
       size,
       showTitle,
-      includeRecommendations
+      showTmdbRating,
+      showImdbRating,
+      showRottenTomatoesRating,
+      showTraktRating,
+      includeRecommendations,
+      includeTrending,
+      includePopular
     } = this.props;
 
     const state = {};
@@ -51,8 +78,32 @@ class DiscoverMoviePosterOptionsModalContent extends Component {
       state.showTitle = showTitle;
     }
 
+    if (showTmdbRating !== prevProps.showTmdbRating) {
+      state.showTmdbRating = showTmdbRating;
+    }
+
+    if (showImdbRating !== prevProps.showImdbRating) {
+      state.showImdbRating = showImdbRating;
+    }
+
+    if (showRottenTomatoesRating !== prevProps.showRottenTomatoesRating) {
+      state.showRottenTomatoesRating = showRottenTomatoesRating;
+    }
+
+    if (showTraktRating !== prevProps.showTraktRating) {
+      state.showTraktRating = showTraktRating;
+    }
+
     if (includeRecommendations !== prevProps.includeRecommendations) {
       state.includeRecommendations = includeRecommendations;
+    }
+
+    if (includeTrending !== prevProps.includeTrending) {
+      state.includeTrending = includeTrending;
+    }
+
+    if (includePopular !== prevProps.includePopular) {
+      state.includePopular = includePopular;
     }
 
     if (!_.isEmpty(state)) {
@@ -69,7 +120,7 @@ class DiscoverMoviePosterOptionsModalContent extends Component {
     }, () => {
       this.props.onChangePosterOption({ [name]: value });
     });
-  }
+  };
 
   onChangeOption = ({ name, value }) => {
     this.setState({
@@ -79,7 +130,7 @@ class DiscoverMoviePosterOptionsModalContent extends Component {
         [name]: value
       });
     });
-  }
+  };
 
   //
   // Render
@@ -92,13 +143,19 @@ class DiscoverMoviePosterOptionsModalContent extends Component {
     const {
       size,
       showTitle,
-      includeRecommendations
+      showTmdbRating,
+      showImdbRating,
+      showRottenTomatoesRating,
+      showTraktRating,
+      includeRecommendations,
+      includeTrending,
+      includePopular
     } = this.state;
 
     return (
       <ModalContent onModalClose={onModalClose}>
         <ModalHeader>
-          Poster Options
+          {translate('PosterOptions')}
         </ModalHeader>
 
         <ModalBody>
@@ -111,6 +168,30 @@ class DiscoverMoviePosterOptionsModalContent extends Component {
                 name="includeRecommendations"
                 value={includeRecommendations}
                 helpText={translate('IncludeRecommendationsHelpText')}
+                onChange={this.onChangeOption}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>{translate('IncludeTrending')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="includeTrending"
+                value={includeTrending}
+                helpText={translate('IncludeTrendingMoviesHelpText')}
+                onChange={this.onChangeOption}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>{translate('IncludePopular')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="includePopular"
+                value={includePopular}
+                helpText={translate('IncludePopularMoviesHelpText')}
                 onChange={this.onChangeOption}
               />
             </FormGroup>
@@ -138,6 +219,54 @@ class DiscoverMoviePosterOptionsModalContent extends Component {
                 onChange={this.onChangePosterOption}
               />
             </FormGroup>
+
+            <FormGroup>
+              <FormLabel>{translate('ShowTmdbRating')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="showTmdbRating"
+                value={showTmdbRating}
+                helpText={translate('ShowTmdbRatingHelpText')}
+                onChange={this.onChangePosterOption}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>{translate('ShowImdbRating')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="showImdbRating"
+                value={showImdbRating}
+                helpText={translate('ShowImdbRatingHelpText')}
+                onChange={this.onChangePosterOption}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>{translate('ShowRottenTomatoesRating')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="showRottenTomatoesRating"
+                value={showRottenTomatoesRating}
+                helpText={translate('ShowRottenTomatoesRatingHelpText')}
+                onChange={this.onChangePosterOption}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>{translate('ShowTraktRating')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="showTraktRating"
+                value={showTraktRating}
+                helpText={translate('ShowTraktRatingPosterHelpText')}
+                onChange={this.onChangePosterOption}
+              />
+            </FormGroup>
           </Form>
         </ModalBody>
 
@@ -156,7 +285,13 @@ class DiscoverMoviePosterOptionsModalContent extends Component {
 DiscoverMoviePosterOptionsModalContent.propTypes = {
   size: PropTypes.string.isRequired,
   showTitle: PropTypes.bool.isRequired,
+  showTmdbRating: PropTypes.bool.isRequired,
+  showImdbRating: PropTypes.bool.isRequired,
+  showRottenTomatoesRating: PropTypes.bool.isRequired,
+  showTraktRating: PropTypes.bool.isRequired,
   includeRecommendations: PropTypes.bool.isRequired,
+  includeTrending: PropTypes.bool.isRequired,
+  includePopular: PropTypes.bool.isRequired,
   onChangePosterOption: PropTypes.func.isRequired,
   onChangeOption: PropTypes.func.isRequired,
   onModalClose: PropTypes.func.isRequired

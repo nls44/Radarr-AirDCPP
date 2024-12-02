@@ -10,6 +10,9 @@ namespace NzbDrone.Core.Test.Languages
     {
         public static object[] FromIntCases =
             {
+                new object[] { -2, Language.Original },
+                new object[] { -1, Language.Any },
+                new object[] { 0, Language.Unknown },
                 new object[] { 1, Language.English },
                 new object[] { 2, Language.French },
                 new object[] { 3, Language.Spanish },
@@ -39,11 +42,35 @@ namespace NzbDrone.Core.Test.Languages
                 new object[] { 27, Language.Romanian },
                 new object[] { 28, Language.Thai },
                 new object[] { 29, Language.Bulgarian },
-                new object[] { 30, Language.PortugueseBR }
+                new object[] { 30, Language.PortugueseBR },
+                new object[] { 31, Language.Arabic },
+                new object[] { 32, Language.Ukrainian },
+                new object[] { 33, Language.Persian },
+                new object[] { 34, Language.Bengali },
+                new object[] { 35, Language.Slovak },
+                new object[] { 36, Language.Latvian },
+                new object[] { 37, Language.SpanishLatino },
+                new object[] { 38, Language.Catalan },
+                new object[] { 39, Language.Croatian },
+                new object[] { 40, Language.Serbian },
+                new object[] { 41, Language.Bosnian },
+                new object[] { 42, Language.Estonian },
+                new object[] { 43, Language.Tamil },
+                new object[] { 44, Language.Indonesian },
+                new object[] { 45, Language.Telugu },
+                new object[] { 46, Language.Macedonian },
+                new object[] { 47, Language.Slovenian },
+                new object[] { 48, Language.Malayalam },
+                new object[] { 49, Language.Kannada },
+                new object[] { 50, Language.Albanian },
+                new object[] { 51, Language.Afrikaans }
             };
 
         public static object[] ToIntCases =
             {
+                new object[] { Language.Original, -2 },
+                new object[] { Language.Any, -1 },
+                new object[] { Language.Unknown, 0 },
                 new object[] { Language.English, 1 },
                 new object[] { Language.French, 2 },
                 new object[] { Language.Spanish, 3 },
@@ -73,7 +100,28 @@ namespace NzbDrone.Core.Test.Languages
                 new object[] { Language.Romanian, 27 },
                 new object[] { Language.Thai, 28 },
                 new object[] { Language.Bulgarian, 29 },
-                new object[] { Language.PortugueseBR, 30 }
+                new object[] { Language.PortugueseBR, 30 },
+                new object[] { Language.Arabic, 31 },
+                new object[] { Language.Ukrainian, 32 },
+                new object[] { Language.Persian, 33 },
+                new object[] { Language.Bengali, 34 },
+                new object[] { Language.Slovak, 35 },
+                new object[] { Language.Latvian, 36 },
+                new object[] { Language.SpanishLatino, 37 },
+                new object[] { Language.Catalan, 38 },
+                new object[] { Language.Croatian, 39 },
+                new object[] { Language.Serbian, 40 },
+                new object[] { Language.Bosnian, 41 },
+                new object[] { Language.Estonian, 42 },
+                new object[] { Language.Tamil, 43 },
+                new object[] { Language.Indonesian, 44 },
+                new object[] { Language.Telugu, 45 },
+                new object[] { Language.Macedonian, 46 },
+                new object[] { Language.Slovenian, 47 },
+                new object[] { Language.Malayalam, 48 },
+                new object[] { Language.Kannada, 49 },
+                new object[] { Language.Albanian, 50 },
+                new object[] { Language.Afrikaans, 51 }
             };
 
         [Test]

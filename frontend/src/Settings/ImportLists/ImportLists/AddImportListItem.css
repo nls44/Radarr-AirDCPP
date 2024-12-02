@@ -1,4 +1,4 @@
-.importList {
+.list {
   composes: card from '~Components/Card.css';
 
   position: relative;
@@ -17,6 +17,8 @@
 }
 
 .name {
+  @add-mixin truncate;
+
   text-align: center;
   font-weight: lighter;
   font-size: 24px;

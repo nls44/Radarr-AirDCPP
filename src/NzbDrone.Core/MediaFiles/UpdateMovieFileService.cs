@@ -49,19 +49,19 @@ namespace NzbDrone.Core.MediaFiles
             {
                 case FileDateType.Release:
                     {
-                        var airDate = movie.PhysicalRelease;
+                        var releaseDate = movie.MovieMetadata.Value.PhysicalRelease ?? movie.MovieMetadata.Value.DigitalRelease;
 
-                        if (airDate.HasValue == false)
+                        if (releaseDate.HasValue == false)
                         {
                             return false;
                         }
 
-                        return ChangeFileDate(movieFilePath, airDate.Value);
+                        return ChangeFileDate(movieFilePath, releaseDate.Value);
                     }
 
                 case FileDateType.Cinemas:
                     {
-                        var airDate = movie.InCinemas;
+                        var airDate = movie.MovieMetadata.Value.InCinemas;
 
                         if (airDate.HasValue == false)
                         {
@@ -77,9 +77,7 @@ namespace NzbDrone.Core.MediaFiles
 
         private bool ChangeFileDate(string filePath, DateTime date)
         {
-            DateTime oldDateTime;
-
-            if (DateTime.TryParse(_diskProvider.FileGetLastWrite(filePath).ToLongDateString(), out oldDateTime))
+            if (DateTime.TryParse(_diskProvider.FileGetLastWrite(filePath).ToLongDateString(), out var oldDateTime))
             {
                 if (!DateTime.Equals(date, oldDateTime))
                 {

@@ -13,6 +13,8 @@ export function headerRenderer(headerProps) {
   } = headerProps;
 
   return (
+
+    // eslint-disable-next-line no-use-before-define
     <VirtualTableHeaderCell
       name={dataKey}
       {...columnData}
@@ -38,7 +40,7 @@ class VirtualTableHeaderCell extends Component {
     } else {
       this.props.onSortPress(name);
     }
-  }
+  };
 
   //
   // Render

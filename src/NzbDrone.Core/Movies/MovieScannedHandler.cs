@@ -1,9 +1,10 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using NLog;
 using NzbDrone.Core.IndexerSearch;
 using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Messaging.Events;
+using NzbDrone.Core.Movies.Collections;
 
 namespace NzbDrone.Core.Movies
 {
@@ -11,33 +12,44 @@ namespace NzbDrone.Core.Movies
                                         IHandle<MovieScanSkippedEvent>
     {
         private readonly IMovieService _movieService;
+        private readonly IMovieCollectionService _collectionService;
         private readonly IManageCommandQueue _commandQueueManager;
 
         private readonly Logger _logger;
 
         public MovieScannedHandler(IMovieService movieService,
+                                    IMovieCollectionService collectionService,
                                     IManageCommandQueue commandQueueManager,
                                     Logger logger)
         {
             _movieService = movieService;
+            _collectionService = collectionService;
             _commandQueueManager = commandQueueManager;
             _logger = logger;
         }
 
         private void HandleScanEvents(Movie movie)
         {
-            if (movie.AddOptions == null)
+            var addOptions = movie.AddOptions;
+
+            if (addOptions == null)
             {
-                //_episodeAddedService.SearchForRecentlyAdded(movie.Id);
                 return;
             }
 
             _logger.Info("[{0}] was recently added, performing post-add actions", movie.Title);
 
-            //_episodeMonitoredService.SetEpisodeMonitoredStatus(movie, movie.AddOptions);
-            if (movie.AddOptions.SearchForMovie)
+            if (addOptions.SearchForMovie)
             {
                 _commandQueueManager.Push(new MoviesSearchCommand { MovieIds = new List<int> { movie.Id } });
+            }
+
+            if (addOptions.Monitor == MonitorTypes.MovieAndCollection && movie.MovieMetadata.Value.CollectionTmdbId > 0)
+            {
+                var collection = _collectionService.FindByTmdbId(movie.MovieMetadata.Value.CollectionTmdbId);
+                collection.Monitored = true;
+
+                _collectionService.UpdateCollection(collection);
             }
 
             movie.AddOptions = null;

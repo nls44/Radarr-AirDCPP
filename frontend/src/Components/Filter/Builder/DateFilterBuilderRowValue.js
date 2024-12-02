@@ -10,12 +10,42 @@ import { NAME } from './FilterBuilderRowValue';
 import styles from './DateFilterBuilderRowValue.css';
 
 const timeOptions = [
-  { key: 'seconds', value: translate('Seconds') },
-  { key: 'minutes', value: translate('Minutes') },
-  { key: 'hours', value: translate('Hours') },
-  { key: 'days', value: translate('Days') },
-  { key: 'weeks', value: translate('Weeks') },
-  { key: 'months', value: translate('Months') }
+  {
+    key: 'seconds',
+    get value() {
+      return translate('Seconds');
+    }
+  },
+  {
+    key: 'minutes',
+    get value() {
+      return translate('Minutes');
+    }
+  },
+  {
+    key: 'hours',
+    get value() {
+      return translate('Hours');
+    }
+  },
+  {
+    key: 'days',
+    get value() {
+      return translate('Days');
+    }
+  },
+  {
+    key: 'weeks',
+    get value() {
+      return translate('Weeks');
+    }
+  },
+  {
+    key: 'months',
+    get value() {
+      return translate('Months');
+    }
+  }
 ];
 
 function isInFilter(filterType) {
@@ -103,7 +133,7 @@ class DateFilterBuilderRowValue extends Component {
       name: NAME,
       value: newValue
     });
-  }
+  };
 
   onTimeChange = ({ value }) => {
     const {
@@ -118,7 +148,7 @@ class DateFilterBuilderRowValue extends Component {
         value: filterValue.value
       }
     });
-  }
+  };
 
   //
   // Render
@@ -161,6 +191,7 @@ class DateFilterBuilderRowValue extends Component {
       <TextInput
         name={NAME}
         value={filterValue}
+        type="date"
         placeholder="yyyy-mm-dd"
         onChange={this.onValueChange}
       />

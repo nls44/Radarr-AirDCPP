@@ -5,6 +5,7 @@ using System.Linq;
 using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.EnvironmentInfo;
+using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download;
@@ -116,9 +117,11 @@ namespace NzbDrone.Core.MediaFiles
         public bool ShouldDeleteFolder(DirectoryInfo directoryInfo, Movie movie)
         {
             try
-                {
+            {
                 var videoFiles = _diskScanService.GetVideoFiles(directoryInfo.FullName);
-                var rarFiles = _diskProvider.GetFiles(directoryInfo.FullName, SearchOption.AllDirectories).Where(f => Path.GetExtension(f).Equals(".rar", StringComparison.OrdinalIgnoreCase));
+                var rarFiles = _diskProvider.GetFiles(directoryInfo.FullName, true).Where(f =>
+                    Path.GetExtension(f).Equals(".rar",
+                        StringComparison.OrdinalIgnoreCase));
 
                 foreach (var videoFile in videoFiles)
                 {
@@ -131,7 +134,7 @@ namespace NzbDrone.Core.MediaFiles
                         return false;
                     }
 
-                    if (_detectSample.IsSample(movie, videoFile) != DetectSampleResult.Sample)
+                    if (_detectSample.IsSample(movie.MovieMetadata, videoFile) != DetectSampleResult.Sample)
                     {
                         _logger.Warn("Non-sample file detected: [{0}]", videoFile);
                         return false;
@@ -149,6 +152,11 @@ namespace NzbDrone.Core.MediaFiles
             catch (DirectoryNotFoundException e)
             {
                 _logger.Debug(e, "Folder {0} has already been removed", directoryInfo.FullName);
+                return false;
+            }
+            catch (Exception e)
+            {
+                _logger.Debug(e, "Unable to determine whether folder {0} should be removed", directoryInfo.FullName);
                 return false;
             }
         }
@@ -175,14 +183,17 @@ namespace NzbDrone.Core.MediaFiles
         {
             if (_movieService.MoviePathExists(directoryInfo.FullName))
             {
-                _logger.Warn("Unable to process folder that is mapped to an existing show");
-                return new List<ImportResult>();
+                _logger.Warn("Unable to process folder that is mapped to an existing movie");
+                return new List<ImportResult>
+                {
+                    RejectionResult("Import path is mapped to a movie folder")
+                };
             }
 
             var cleanedUpName = GetCleanedUpFolderName(directoryInfo.Name);
             var historyItems = _historyService.FindByDownloadId(downloadClientItem?.DownloadId ?? "");
             var firstHistoryItem = historyItems?.OrderByDescending(h => h.Date).FirstOrDefault();
-            var folderInfo = _parsingService.ParseMovieInfo(cleanedUpName, new List<object> { firstHistoryItem });
+            var folderInfo = Parser.Parser.ParseMovieTitle(cleanedUpName);
 
             if (folderInfo != null)
             {
@@ -218,7 +229,19 @@ namespace NzbDrone.Core.MediaFiles
                 ShouldDeleteFolder(directoryInfo, movie))
             {
                 _logger.Debug("Deleting folder after importing valid files");
-                _diskProvider.DeleteFolder(directoryInfo.FullName, true);
+
+                try
+                {
+                    _diskProvider.DeleteFolder(directoryInfo.FullName, true);
+                }
+                catch (IOException e)
+                {
+                    _logger.Debug(e, "Unable to delete folder after importing: {0}", e.Message);
+                }
+            }
+            else if (importResults.Empty())
+            {
+                importResults.AddIfNotNull(CheckEmptyResultForIssue(directoryInfo.FullName));
             }
 
             return importResults;
@@ -250,6 +273,20 @@ namespace NzbDrone.Core.MediaFiles
                 return new List<ImportResult>
                        {
                            new ImportResult(new ImportDecision(new LocalMovie { Path = fileInfo.FullName }, new Rejection("Invalid video file, filename starts with '._'")), "Invalid video file, filename starts with '._'")
+                       };
+            }
+
+            var extension = Path.GetExtension(fileInfo.Name);
+
+            if (extension.IsNullOrWhiteSpace() || !MediaFileExtensions.Extensions.Contains(extension))
+            {
+                _logger.Debug("[{0}] has an unsupported extension: '{1}'", fileInfo.FullName, extension);
+
+                return new List<ImportResult>
+                       {
+                           new ImportResult(new ImportDecision(new LocalMovie { Path = fileInfo.FullName },
+                               new Rejection($"Invalid video file, unsupported extension: '{extension}'")),
+                               $"Invalid video file, unsupported extension: '{extension}'")
                        };
             }
 
@@ -288,6 +325,28 @@ namespace NzbDrone.Core.MediaFiles
             var localMovie = videoFile == null ? null : new LocalMovie { Path = videoFile };
 
             return new ImportResult(new ImportDecision(localMovie, new Rejection("Unknown Movie")), message);
+        }
+
+        private ImportResult RejectionResult(string message)
+        {
+            return new ImportResult(new ImportDecision(null, new Rejection(message)), message);
+        }
+
+        private ImportResult CheckEmptyResultForIssue(string folder)
+        {
+            var files = _diskProvider.GetFiles(folder, true);
+
+            if (files.Any(file => FileExtensions.ExecutableExtensions.Contains(Path.GetExtension(file))))
+            {
+                return RejectionResult("Caution: Found executable file");
+            }
+
+            if (files.Any(file => FileExtensions.ArchiveExtensions.Contains(Path.GetExtension(file))))
+            {
+                return RejectionResult("Found archive file, might need to be extracted");
+            }
+
+            return null;
         }
 
         private void LogInaccessiblePathError(string path)

@@ -28,6 +28,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IMediaFileService _mediaFileService;
         private readonly IMovieService _movieService;
         private readonly IConfigService _configService;
+        private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
 
         public MediaFileDeletionService(IDiskProvider diskProvider,
@@ -35,6 +36,7 @@ namespace NzbDrone.Core.MediaFiles
                                         IMediaFileService mediaFileService,
                                         IMovieService movieService,
                                         IConfigService configService,
+                                        IEventAggregator eventAggregator,
                                         Logger logger)
         {
             _diskProvider = diskProvider;
@@ -42,6 +44,7 @@ namespace NzbDrone.Core.MediaFiles
             _mediaFileService = mediaFileService;
             _movieService = movieService;
             _configService = configService;
+            _eventAggregator = eventAggregator;
             _logger = logger;
         }
 
@@ -58,8 +61,8 @@ namespace NzbDrone.Core.MediaFiles
 
             if (_diskProvider.GetDirectories(rootFolder).Empty())
             {
-                _logger.Warn("Movie's root folder ({0}) is empty.", rootFolder);
-                throw new NzbDroneClientException(HttpStatusCode.Conflict, "Movie's root folder ({0}) is empty.", rootFolder);
+                _logger.Warn("Movie's root folder ({0}) is empty. Rescan will not update movies as a failsafe.", rootFolder);
+                throw new NzbDroneClientException(HttpStatusCode.Conflict, "Movie's root folder ({0}) is empty. Rescan will not update movies as a failsafe.", rootFolder);
             }
 
             if (_diskProvider.FolderExists(movie.Path) && _diskProvider.FileExists(fullPath))
@@ -81,30 +84,32 @@ namespace NzbDrone.Core.MediaFiles
 
             // Delete the movie file from the database to clean it up even if the file was already deleted
             _mediaFileService.Delete(movieFile, DeleteMediaFileReason.Manual);
+
+            _eventAggregator.PublishEvent(new DeleteCompletedEvent());
         }
 
         public void HandleAsync(MoviesDeletedEvent message)
         {
             if (message.DeleteFiles)
             {
-                var allMovies = _movieService.GetAllMovies();
+                var allMovies = _movieService.AllMoviePaths();
 
                 foreach (var movie in message.Movies)
                 {
                     foreach (var s in allMovies)
                     {
-                        if (s.Id == movie.Id)
+                        if (s.Key == movie.Id)
                         {
                             continue;
                         }
 
-                        if (movie.Path.IsParentPath(s.Path))
+                        if (movie.Path.IsParentPath(s.Value))
                         {
                             _logger.Error("Movie path: '{0}' is a parent of another movie, not deleting files.", movie.Path);
                             return;
                         }
 
-                        if (movie.Path.PathEquals(s.Path))
+                        if (movie.Path.PathEquals(s.Value))
                         {
                             _logger.Error("Movie path: '{0}' is the same as another movie, not deleting files.", movie.Path);
                             return;
@@ -116,6 +121,8 @@ namespace NzbDrone.Core.MediaFiles
                         _recycleBinProvider.DeleteFolder(movie.Path);
                     }
                 }
+
+                _eventAggregator.PublishEvent(new DeleteCompletedEvent());
             }
         }
 

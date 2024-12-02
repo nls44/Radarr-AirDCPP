@@ -128,10 +128,11 @@ namespace NzbDrone.Update.UpdateEngine
                     _logger.Info("Copying new files to target folder");
                     _diskTransferService.MirrorFolder(_appFolderInfo.GetUpdatePackageFolder(), installationFolder);
 
-                    // Set executable flag on app
-                    if (OsInfo.IsOsx || (OsInfo.IsLinux && PlatformInfo.IsNetCore))
+                    // Set executable flag on app and ffprobe
+                    if (OsInfo.IsOsx || OsInfo.IsLinux)
                     {
                         _diskProvider.SetFilePermissions(Path.Combine(installationFolder, "Radarr"), "755", null);
+                        _diskProvider.SetFilePermissions(Path.Combine(installationFolder, "ffprobe"), "755", null);
                     }
                 }
                 catch (Exception e)
@@ -152,7 +153,7 @@ namespace NzbDrone.Update.UpdateEngine
                     _terminateNzbDrone.Terminate(processId);
 
                     _logger.Info("Waiting for external auto-restart.");
-                    for (int i = 0; i < 10; i++)
+                    for (var i = 0; i < 10; i++)
                     {
                         System.Threading.Thread.Sleep(1000);
 

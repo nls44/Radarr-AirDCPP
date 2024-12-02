@@ -1,9 +1,8 @@
-﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using FluentAssertions;
 using NUnit.Framework;
-using NzbDrone.Core.Profiles;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Test.Framework;
 
@@ -25,7 +24,7 @@ namespace NzbDrone.Core.Test.Qualities
                         new object[] { 8, Quality.WEBDL480p },
                         new object[] { 9, Quality.HDTV1080p },
 
-                        //new object[] {10, Quality.RAWHD},
+                        // new object[] {10, Quality.RAWHD},
                         new object[] { 16, Quality.HDTV2160p },
                         new object[] { 18, Quality.WEBDL2160p },
                         new object[] { 19, Quality.Bluray2160p },
@@ -44,7 +43,7 @@ namespace NzbDrone.Core.Test.Qualities
                         new object[] { Quality.WEBDL480p, 8 },
                         new object[] { Quality.HDTV1080p, 9 },
 
-                        //new object[] {Quality.RAWHD, 10},
+                        // new object[] {Quality.RAWHD, 10},
                         new object[] { Quality.HDTV2160p, 16 },
                         new object[] { Quality.WEBDL2160p, 18 },
                         new object[] { Quality.Bluray2160p, 19 },
@@ -66,10 +65,11 @@ namespace NzbDrone.Core.Test.Qualities
             i.Should().Be(expected);
         }
 
-        public static List<ProfileQualityItem> GetDefaultQualities(params Quality[] allowed)
+        public static List<QualityProfileQualityItem> GetDefaultQualities(params Quality[] allowed)
         {
             var qualities = new List<Quality>
             {
+                Quality.Unknown,
                 Quality.CAM,
                 Quality.TELECINE,
                 Quality.DVDSCR,
@@ -101,7 +101,7 @@ namespace NzbDrone.Core.Test.Qualities
             var items = qualities
                 .Except(allowed)
                 .Concat(allowed)
-                .Select(v => new ProfileQualityItem
+                .Select(v => new QualityProfileQualityItem
                 {
                     Quality = v,
                     Allowed = allowed.Contains(v)

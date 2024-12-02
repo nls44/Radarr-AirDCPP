@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
+using System.Net.Http;
+using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 
@@ -13,11 +15,6 @@ namespace NzbDrone.Core.ImportLists.TMDb.User
 
         public int MaxPages { get; set; }
 
-        public TMDbUserRequestGenerator()
-        {
-            MaxPages = 3;
-        }
-
         public virtual ImportListPageableRequestChain GetMovies()
         {
             var pageableRequests = new ImportListPageableRequestChain();
@@ -30,10 +27,10 @@ namespace NzbDrone.Core.ImportLists.TMDb.User
         private IEnumerable<ImportListRequest> GetMoviesRequests()
         {
             var requestBuilder = RequestBuilder.Create()
-                                               .SetHeader("Authorization", $"Bearer {Settings.AccessToken}")
-                                               .SetSegment("api", "4")
-                                               .SetSegment("route", "account")
-                                               .SetSegment("id", Settings.AccountId);
+                .SetHeader("Authorization", $"Bearer {Settings.AccessToken}")
+                .SetSegment("api", "4")
+                .SetSegment("route", "account")
+                .SetSegment("id", Settings.AccountId);
 
             switch (Settings.ListType)
             {
@@ -53,9 +50,22 @@ namespace NzbDrone.Core.ImportLists.TMDb.User
 
             requestBuilder.Accept(HttpAccept.Json);
 
-            requestBuilder.Method = HttpMethod.GET;
+            requestBuilder.Method = HttpMethod.Get;
 
-            yield return new ImportListRequest(requestBuilder.Build());
+            var jsonResponse = JsonConvert.DeserializeObject<MovieSearchResource>(HttpClient.Execute(requestBuilder.Build()).Content);
+
+            MaxPages = jsonResponse.TotalPages;
+
+            for (var pageNumber = 1; pageNumber <= MaxPages; pageNumber++)
+            {
+                requestBuilder.AddQueryParam("page", pageNumber, true);
+
+                var request = requestBuilder.Build();
+
+                Logger.Debug("Importing TMDb movies from: {0}", request.Url);
+
+                yield return new ImportListRequest(request);
+            }
         }
     }
 }

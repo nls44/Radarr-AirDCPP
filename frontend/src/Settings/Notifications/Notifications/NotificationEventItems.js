@@ -19,14 +19,26 @@ function NotificationEventItems(props) {
     onDownload,
     onUpgrade,
     onRename,
-    onDelete,
+    onMovieAdded,
+    onMovieDelete,
+    onMovieFileDelete,
+    onMovieFileDeleteForUpgrade,
     onHealthIssue,
+    onHealthRestored,
+    onApplicationUpdate,
+    onManualInteractionRequired,
     supportsOnGrab,
     supportsOnDownload,
     supportsOnUpgrade,
     supportsOnRename,
-    supportsOnDelete,
+    supportsOnMovieAdded,
+    supportsOnMovieDelete,
+    supportsOnMovieFileDelete,
+    supportsOnMovieFileDeleteForUpgrade,
+    supportsOnApplicationUpdate,
+    supportsOnManualInteractionRequired,
     supportsOnHealthIssue,
+    supportsOnHealthRestored,
     includeHealthWarnings
   } = item;
 
@@ -35,15 +47,15 @@ function NotificationEventItems(props) {
       <FormLabel>{translate('NotificationTriggers')}</FormLabel>
       <div>
         <FormInputHelpText
-          text={translate('NotifcationTriggersHelpText')}
-          link="https://wiki.servarr.com/Radarr_Settings#Connections"
+          text={translate('NotificationTriggersHelpText')}
+          link="https://wiki.servarr.com/radarr/settings#connections"
         />
         <div className={styles.events}>
           <div>
             <FormInputGroup
               type={inputTypes.CHECK}
               name="onGrab"
-              helpText={translate('OnGrabHelpText')}
+              helpText={translate('OnGrab')}
               isDisabled={!supportsOnGrab.value}
               {...onGrab}
               onChange={onInputChange}
@@ -54,7 +66,7 @@ function NotificationEventItems(props) {
             <FormInputGroup
               type={inputTypes.CHECK}
               name="onDownload"
-              helpText={translate('OnDownloadHelpText')}
+              helpText={translate('OnFileImport')}
               isDisabled={!supportsOnDownload.value}
               {...onDownload}
               onChange={onInputChange}
@@ -67,7 +79,7 @@ function NotificationEventItems(props) {
                 <FormInputGroup
                   type={inputTypes.CHECK}
                   name="onUpgrade"
-                  helpText={translate('OnUpgradeHelpText')}
+                  helpText={translate('OnFileUpgrade')}
                   isDisabled={!supportsOnUpgrade.value}
                   {...onUpgrade}
                   onChange={onInputChange}
@@ -79,7 +91,7 @@ function NotificationEventItems(props) {
             <FormInputGroup
               type={inputTypes.CHECK}
               name="onRename"
-              helpText={translate('OnRenameHelpText')}
+              helpText={translate('OnRename')}
               isDisabled={!supportsOnRename.value}
               {...onRename}
               onChange={onInputChange}
@@ -89,10 +101,10 @@ function NotificationEventItems(props) {
           <div>
             <FormInputGroup
               type={inputTypes.CHECK}
-              name="onDelete"
-              helpText={translate('OnDeleteHelpText')}
-              isDisabled={!supportsOnDelete.value}
-              {...onDelete}
+              name="onMovieAdded"
+              helpText={translate('OnMovieAdded')}
+              isDisabled={!supportsOnMovieAdded.value}
+              {...onMovieAdded}
               onChange={onInputChange}
             />
           </div>
@@ -100,27 +112,96 @@ function NotificationEventItems(props) {
           <div>
             <FormInputGroup
               type={inputTypes.CHECK}
+              name="onMovieDelete"
+              helpText={translate('OnMovieDelete')}
+              isDisabled={!supportsOnMovieDelete.value}
+              {...onMovieDelete}
+              onChange={onInputChange}
+            />
+          </div>
+
+          <div>
+            <FormInputGroup
+              type={inputTypes.CHECK}
+              name="onMovieFileDelete"
+              helpText={translate('OnMovieFileDelete')}
+              isDisabled={!supportsOnMovieFileDelete.value}
+              {...onMovieFileDelete}
+              onChange={onInputChange}
+            />
+          </div>
+
+          {
+            onMovieFileDelete.value &&
+              <div>
+                <FormInputGroup
+                  type={inputTypes.CHECK}
+                  name="onMovieFileDeleteForUpgrade"
+                  helpText={translate('OnMovieFileDeleteForUpgrade')}
+                  isDisabled={!supportsOnMovieFileDeleteForUpgrade.value}
+                  {...onMovieFileDeleteForUpgrade}
+                  onChange={onInputChange}
+                />
+              </div>
+          }
+
+          <div>
+            <FormInputGroup
+              type={inputTypes.CHECK}
               name="onHealthIssue"
-              helpText={translate('OnHealthIssueHelpText')}
+              helpText={translate('OnHealthIssue')}
               isDisabled={!supportsOnHealthIssue.value}
               {...onHealthIssue}
               onChange={onInputChange}
             />
           </div>
 
+          <div>
+            <FormInputGroup
+              type={inputTypes.CHECK}
+              name="onHealthRestored"
+              helpText={translate('OnHealthRestored')}
+              isDisabled={!supportsOnHealthRestored.value}
+              {...onHealthRestored}
+              onChange={onInputChange}
+            />
+          </div>
+
           {
-            onHealthIssue.value &&
+            (onHealthIssue.value || onHealthRestored.value) &&
               <div>
                 <FormInputGroup
                   type={inputTypes.CHECK}
                   name="includeHealthWarnings"
-                  helpText={translate('IncludeHealthWarningsHelpText')}
+                  helpText={translate('IncludeHealthWarnings')}
                   isDisabled={!supportsOnHealthIssue.value}
                   {...includeHealthWarnings}
                   onChange={onInputChange}
                 />
               </div>
           }
+
+          <div>
+            <FormInputGroup
+              type={inputTypes.CHECK}
+              name="onApplicationUpdate"
+              helpText={translate('OnApplicationUpdate')}
+              isDisabled={!supportsOnApplicationUpdate.value}
+              {...onApplicationUpdate}
+              onChange={onInputChange}
+            />
+          </div>
+
+          <div>
+            <FormInputGroup
+              type={inputTypes.CHECK}
+              name="onManualInteractionRequired"
+              helpText={translate('OnManualInteractionRequired')}
+              isDisabled={!supportsOnManualInteractionRequired.value}
+              {...onManualInteractionRequired}
+              onChange={onInputChange}
+            />
+          </div>
         </div>
       </div>
     </FormGroup>

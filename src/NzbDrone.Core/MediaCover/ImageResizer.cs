@@ -2,7 +2,6 @@ using NzbDrone.Common.Disk;
 using NzbDrone.Common.EnvironmentInfo;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Memory;
 using SixLabors.ImageSharp.Processing;
 
 namespace NzbDrone.Core.MediaCover
@@ -21,16 +20,7 @@ namespace NzbDrone.Core.MediaCover
         {
             _diskProvider = diskProvider;
 
-            // Random segfaults on mono 5.0 and 5.4
-            if (PlatformInfo.IsMono && platformInfo.Version < new System.Version(5, 8))
-            {
-                return;
-            }
-
             _enabled = true;
-
-            // More conservative memory allocation
-            SixLabors.ImageSharp.Configuration.Default.MemoryAllocator = new SimpleGcMemoryAllocator();
 
             // Thumbnails don't need super high quality
             SixLabors.ImageSharp.Configuration.Default.ImageFormatsManager.SetEncoder(JpegFormat.Instance, new JpegEncoder
@@ -48,11 +38,9 @@ namespace NzbDrone.Core.MediaCover
 
             try
             {
-                using (var image = Image.Load(source))
-                {
-                    image.Mutate(x => x.Resize(0, height));
-                    image.Save(destination);
-                }
+                using var image = Image.Load(source);
+                image.Mutate(x => x.Resize(0, height));
+                image.Save(destination);
             }
             catch
             {

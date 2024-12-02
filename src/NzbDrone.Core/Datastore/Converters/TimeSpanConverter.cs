@@ -1,19 +1,19 @@
-﻿using System;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System;
+using System.Data;
+using Dapper;
 
 namespace NzbDrone.Core.Datastore.Converters
 {
-    public class TimeSpanConverter : JsonConverter<TimeSpan>
+    public class DapperTimeSpanConverter : SqlMapper.TypeHandler<TimeSpan>
     {
-        public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override void SetValue(IDbDataParameter parameter, TimeSpan value)
         {
-            return TimeSpan.Parse(reader.GetString());
+            parameter.Value = value.ToString();
         }
 
-        public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options)
+        public override TimeSpan Parse(object value)
         {
-            writer.WriteStringValue(value.ToString());
+            return TimeSpan.Parse((string)value);
         }
     }
 }

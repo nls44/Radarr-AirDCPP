@@ -5,13 +5,20 @@ import { createSelector } from 'reselect';
 import { fetchRootFolders } from 'Store/Actions/rootFolderActions';
 import { deleteImportList, fetchImportLists } from 'Store/Actions/settingsActions';
 import createSortedSectionSelector from 'Store/Selectors/createSortedSectionSelector';
-import sortByName from 'Utilities/Array/sortByName';
+import createTagsSelector from 'Store/Selectors/createTagsSelector';
+import sortByProp from 'Utilities/Array/sortByProp';
 import ImportLists from './ImportLists';
 
 function createMapStateToProps() {
   return createSelector(
-    createSortedSectionSelector('settings.importLists', sortByName),
-    (importLists) => importLists
+    createSortedSectionSelector('settings.importLists', sortByProp('name')),
+    createTagsSelector(),
+    (importLists, tagList) => {
+      return {
+        ...importLists,
+        tagList
+      };
+    }
   );
 }
 
@@ -36,7 +43,7 @@ class ImportListsConnector extends Component {
 
   onConfirmDeleteImportList = (id) => {
     this.props.deleteImportList({ id });
-  }
+  };
 
   //
   // Render

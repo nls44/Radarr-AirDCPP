@@ -30,23 +30,23 @@ class Indexers extends Component {
 
   onAddIndexerPress = () => {
     this.setState({ isAddIndexerModalOpen: true });
-  }
+  };
 
   onCloneIndexerPress = (id) => {
     this.props.dispatchCloneIndexer({ id });
     this.setState({ isEditIndexerModalOpen: true });
-  }
+  };
 
   onAddIndexerModalClose = ({ indexerSelected = false } = {}) => {
     this.setState({
       isAddIndexerModalOpen: false,
       isEditIndexerModalOpen: indexerSelected
     });
-  }
+  };
 
   onEditIndexerModalClose = () => {
     this.setState({ isEditIndexerModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -54,6 +54,7 @@ class Indexers extends Component {
   render() {
     const {
       items,
+      tagList,
       dispatchCloneIndexer,
       onConfirmDeleteIndexer,
       ...otherProps
@@ -69,7 +70,7 @@ class Indexers extends Component {
     return (
       <FieldSet legend={translate('Indexers')}>
         <PageSectionContent
-          errorMessage={translate('UnableToLoadIndexers')}
+          errorMessage={translate('IndexersLoadError')}
           {...otherProps}
         >
           <div className={styles.indexers}>
@@ -79,6 +80,7 @@ class Indexers extends Component {
                   <Indexer
                     key={item.id}
                     {...item}
+                    tagList={tagList}
                     showPriority={showPriority}
                     onCloneIndexerPress={this.onCloneIndexerPress}
                     onConfirmDeleteIndexer={onConfirmDeleteIndexer}
@@ -119,6 +121,7 @@ Indexers.propTypes = {
   isFetching: PropTypes.bool.isRequired,
   error: PropTypes.object,
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
+  tagList: PropTypes.arrayOf(PropTypes.object).isRequired,
   dispatchCloneIndexer: PropTypes.func.isRequired,
   onConfirmDeleteIndexer: PropTypes.func.isRequired
 };

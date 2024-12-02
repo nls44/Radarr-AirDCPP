@@ -1,19 +1,23 @@
 import PropTypes from 'prop-types';
 import React from 'react';
 import Link from 'Components/Link/Link';
-import { inputTypes } from 'Helpers/Props';
+import { inputTypes, kinds } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import AutoCompleteInput from './AutoCompleteInput';
 import AvailabilitySelectInput from './AvailabilitySelectInput';
 import CaptchaInputConnector from './CaptchaInputConnector';
 import CheckInput from './CheckInput';
 import DeviceInputConnector from './DeviceInputConnector';
+import DownloadClientSelectInputConnector from './DownloadClientSelectInputConnector';
 import EnhancedSelectInput from './EnhancedSelectInput';
 import EnhancedSelectInputConnector from './EnhancedSelectInputConnector';
 import FormInputHelpText from './FormInputHelpText';
-import IndexerFlagsSelectInputConnector from './IndexerFlagsSelectInputConnector';
+import IndexerFlagsSelectInput from './IndexerFlagsSelectInput';
+import IndexerSelectInputConnector from './IndexerSelectInputConnector';
 import KeyValueListInput from './KeyValueListInput';
+import LanguageSelectInputConnector from './LanguageSelectInputConnector';
 import MovieMonitoredSelectInput from './MovieMonitoredSelectInput';
+import MovieTagInput from './MovieTagInput';
 import NumberInput from './NumberInput';
 import OAuthInputConnector from './OAuthInputConnector';
 import PasswordInput from './PasswordInput';
@@ -63,6 +67,9 @@ function getComponent(type) {
     case inputTypes.QUALITY_PROFILE_SELECT:
       return QualityProfileSelectInputConnector;
 
+    case inputTypes.INDEXER_SELECT:
+      return IndexerSelectInputConnector;
+
     case inputTypes.MOVIE_MONITORED_SELECT:
       return MovieMonitoredSelectInput;
 
@@ -70,13 +77,23 @@ function getComponent(type) {
       return RootFolderSelectInputConnector;
 
     case inputTypes.INDEXER_FLAGS_SELECT:
-      return IndexerFlagsSelectInputConnector;
+      return IndexerFlagsSelectInput;
+
+    case inputTypes.DOWNLOAD_CLIENT_SELECT:
+      return DownloadClientSelectInputConnector;
+
+    case inputTypes.LANGUAGE_SELECT:
+      return LanguageSelectInputConnector;
 
     case inputTypes.SELECT:
       return EnhancedSelectInput;
 
     case inputTypes.DYNAMIC_SELECT:
       return EnhancedSelectInputConnector;
+
+    case inputTypes.MOVIE_TAG:
+      return MovieTagInput;
+
     case inputTypes.TAG:
       return TagInputConnector;
 
@@ -252,16 +269,33 @@ FormInputGroup.propTypes = {
   className: PropTypes.string.isRequired,
   containerClassName: PropTypes.string.isRequired,
   inputClassName: PropTypes.string,
+  name: PropTypes.string.isRequired,
+  value: PropTypes.any,
+  values: PropTypes.arrayOf(PropTypes.any),
+  placeholder: PropTypes.string,
+  delimiters: PropTypes.arrayOf(PropTypes.string),
+  isDisabled: PropTypes.bool,
   type: PropTypes.string.isRequired,
+  kind: PropTypes.oneOf(kinds.all),
+  min: PropTypes.number,
+  max: PropTypes.number,
   unit: PropTypes.string,
   buttons: PropTypes.oneOfType([PropTypes.node, PropTypes.arrayOf(PropTypes.node)]),
   helpText: PropTypes.string,
   helpTexts: PropTypes.arrayOf(PropTypes.string),
   helpTextWarning: PropTypes.string,
   helpLink: PropTypes.string,
+  autoFocus: PropTypes.bool,
+  canEdit: PropTypes.bool,
+  includeNoChange: PropTypes.bool,
+  includeNoChangeDisabled: PropTypes.bool,
+  includeAny: PropTypes.bool,
+  selectedValueOptions: PropTypes.object,
+  indexerFlags: PropTypes.number,
   pending: PropTypes.bool,
   errors: PropTypes.arrayOf(PropTypes.object),
-  warnings: PropTypes.arrayOf(PropTypes.object)
+  warnings: PropTypes.arrayOf(PropTypes.object),
+  onChange: PropTypes.func.isRequired
 };
 
 FormInputGroup.defaultProps = {

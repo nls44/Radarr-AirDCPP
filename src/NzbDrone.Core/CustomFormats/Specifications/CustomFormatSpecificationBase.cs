@@ -1,4 +1,4 @@
-using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Validation;
 
 namespace NzbDrone.Core.CustomFormats
 {
@@ -7,7 +7,7 @@ namespace NzbDrone.Core.CustomFormats
         public abstract int Order { get; }
         public abstract string ImplementationName { get; }
 
-        public virtual string InfoLink => "https://wiki.servarr.com/Radarr_Settings#Custom_Formats_2";
+        public virtual string InfoLink => "https://wiki.servarr.com/radarr/settings#custom-formats-2";
 
         public string Name { get; set; }
         public bool Negate { get; set; }
@@ -18,9 +18,12 @@ namespace NzbDrone.Core.CustomFormats
             return (ICustomFormatSpecification)MemberwiseClone();
         }
 
-        public bool IsSatisfiedBy(ParsedMovieInfo movieInfo)
+        public abstract NzbDroneValidationResult Validate();
+
+        public virtual bool IsSatisfiedBy(CustomFormatInput input)
         {
-            var match = IsSatisfiedByWithoutNegate(movieInfo);
+            var match = IsSatisfiedByWithoutNegate(input);
+
             if (Negate)
             {
                 match = !match;
@@ -29,6 +32,6 @@ namespace NzbDrone.Core.CustomFormats
             return match;
         }
 
-        protected abstract bool IsSatisfiedByWithoutNegate(ParsedMovieInfo movieInfo);
+        protected abstract bool IsSatisfiedByWithoutNegate(CustomFormatInput input);
     }
 }

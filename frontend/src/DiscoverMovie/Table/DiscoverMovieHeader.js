@@ -7,6 +7,7 @@ import VirtualTableHeader from 'Components/Table/VirtualTableHeader';
 import VirtualTableHeaderCell from 'Components/Table/VirtualTableHeaderCell';
 import VirtualTableSelectAllHeaderCell from 'Components/Table/VirtualTableSelectAllHeaderCell';
 import { icons } from 'Helpers/Props';
+import translate from 'Utilities/String/translate';
 import DiscoverMovieTableOptionsConnector from './DiscoverMovieTableOptionsConnector';
 import styles from './DiscoverMovieHeader.css';
 
@@ -28,11 +29,11 @@ class DiscoverMovieHeader extends Component {
 
   onTableOptionsPress = () => {
     this.setState({ isTableOptionsModalOpen: true });
-  }
+  };
 
   onTableOptionsModalClose = () => {
     this.setState({ isTableOptionsModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -98,6 +99,43 @@ class DiscoverMovieHeader extends Component {
                   <Icon
                     name={icons.RECOMMENDED}
                     size={12}
+                    title={translate('Recommendation')}
+                  />
+                </VirtualTableHeaderCell>
+              );
+            }
+
+            if (name === 'isTrending') {
+              return (
+                <VirtualTableHeaderCell
+                  key={name}
+                  className={styles[name]}
+                  name={name}
+                  isSortable={true}
+                  {...otherProps}
+                >
+                  <Icon
+                    name={icons.TRENDING}
+                    size={12}
+                    title={translate('Trending')}
+                  />
+                </VirtualTableHeaderCell>
+              );
+            }
+
+            if (name === 'isPopular') {
+              return (
+                <VirtualTableHeaderCell
+                  key={name}
+                  className={styles[name]}
+                  name={name}
+                  isSortable={true}
+                  {...otherProps}
+                >
+                  <Icon
+                    name={icons.POPULAR}
+                    size={12}
+                    title={translate('Popular')}
                   />
                 </VirtualTableHeaderCell>
               );
@@ -111,7 +149,7 @@ class DiscoverMovieHeader extends Component {
                 isSortable={isSortable}
                 {...otherProps}
               >
-                {label}
+                {typeof label === 'function' ? label() : label}
               </VirtualTableHeaderCell>
             );
           })

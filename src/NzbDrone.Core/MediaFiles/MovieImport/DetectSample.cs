@@ -9,7 +9,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
 {
     public interface IDetectSample
     {
-        DetectSampleResult IsSample(Movie movie, string path);
+        DetectSampleResult IsSample(MovieMetadata movie, string path);
     }
 
     public class DetectSample : IDetectSample
@@ -23,7 +23,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
             _logger = logger;
         }
 
-        public DetectSampleResult IsSample(Movie movie, string path)
+        public DetectSampleResult IsSample(MovieMetadata movie, string path)
         {
             var extension = Path.GetExtension(path);
 
@@ -53,7 +53,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
 
             if (!runTime.HasValue)
             {
-                _logger.Error("Failed to get runtime from the file, make sure mediainfo is available");
+                _logger.Error("Failed to get runtime from the file, make sure ffprobe is available");
                 return DetectSampleResult.Indeterminate;
             }
 
@@ -71,31 +71,31 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                 return DetectSampleResult.Sample;
             }
 
-            _logger.Debug("Runtime of {0} is more than {1} seconds, Not Sample", runTime.Value.TotalSeconds, minimumRuntime);
+            _logger.Debug("[{0}] does not appear to be a sample. Runtime {1} seconds is more than minimum of {2} seconds", path, runTime, minimumRuntime);
             return DetectSampleResult.NotSample;
         }
 
-        private int GetMinimumAllowedRuntime(Movie movie)
+        private int GetMinimumAllowedRuntime(MovieMetadata movie)
         {
-            //Anime short - 15 seconds
+            // Anime short - 15 seconds
             if (movie.Runtime <= 3)
             {
                 return 15;
             }
 
-            //Webisodes - 90 seconds
+            // Webisodes - 90 seconds
             if (movie.Runtime <= 10)
             {
                 return 90;
             }
 
-            //30 minute episodes - 5 minutes
+            // 30 minute episodes - 5 minutes
             if (movie.Runtime <= 30)
             {
                 return 300;
             }
 
-            //60 minute episodes - 10 minutes
+            // 60 minute episodes - 10 minutes
             return 600;
         }
     }

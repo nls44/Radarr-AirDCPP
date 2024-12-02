@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using Newtonsoft.Json.Linq;
@@ -141,7 +141,8 @@ namespace NzbDrone.Core.Download.Clients.Transmission
 
         private TransmissionResponse GetSessionVariables(TransmissionSettings settings)
         {
-            // Retrieve transmission information such as the default download directory, bandwith throttling and seed ratio.
+            // Retrieve transmission information such as the default download directory, bandwidth throttling and seed ratio.
+
             return ProcessRequest("session-get", null, settings);
         }
 
@@ -177,7 +178,8 @@ namespace NzbDrone.Core.Download.Clients.Transmission
                 "seedRatioMode",
                 "seedIdleLimit",
                 "seedIdleMode",
-                "fileCount"
+                "fileCount",
+                "file-count"
             };
 
             var arguments = new Dictionary<string, object>();
@@ -200,7 +202,7 @@ namespace NzbDrone.Core.Download.Clients.Transmission
                 .Accept(HttpAccept.Json);
 
             requestBuilder.LogResponseContent = true;
-            requestBuilder.NetworkCredential = new NetworkCredential(settings.Username, settings.Password);
+            requestBuilder.NetworkCredential = new BasicNetworkCredential(settings.Username, settings.Password);
             requestBuilder.AllowAutoRedirect = false;
 
             return requestBuilder;

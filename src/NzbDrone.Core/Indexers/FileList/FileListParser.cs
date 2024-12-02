@@ -19,8 +19,6 @@ namespace NzbDrone.Core.Indexers.FileList
 
         public IList<ReleaseInfo> ParseResponse(IndexerResponse indexerResponse)
         {
-            var torrentInfos = new List<ReleaseInfo>();
-
             if (indexerResponse.HttpResponse.StatusCode != HttpStatusCode.OK)
             {
                 throw new IndexerException(indexerResponse,
@@ -28,18 +26,18 @@ namespace NzbDrone.Core.Indexers.FileList
                     indexerResponse.HttpResponse.StatusCode);
             }
 
+            if (!indexerResponse.HttpResponse.Headers.ContentType.Contains(HttpAccept.Json.Value))
+            {
+                throw new IndexerException(indexerResponse, "Unexpected response header '{0}' from indexer request, expected '{1}'", indexerResponse.HttpResponse.Headers.ContentType, HttpAccept.Json.Value);
+            }
+
+            var torrentInfos = new List<ReleaseInfo>();
+
             var queryResults = JsonConvert.DeserializeObject<List<FileListTorrent>>(indexerResponse.Content);
 
             foreach (var result in queryResults)
             {
                 var id = result.Id;
-
-                IndexerFlags flags = 0;
-
-                if (result.FreeLeech)
-                {
-                    flags |= IndexerFlags.G_Freeleech;
-                }
 
                 var imdbId = 0;
                 if (result.ImdbId != null && result.ImdbId.Length > 2)
@@ -47,9 +45,9 @@ namespace NzbDrone.Core.Indexers.FileList
                     imdbId = int.Parse(result.ImdbId.Substring(2));
                 }
 
-                torrentInfos.Add(new TorrentInfo()
+                torrentInfos.Add(new TorrentInfo
                 {
-                    Guid = string.Format("FileList-{0}", id),
+                    Guid = $"FileList-{id}",
                     Title = result.Name,
                     Size = result.Size,
                     DownloadUrl = GetDownloadUrl(id),
@@ -58,14 +56,29 @@ namespace NzbDrone.Core.Indexers.FileList
                     Peers = result.Leechers + result.Seeders,
                     PublishDate = result.UploadDate,
                     ImdbId = imdbId,
-                    IndexerFlags = flags
+                    IndexerFlags = GetIndexerFlags(result)
                 });
             }
 
             return torrentInfos.ToArray();
         }
 
-        public Action<IDictionary<string, string>, DateTime?> CookiesUpdater { get; set; }
+        private static IndexerFlags GetIndexerFlags(FileListTorrent item)
+        {
+            IndexerFlags flags = 0;
+
+            if (item.FreeLeech)
+            {
+                flags |= IndexerFlags.G_Freeleech;
+            }
+
+            if (item.Internal)
+            {
+                flags |= IndexerFlags.G_Internal;
+            }
+
+            return flags;
+        }
 
         private string GetDownloadUrl(string torrentId)
         {
@@ -85,5 +98,7 @@ namespace NzbDrone.Core.Indexers.FileList
 
             return url.FullUri;
         }
+
+        public Action<IDictionary<string, string>, DateTime?> CookiesUpdater { get; set; }
     }
 }

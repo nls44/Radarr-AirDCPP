@@ -54,7 +54,7 @@ namespace NzbDrone.Core.MediaFiles
             var movie = _movieService.GetMovie(movieId);
             var file = _mediaFileService.GetFilesByMovie(movieId);
 
-            return GetPreviews(movie, file).OrderByDescending(m => m.MovieId).ToList(); //TODO: Would really like to not have these be lists
+            return GetPreviews(movie, file).OrderByDescending(m => m.MovieId).ToList(); // TODO: Would really like to not have these be lists
         }
 
         private IEnumerable<RenameMovieFilePreview> GetPreviews(Movie movie, List<MovieFile> files)
@@ -80,13 +80,14 @@ namespace NzbDrone.Core.MediaFiles
             }
         }
 
-        private void RenameFiles(List<MovieFile> movieFiles, Movie movie)
+        private List<RenamedMovieFile> RenameFiles(List<MovieFile> movieFiles, Movie movie)
         {
-            var renamed = new List<MovieFile>();
+            var renamed = new List<RenamedMovieFile>();
 
             foreach (var movieFile in movieFiles)
             {
-                var movieFilePath = Path.Combine(movie.Path, movieFile.RelativePath);
+                var previousRelativePath = movieFile.RelativePath;
+                var previousPath = Path.Combine(movie.Path, movieFile.RelativePath);
 
                 try
                 {
@@ -95,11 +96,20 @@ namespace NzbDrone.Core.MediaFiles
 
                     _mediaFileService.Update(movieFile);
                     _movieService.UpdateMovie(movie);
-                    renamed.Add(movieFile);
+                    renamed.Add(new RenamedMovieFile
+                                {
+                                    MovieFile = movieFile,
+                                    PreviousRelativePath = previousRelativePath,
+                                    PreviousPath = previousPath
+                                });
 
                     _logger.Debug("Renamed movie file: {0}", movieFile);
 
-                    _eventAggregator.PublishEvent(new MovieFileRenamedEvent(movie, movieFile, movieFilePath));
+                    _eventAggregator.PublishEvent(new MovieFileRenamedEvent(movie, movieFile, previousPath));
+                }
+                catch (FileAlreadyExistsException ex)
+                {
+                    _logger.Warn("File not renamed, there is already a file at the destination: {0}", ex.Filename);
                 }
                 catch (SameFilenameException ex)
                 {
@@ -107,7 +117,7 @@ namespace NzbDrone.Core.MediaFiles
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error(ex, "Failed to rename file: {0}", movieFilePath);
+                    _logger.Error(ex, "Failed to rename file: {0}", previousPath);
                 }
             }
 
@@ -115,8 +125,10 @@ namespace NzbDrone.Core.MediaFiles
             {
                 _diskProvider.RemoveEmptySubfolders(movie.Path);
 
-                _eventAggregator.PublishEvent(new MovieRenamedEvent(movie));
+                _eventAggregator.PublishEvent(new MovieRenamedEvent(movie, renamed));
             }
+
+            return renamed;
         }
 
         public void Execute(RenameFilesCommand message)
@@ -125,8 +137,8 @@ namespace NzbDrone.Core.MediaFiles
             var movieFiles = _mediaFileService.GetMovies(message.Files);
 
             _logger.ProgressInfo("Renaming {0} files for {1}", movieFiles.Count, movie.Title);
-            RenameFiles(movieFiles, movie);
-            _logger.ProgressInfo("Selected movie files renamed for {0}", movie.Title);
+            var renamedFiles = RenameFiles(movieFiles, movie);
+            _logger.ProgressInfo("{0} selected movie files renamed for {1}", renamedFiles.Count, movie.Title);
 
             _eventAggregator.PublishEvent(new RenameCompletedEvent());
         }
@@ -140,8 +152,8 @@ namespace NzbDrone.Core.MediaFiles
             {
                 var movieFiles = _mediaFileService.GetFilesByMovie(movie.Id);
                 _logger.ProgressInfo("Renaming movie files for {0}", movie.Title);
-                RenameFiles(movieFiles, movie);
-                _logger.ProgressInfo("All movie files renamed for {0}", movie.Title);
+                var renamedFiles = RenameFiles(movieFiles, movie);
+                _logger.ProgressInfo("{0} movie files renamed for {1}", renamedFiles.Count, movie.Title);
             }
 
             _eventAggregator.PublishEvent(new RenameCompletedEvent());

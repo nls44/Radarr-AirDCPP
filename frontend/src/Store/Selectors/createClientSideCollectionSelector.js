@@ -44,7 +44,14 @@ function filter(items, state) {
         const predicate = filterPredicates[key];
 
         if (Array.isArray(value)) {
-          accepted = value.some((v) => predicate(item, v, type));
+          if (
+            type === filterTypes.NOT_CONTAINS ||
+            type === filterTypes.NOT_EQUAL
+          ) {
+            accepted = value.every((v) => predicate(item, v, type));
+          } else {
+            accepted = value.some((v) => predicate(item, v, type));
+          }
         } else {
           accepted = predicate(item, value, type);
         }
@@ -101,7 +108,7 @@ function sort(items, state) {
   return _.orderBy(items, clauses, orders);
 }
 
-function createCustomFiltersSelector(type, alternateType) {
+export function createCustomFiltersSelector(type, alternateType) {
   return createSelector(
     (state) => state.customFilters.items,
     (customFilters) => {

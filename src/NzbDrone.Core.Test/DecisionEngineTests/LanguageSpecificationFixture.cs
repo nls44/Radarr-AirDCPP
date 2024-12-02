@@ -5,7 +5,7 @@ using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
-using NzbDrone.Core.Profiles;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Test.Framework;
 
 namespace NzbDrone.Core.Test.DecisionEngineTests
@@ -27,28 +27,31 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
                 },
                 Movie = new Movie
                          {
-                             Profile = new Profile
+                             QualityProfile = new QualityProfile
                              {
                                  Language = Language.English
                              },
-                             OriginalLanguage = Language.French
+                             MovieMetadata = new MovieMetadata
+                             {
+                                 OriginalLanguage = Language.French
+                             }
                          }
             };
         }
 
         private void WithEnglishRelease()
         {
-            _remoteMovie.ParsedMovieInfo.Languages = new List<Language> { Language.English };
+            _remoteMovie.Languages = new List<Language> { Language.English };
         }
 
         private void WithGermanRelease()
         {
-            _remoteMovie.ParsedMovieInfo.Languages = new List<Language> { Language.German };
+            _remoteMovie.Languages = new List<Language> { Language.German };
         }
 
         private void WithFrenchRelease()
         {
-            _remoteMovie.ParsedMovieInfo.Languages = new List<Language> { Language.French };
+            _remoteMovie.Languages = new List<Language> { Language.French };
         }
 
         [Test]
@@ -70,7 +73,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_return_false_if_release_is_german_and_profile_original()
         {
-            _remoteMovie.Movie.Profile.Language = Language.Original;
+            _remoteMovie.Movie.QualityProfile.Language = Language.Original;
 
             WithGermanRelease();
 
@@ -80,7 +83,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_return_true_if_release_is_french_and_profile_original()
         {
-            _remoteMovie.Movie.Profile.Language = Language.Original;
+            _remoteMovie.Movie.QualityProfile.Language = Language.Original;
 
             WithFrenchRelease();
 
@@ -90,7 +93,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_return_true_if_allowed_language_any()
         {
-            _remoteMovie.Movie.Profile = new Profile
+            _remoteMovie.Movie.QualityProfile = new QualityProfile
             {
                 Language = Language.Any
             };

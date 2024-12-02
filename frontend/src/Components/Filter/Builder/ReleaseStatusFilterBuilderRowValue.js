@@ -2,18 +2,38 @@ import React from 'react';
 import translate from 'Utilities/String/translate';
 import FilterBuilderRowValue from './FilterBuilderRowValue';
 
-const protocols = [
+const statusTagList = [
   { id: 'tba', name: 'TBA' },
-  { id: 'announced', name: translate('Announced') },
-  { id: 'inCinemas', name: translate('InCinemas') },
-  { id: 'released', name: translate('Released') },
-  { id: 'deleted', name: translate('Deleted') }
+  {
+    id: 'announced',
+    get name() {
+      return translate('Announced');
+    }
+  },
+  {
+    id: 'inCinemas',
+    get name() {
+      return translate('InCinemas');
+    }
+  },
+  {
+    id: 'released',
+    get name() {
+      return translate('Released');
+    }
+  },
+  {
+    id: 'deleted',
+    get name() {
+      return translate('Deleted');
+    }
+  }
 ];
 
 function ReleaseStatusFilterBuilderRowValue(props) {
   return (
     <FilterBuilderRowValue
-      tagList={protocols}
+      tagList={statusTagList}
       {...props}
     />
   );

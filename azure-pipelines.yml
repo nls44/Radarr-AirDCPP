@@ -7,23 +7,40 @@ variables:
   outputFolder: './_output'
   artifactsFolder: './_artifacts'
   testsFolder: './_tests'
-  majorVersion: '3.0.1'
+  yarnCacheFolder: $(Pipeline.Workspace)/.yarn
+  nugetCacheFolder: $(Pipeline.Workspace)/.nuget/packages
+  majorVersion: '5.16.1'
   minorVersion: $[counter('minorVersion', 2000)]
   radarrVersion: '$(majorVersion).$(minorVersion)'
   buildName: '$(Build.SourceBranchName).$(radarrVersion)'
   sentryOrg: 'servarr'
   sentryUrl: 'https://sentry.servarr.com'
-  dotnetVersion: '3.1.404'
-  yarnCacheFolder: $(Pipeline.Workspace)/.yarn
+  dotnetVersion: '6.0.427'
+  nodeVersion: '20.X'
+  innoVersion: '6.2.2'
+  windowsImage: 'windows-2022'
+  linuxImage: 'ubuntu-20.04'
+  macImage: 'macOS-13'
 
 trigger:
   branches:
     include:
     - develop
     - master
+  paths:
+    exclude:
+      - .github
+      - src/Radarr.Api.*/openapi.json
 
 pr:
-- develop
+  branches:
+    include:
+    - develop
+  paths:
+    exclude:
+    - .github
+    - src/NzbDrone.Core/Localization/Core
+    - src/Radarr.Api.*/openapi.json
 
 stages:
   - stage: Setup
@@ -32,7 +49,7 @@ stages:
     - job:
       displayName: Build Variables
       pool:
-        vmImage: 'ubuntu-18.04'
+        vmImage: ${{ variables.linuxImage }}
       steps:
       # Set the build name properly.  The 'name' property won't recursively expand so hack here:
       - bash: echo "##vso[build.updatebuildnumber]$RADARRVERSION"
@@ -58,19 +75,22 @@ stages:
         matrix:
           Linux:
             osName: 'Linux'
-            imageName: 'ubuntu-18.04'
+            imageName: ${{ variables.linuxImage }}
+            enableAnalysis: 'true'
           Mac:
             osName: 'Mac'
-            imageName: 'macOS-10.15'
+            imageName: ${{ variables.macImage }}
+            enableAnalysis: 'false'
           Windows:
             osName: 'Windows'
-            imageName: 'windows-2019'
+            imageName: ${{ variables.windowsImage }}
+            enableAnalysis: 'false'
 
       pool:
         vmImage: $(imageName)
       variables:
         # Disable stylecop here - linting errors get caught by the analyze task
-        EnableAnalyzers: 'false'
+        EnableAnalyzers: $(enableAnalysis)
       steps:
       - checkout: self
         submodules: true
@@ -79,7 +99,17 @@ stages:
         displayName: 'Install .net core'
         inputs:
           version: $(dotnetVersion)
-      - bash: ./build.sh --backend
+      - bash: |
+          BUNDLEDVERSIONS=${AGENT_TOOLSDIRECTORY}/dotnet/sdk/${DOTNETVERSION}/Microsoft.NETCoreSdk.BundledVersions.props
+          echo $BUNDLEDVERSIONS
+          if grep -q freebsd-x64 $BUNDLEDVERSIONS; then
+            echo "Extra platforms already enabled"
+          else
+            echo "Enabling extra platform support"
+            sed -i.ORI 's/osx-x64/osx-x64;freebsd-x64;linux-x86/' $BUNDLEDVERSIONS
+          fi
+        displayName: Enable Extra Platform Support
+      - bash: ./build.sh --backend --enable-extra-platforms
         displayName: Build Radarr Backend
       - bash: |
           find ${OUTPUTFOLDER} -type f ! -path "*/publish/*" -exec rm -rf {} \;
@@ -92,25 +122,29 @@ stages:
         artifact: '$(osName)Backend'
         displayName: Publish Backend
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-      - publish: '$(testsFolder)/netcoreapp3.1/win-x64/publish'
-        artifact: WindowsCoreTests
-        displayName: Publish Windows Test Package
+      - publish: '$(testsFolder)/net6.0/win-x64/publish'
+        artifact: win-x64-tests
+        displayName: Publish win-x64 Test Package
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-      - publish: '$(testsFolder)/net462/linux-x64/publish'
-        artifact: LinuxTests
-        displayName: Publish Linux Mono Test Package
+      - publish: '$(testsFolder)/net6.0/linux-x64/publish'
+        artifact: linux-x64-tests
+        displayName: Publish linux-x64 Test Package
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-      - publish: '$(testsFolder)/netcoreapp3.1/linux-x64/publish'
-        artifact: LinuxCoreTests
-        displayName: Publish Linux Test Package
+      - publish: '$(testsFolder)/net6.0/linux-x86/publish'
+        artifact: linux-x86-tests
+        displayName: Publish linux-x86 Test Package
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-      - publish: '$(testsFolder)/netcoreapp3.1/linux-musl-x64/publish'
-        artifact: LinuxMuslCoreTests
-        displayName: Publish Linux Musl Test Package
+      - publish: '$(testsFolder)/net6.0/linux-musl-x64/publish'
+        artifact: linux-musl-x64-tests
+        displayName: Publish linux-musl-x64 Test Package
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-      - publish: '$(testsFolder)/netcoreapp3.1/osx-x64/publish'
-        artifact: MacCoreTests
-        displayName: Publish MacOS Test Package
+      - publish: '$(testsFolder)/net6.0/freebsd-x64/publish'
+        artifact: freebsd-x64-tests
+        displayName: Publish freebsd-x64 Test Package
+        condition: and(succeeded(), eq(variables['osName'], 'Windows'))
+      - publish: '$(testsFolder)/net6.0/osx-x64/publish'
+        artifact: osx-x64-tests
+        displayName: Publish osx-x64 Test Package
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
 
   - stage: Build_Frontend
@@ -122,20 +156,20 @@ stages:
         matrix:
           Linux:
             osName: 'Linux'
-            imageName: 'ubuntu-18.04'
+            imageName: ${{ variables.linuxImage }}
           Mac:
             osName: 'Mac'
-            imageName: 'macOS-10.15'
+            imageName: ${{ variables.macImage }}
           Windows:
             osName: 'Windows'
-            imageName: 'windows-2019'
+            imageName: ${{ variables.windowsImage }}
       pool:
         vmImage: $(imageName)
       steps:
-      - task: NodeTool@0
+      - task: UseNode@1
         displayName: Set Node.js version
         inputs:
-          versionSpec: '10.x'
+          version: $(nodeVersion)
       - checkout: self
         submodules: true
         fetchDepth: 1
@@ -144,11 +178,8 @@ stages:
           key: 'yarn | "$(osName)" | yarn.lock'
           restoreKeys: |
              yarn | "$(osName)"
-             yarn
           path: $(yarnCacheFolder)
         displayName: Cache Yarn packages
-      - bash: yarn global add gulp-cli
-        displayName: Add Gulp
       - bash: ./build.sh --frontend
         displayName: Build Radarr Frontend
         env:
@@ -167,7 +198,7 @@ stages:
     - job: Windows_Installer
       displayName: Create Installer
       pool:
-        vmImage: 'windows-2019'
+        vmImage: ${{ variables.windowsImage }}
       steps:
       - checkout: self
         fetchDepth: 1
@@ -183,16 +214,11 @@ stages:
           artifactName: WindowsFrontend
           targetPath: _output
         displayName: Fetch Frontend
-      - bash: ./build.sh --packages
-        displayName: Create Packages
       - bash: |
-          setup/inno/ISCC.exe setup/radarr.iss //DFramework=netcoreapp3.1 //DRuntime=win-x86
-          cp setup/output/Radarr.*windows.netcoreapp3.1.exe ${BUILD_ARTIFACTSTAGINGDIRECTORY}/Radarr.${BUILDNAME}.windows-core-x86-installer.exe
-        displayName: Create .NET Core Windows installer
-      - bash: |
-          setup/inno/ISCC.exe setup/radarr.iss //DFramework=netcoreapp3.1 //DRuntime=win-x64
-          cp setup/output/Radarr.*windows.netcoreapp3.1.exe ${BUILD_ARTIFACTSTAGINGDIRECTORY}/Radarr.${BUILDNAME}.windows-core-x64-installer.exe
-        displayName: Create .NET Core Windows installer
+          ./build.sh --packages --installer
+          cp distribution/windows/setup/output/Radarr.*win-x64.exe ${BUILD_ARTIFACTSTAGINGDIRECTORY}/Radarr.${BUILDNAME}.windows-core-x64-installer.exe
+          cp distribution/windows/setup/output/Radarr.*win-x86.exe ${BUILD_ARTIFACTSTAGINGDIRECTORY}/Radarr.${BUILDNAME}.windows-core-x86-installer.exe
+        displayName: Create Installers
       - publish: $(Build.ArtifactStagingDirectory)
         artifact: 'WindowsInstaller'
         displayName: Publish Installer
@@ -205,7 +231,7 @@ stages:
     - job: Other_Packages
       displayName: Create Standard Packages
       pool:
-        vmImage: 'ubuntu-18.04'
+        vmImage: ${{ variables.linuxImage }}
       steps:
       - checkout: self
         fetchDepth: 1
@@ -221,92 +247,151 @@ stages:
           artifactName: WindowsFrontend
           targetPath: _output
         displayName: Fetch Frontend
-      - bash: ./build.sh --packages
+      - bash: ./build.sh --packages --enable-extra-platforms
         displayName: Create Packages
       - bash: |
+          find . -name "ffprobe" -exec chmod a+x {} \;
           find . -name "Radarr" -exec chmod a+x {} \;
           find . -name "Radarr.Update" -exec chmod a+x {} \;
         displayName: Set executable bits
       - task: ArchiveFiles@2
-        displayName: Create Windows Core zip
+        displayName: Create win-x64 zip
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).windows-core-x64.zip'
           archiveType: 'zip'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/win-x64/netcoreapp3.1
+          rootFolderOrFile: $(artifactsFolder)/win-x64/net6.0
       - task: ArchiveFiles@2
-        displayName: Create Windows x86 Core zip
+        displayName: Create win-x86 zip
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).windows-core-x86.zip'
           archiveType: 'zip'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/win-x86/netcoreapp3.1
+          rootFolderOrFile: $(artifactsFolder)/win-x86/net6.0
       - task: ArchiveFiles@2
-        displayName: Create MacOS Core app
+        displayName: Create osx-x64 app
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).osx-app-core-x64.zip'
           archiveType: 'zip'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/macos-app/netcoreapp3.1
+          rootFolderOrFile: $(artifactsFolder)/osx-x64-app/net6.0
       - task: ArchiveFiles@2
-        displayName: Create MacOS Core tar
+        displayName: Create osx-x64 tar
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).osx-core-x64.tar.gz'
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/macos/netcoreapp3.1
+          rootFolderOrFile: $(artifactsFolder)/osx-x64/net6.0
       - task: ArchiveFiles@2
-        displayName: Create Linux Mono tar
+        displayName: Create osx-arm64 app
         inputs:
-          archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).linux.tar.gz'
+          archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).osx-app-core-arm64.zip'
+          archiveType: 'zip'
+          includeRootFolder: false
+          rootFolderOrFile: $(artifactsFolder)/osx-arm64-app/net6.0
+      - task: ArchiveFiles@2
+        displayName: Create osx-arm64 tar
+        inputs:
+          archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).osx-core-arm64.tar.gz'
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-x64/net462
+          rootFolderOrFile: $(artifactsFolder)/osx-arm64/net6.0
       - task: ArchiveFiles@2
-        displayName: Create Linux Core tar
+        displayName: Create linux-x64 tar
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).linux-core-x64.tar.gz'
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-x64/netcoreapp3.1
+          rootFolderOrFile: $(artifactsFolder)/linux-x64/net6.0
       - task: ArchiveFiles@2
-        displayName: Create Linux Musl Core tar
+        displayName: Create linux-musl-x64 tar
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).linux-musl-core-x64.tar.gz'
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-musl-x64/netcoreapp3.1
+          rootFolderOrFile: $(artifactsFolder)/linux-musl-x64/net6.0
       - task: ArchiveFiles@2
-        displayName: Create ARM32 Linux Core tar
+        displayName: Create linux-x86 tar
+        inputs:
+          archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).linux-core-x86.tar.gz'
+          archiveType: 'tar'
+          tarCompression: 'gz'
+          includeRootFolder: false
+          rootFolderOrFile: $(artifactsFolder)/linux-x86/net6.0
+      - task: ArchiveFiles@2
+        displayName: Create linux-arm tar
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).linux-core-arm.tar.gz'
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-arm/netcoreapp3.1
+          rootFolderOrFile: $(artifactsFolder)/linux-arm/net6.0
       - task: ArchiveFiles@2
-        displayName: Create ARM64 Linux Core tar
+        displayName: Create linux-musl-arm tar
+        inputs:
+          archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).linux-musl-core-arm.tar.gz'
+          archiveType: 'tar'
+          tarCompression: 'gz'
+          includeRootFolder: false
+          rootFolderOrFile: $(artifactsFolder)/linux-musl-arm/net6.0
+      - task: ArchiveFiles@2
+        displayName: Create linux-arm64 tar
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).linux-core-arm64.tar.gz'
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-arm64/netcoreapp3.1
+          rootFolderOrFile: $(artifactsFolder)/linux-arm64/net6.0
       - task: ArchiveFiles@2
-        displayName: Create ARM64 Linux Musl Core tar
+        displayName: Create linux-musl-arm64 tar
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).linux-musl-core-arm64.tar.gz'
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-musl-arm64/netcoreapp3.1
+          rootFolderOrFile: $(artifactsFolder)/linux-musl-arm64/net6.0
+      - task: ArchiveFiles@2
+        displayName: Create freebsd-x64 tar
+        inputs:
+          archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).freebsd-core-x64.tar.gz'
+          archiveType: 'tar'
+          tarCompression: 'gz'
+          includeRootFolder: false
+          rootFolderOrFile: $(artifactsFolder)/freebsd-x64/net6.0
       - publish: $(Build.ArtifactStagingDirectory)
         artifact: 'Packages'
         displayName: Publish Packages
+      - bash: |
+          echo "Uploading source maps to sentry"
+          curl -sL https://sentry.io/get-cli/ | bash
+          RELEASENAME="Radarr@${RADARRVERSION}-${BUILD_SOURCEBRANCHNAME}"
+          sentry-cli releases new --finalize -p radarr -p radarr-ui -p radarr-update "${RELEASENAME}"
+          sentry-cli releases -p radarr-ui files "${RELEASENAME}" upload-sourcemaps _output/UI/ --rewrite
+          sentry-cli releases set-commits --auto "${RELEASENAME}"
+          if [[ ${BUILD_SOURCEBRANCH} == "refs/heads/develop" ]]; then
+          sentry-cli releases deploys "${RELEASENAME}" new -e nightly
+          else
+          sentry-cli releases deploys "${RELEASENAME}" new -e production
+          fi
+          if [ $? -gt 0 ]; then
+            echo "##vso[task.logissue type=warning]Error uploading source maps."
+          fi
+          exit 0
+        displayName: Publish Sentry Source Maps
+        condition: |
+          or
+          (
+            and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop')),
+            and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+          )
+        env:
+          SENTRY_AUTH_TOKEN: $(sentryAuthTokenServarr)
+          SENTRY_ORG: $(sentryOrg)
+          SENTRY_URL: $(sentryUrl)
     
   - stage: Unit_Test
     displayName: Unit Tests
@@ -315,7 +400,7 @@ stages:
     jobs:
     - job: Prepare
       pool:
-        vmImage: 'ubuntu-18.04'
+        vmImage: ${{ variables.linuxImage }}
       steps:
       - checkout: none
       - task: DownloadPipelineArtifact@2
@@ -330,24 +415,34 @@ stages:
       displayName: Unit Native
       dependsOn: Prepare
       condition: and(succeeded(), eq(dependencies.Prepare.outputs['setVar.backendNotUpdated'], '0'))
+      workspace:
+        clean: all
 
       strategy:
         matrix:
           MacCore:
             osName: 'Mac'
-            testName: 'MacCore'
-            imageName: 'macOS-10.15'
+            testName: 'osx-x64'
+            poolName: 'Azure Pipelines'
+            imageName: ${{ variables.macImage }}
           WindowsCore:
             osName: 'Windows'
-            testName: 'WindowsCore'
-            imageName: 'windows-2019'
+            testName: 'win-x64'
+            poolName: 'Azure Pipelines'
+            imageName: ${{ variables.windowsImage }}
           LinuxCore:
             osName: 'Linux'
-            testName: 'LinuxCore'
-            imageName: 'ubuntu-18.04'
-            pattern: 'Radarr.**.linux-core-x64.tar.gz'
+            testName: 'linux-x64'
+            poolName: 'Azure Pipelines'
+            imageName: ${{ variables.linuxImage }}
+          FreebsdCore:
+            osName: 'Linux'
+            testName: 'freebsd-x64'
+            poolName: 'FreeBSD'
+            imageName:
 
       pool:
+        name: $(poolName)
         vmImage: $(imageName)
 
       steps:
@@ -356,30 +451,20 @@ stages:
         displayName: 'Install .net core'
         inputs:
           version: $(dotnetVersion)
+        condition: ne(variables['poolName'], 'FreeBSD')
       - task: DownloadPipelineArtifact@2
         displayName: Download Test Artifact
         inputs:
           buildType: 'current'
-          artifactName: '$(testName)Tests'
+          artifactName: '$(testName)-tests'
           targetPath: $(testsFolder)
-      - bash: |
-          wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-11_all.deb
-          sudo dpkg -i repo-mediaarea_1.0-11_all.deb
-          sudo apt-get update
-          sudo apt-get install -y --allow-unauthenticated libmediainfo-dev libmediainfo0v5 mediainfo
-        displayName: Install mediainfo
-        condition: and(succeeded(), eq(variables['osName'], 'Linux'))
       - powershell: Set-Service SCardSvr -StartupType Manual
         displayName: Enable Windows Test Service
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
       - bash: |
-          SYMLINK=6_6_0
-          MONOPREFIX=/Library/Frameworks/Mono.framework/Versions/$SYMLINK
-          echo "##vso[task.setvariable variable=MONOPREFIX;]$MONOPREFIX"
-          echo "##vso[task.setvariable variable=PKG_CONFIG_PATH;]$MONOPREFIX/lib/pkgconfig:$MONOPREFIX/share/pkgconfig:$PKG_CONFIG_PATH"
-          echo "##vso[task.setvariable variable=PATH;]$MONOPREFIX/bin:$PATH"
-        displayName: Set Mono Version
-        condition: and(succeeded(), eq(variables['osName'], 'Mac'))
+          chmod a+x _tests/ffprobe
+        displayName: Make ffprobe Executable
+        condition: and(succeeded(), ne(variables['osName'], 'Windows'))
       - bash: find ${TESTSFOLDER} -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
         displayName: Make Test Dummy Executable
         condition: and(succeeded(), ne(variables['osName'], 'Windows'))
@@ -403,25 +488,17 @@ stages:
       condition: and(succeeded(), eq(dependencies.Prepare.outputs['setVar.backendNotUpdated'], '0'))
       strategy:
         matrix:
-          mono520:
-            testName: 'Mono 5.20'
-            artifactName: LinuxTests
-            containerImage: servarr/testimages:mono-5.20
-          mono610:
-            testName: 'Mono 6.10'
-            artifactName: LinuxTests
-            containerImage: servarr/testimages:mono-6.10
-          mono612:
-            testName: 'Mono 6.12'
-            artifactName: LinuxTests
-            containerImage: servarr/testimages:mono-6.12
           alpine:
             testName: 'Musl Net Core'
-            artifactName: LinuxMuslCoreTests
-            containerImage: servarr/testimages:alpine
+            artifactName: linux-musl-x64-tests
+            containerImage: ghcr.io/servarr/testimages:alpine
+          linux-x86:
+            testName: 'linux-x86'
+            artifactName: linux-x86-tests
+            containerImage: ghcr.io/servarr/testimages:linux-x86
 
       pool:
-        vmImage: 'ubuntu-18.04'
+        vmImage: ${{ variables.linuxImage }}
       
       container: $[ variables['containerImage'] ]
 
@@ -429,9 +506,15 @@ stages:
         
       steps:
       - task: UseDotNet@2
-        displayName: 'Install .net core'
+        displayName: 'Install .NET'
         inputs:
           version: $(dotnetVersion)
+        condition: and(succeeded(), ne(variables['testName'], 'linux-x86'))
+      - bash: |
+          SDKURL=$(curl -s https://api.github.com/repos/Servarr/dotnet-linux-x86/releases | jq -rc '.[].assets[].browser_download_url' | grep sdk-${DOTNETVERSION}.*gz$)
+          curl -fsSL $SDKURL | tar xzf - -C /opt/dotnet
+        displayName: 'Install .NET'
+        condition: and(succeeded(), eq(variables['testName'], 'linux-x86'))
       - checkout: none
       - task: DownloadPipelineArtifact@2
         displayName: Download Test Artifact
@@ -439,6 +522,9 @@ stages:
           buildType: 'current'
           artifactName: $(artifactName)
           targetPath: $(testsFolder)
+      - bash: |
+          chmod a+x _tests/ffprobe
+        displayName: Make ffprobe Executable
       - bash: find ${TESTSFOLDER} -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
         displayName: Make Test Dummy Executable
         condition: and(succeeded(), ne(variables['osName'], 'Windows'))
@@ -454,6 +540,118 @@ stages:
           testResultsFiles: '**/TestResult.xml'
           testRunTitle: '$(testName) Unit Tests'
           failTaskOnFailedTests: true
+          
+    - job: Unit_LinuxCore_Postgres14
+      displayName: Unit Native LinuxCore with Postgres14 Database
+      dependsOn: Prepare
+      condition: and(succeeded(), eq(dependencies.Prepare.outputs['setVar.backendNotUpdated'], '0'))
+      variables:
+        pattern: 'Radarr.*.linux-core-x64.tar.gz'
+        artifactName: linux-x64-tests
+        Radarr__Postgres__Host: 'localhost'
+        Radarr__Postgres__Port: '5432'
+        Radarr__Postgres__User: 'radarr'
+        Radarr__Postgres__Password: 'radarr'
+
+      pool:
+        vmImage: ${{ variables.linuxImage }}
+
+      timeoutInMinutes: 10
+        
+      steps:
+      - task: UseDotNet@2
+        displayName: 'Install .net core'
+        inputs:
+          version: $(dotnetVersion)
+      - checkout: none
+      - task: DownloadPipelineArtifact@2
+        displayName: Download Test Artifact
+        inputs:
+          buildType: 'current'
+          artifactName: $(artifactName)
+          targetPath: $(testsFolder)
+      - bash: |
+          chmod a+x _tests/ffprobe
+        displayName: Make ffprobe Executable
+      - bash: find ${TESTSFOLDER} -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
+        displayName: Make Test Dummy Executable
+        condition: and(succeeded(), ne(variables['osName'], 'Windows'))
+      - bash: |
+          docker run -d --name=postgres14 \
+          -e POSTGRES_PASSWORD=radarr \
+          -e POSTGRES_USER=radarr \
+          -p 5432:5432/tcp \
+          -v /usr/share/zoneinfo/America/Chicago:/etc/localtime:ro \
+          postgres:14
+        displayName: Start postgres
+      - bash: |
+          chmod a+x ${TESTSFOLDER}/test.sh
+          ls -lR ${TESTSFOLDER}
+          ${TESTSFOLDER}/test.sh Linux Unit Test
+        displayName: Run Tests
+      - task: PublishTestResults@2
+        displayName: Publish Test Results
+        inputs:
+          testResultsFormat: 'NUnit'
+          testResultsFiles: '**/TestResult.xml'
+          testRunTitle: 'LinuxCore Postgres14 Unit Tests'
+          failTaskOnFailedTests: true
+
+    - job: Unit_LinuxCore_Postgres15
+      displayName: Unit Native LinuxCore with Postgres15 Database
+      dependsOn: Prepare
+      condition: and(succeeded(), eq(dependencies.Prepare.outputs['setVar.backendNotUpdated'], '0'))
+      variables:
+        pattern: 'Radarr.*.linux-core-x64.tar.gz'
+        artifactName: linux-x64-tests
+        Radarr__Postgres__Host: 'localhost'
+        Radarr__Postgres__Port: '5432'
+        Radarr__Postgres__User: 'radarr'
+        Radarr__Postgres__Password: 'radarr'
+  
+      pool:
+        vmImage: ${{ variables.linuxImage }}
+
+      timeoutInMinutes: 10
+        
+      steps:
+      - task: UseDotNet@2
+        displayName: 'Install .net core'
+        inputs:
+          version: $(dotnetVersion)
+      - checkout: none
+      - task: DownloadPipelineArtifact@2
+        displayName: Download Test Artifact
+        inputs:
+          buildType: 'current'
+          artifactName: $(artifactName)
+          targetPath: $(testsFolder)
+      - bash: |
+          chmod a+x _tests/ffprobe
+        displayName: Make ffprobe Executable
+      - bash: find ${TESTSFOLDER} -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
+        displayName: Make Test Dummy Executable
+        condition: and(succeeded(), ne(variables['osName'], 'Windows'))
+      - bash: |
+          docker run -d --name=postgres15 \
+          -e POSTGRES_PASSWORD=radarr \
+          -e POSTGRES_USER=radarr \
+          -p 5432:5432/tcp \
+          -v /usr/share/zoneinfo/America/Chicago:/etc/localtime:ro \
+          postgres:15
+        displayName: Start postgres
+      - bash: |
+          chmod a+x ${TESTSFOLDER}/test.sh
+          ls -lR ${TESTSFOLDER}
+          ${TESTSFOLDER}/test.sh Linux Unit Test
+        displayName: Run Tests
+      - task: PublishTestResults@2
+        displayName: Publish Test Results
+        inputs:
+          testResultsFormat: 'NUnit'
+          testResultsFiles: '**/TestResult.xml'
+          testRunTitle: 'LinuxCore Postgres15 Unit Tests'
+          failTaskOnFailedTests: true
 
   - stage: Integration
     displayName: Integration
@@ -462,7 +660,7 @@ stages:
     jobs:
     - job: Prepare
       pool:
-        vmImage: 'ubuntu-18.04'
+        vmImage: ${{ variables.linuxImage }}
       steps:
       - checkout: none
       - task: DownloadPipelineArtifact@2
@@ -481,32 +679,24 @@ stages:
         matrix:
           MacCore:
             osName: 'Mac'
-            testName: 'MacCore'
-            imageName: 'macOS-10.15'
-            pattern: 'Radarr.**.osx-core-x64.tar.gz'
+            testName: 'osx-x64'
+            imageName: ${{ variables.macImage }}
+            pattern: 'Radarr.*.osx-core-x64.tar.gz'
           WindowsCore:
             osName: 'Windows'
-            testName: 'WindowsCore'
-            imageName: 'windows-2019'
-            pattern: 'Radarr.**.windows-core-x64.zip'
+            testName: 'win-x64'
+            imageName: ${{ variables.windowsImage }}
+            pattern: 'Radarr.*.windows-core-x64.zip'
           LinuxCore:
             osName: 'Linux'
-            testName: 'LinuxCore'
-            imageName: 'ubuntu-18.04'
-            pattern: 'Radarr.**.linux-core-x64.tar.gz'
+            testName: 'linux-x64'
+            imageName: ${{ variables.linuxImage }}
+            pattern: 'Radarr.*.linux-core-x64.tar.gz'
 
       pool:
         vmImage: $(imageName)
         
       steps:
-      - bash: |
-          SYMLINK=6_6_0
-          MONOPREFIX=/Library/Frameworks/Mono.framework/Versions/$SYMLINK
-          echo "##vso[task.setvariable variable=MONOPREFIX;]$MONOPREFIX"
-          echo "##vso[task.setvariable variable=PKG_CONFIG_PATH;]$MONOPREFIX/lib/pkgconfig:$MONOPREFIX/share/pkgconfig:$PKG_CONFIG_PATH"
-          echo "##vso[task.setvariable variable=PATH;]$MONOPREFIX/bin:$PATH"
-        displayName: Set Mono Version
-        condition: and(succeeded(), eq(variables['osName'], 'Mac'))
       - task: UseDotNet@2
         displayName: 'Install .net core'
         inputs:
@@ -516,7 +706,7 @@ stages:
         displayName: Download Test Artifact
         inputs:
           buildType: 'current'
-          artifactName: '$(testName)Tests'
+          artifactName: '$(testName)-tests'
           targetPath: $(testsFolder)
       - task: DownloadPipelineArtifact@2
         displayName: Download Build Artifact
@@ -546,34 +736,195 @@ stages:
           failTaskOnFailedTests: true
         displayName: Publish Test Results
 
+    - job: Integration_LinuxCore_Postgres14
+      displayName: Integration Native LinuxCore with Postgres14 Database
+      dependsOn: Prepare
+      condition: and(succeeded(), eq(dependencies.Prepare.outputs['setVar.backendNotUpdated'], '0'))
+      variables:
+        pattern: 'Radarr.*.linux-core-x64.tar.gz'
+        Radarr__Postgres__Host: 'localhost'
+        Radarr__Postgres__Port: '5432'
+        Radarr__Postgres__User: 'radarr'
+        Radarr__Postgres__Password: 'radarr'
+
+      pool:
+        vmImage: ${{ variables.linuxImage }}
+
+      steps:
+        - task: UseDotNet@2
+          displayName: 'Install .net core'
+          inputs:
+            version: $(dotnetVersion)
+        - checkout: none
+        - task: DownloadPipelineArtifact@2
+          displayName: Download Test Artifact
+          inputs:
+            buildType: 'current'
+            artifactName: 'linux-x64-tests'
+            targetPath: $(testsFolder)
+        - task: DownloadPipelineArtifact@2
+          displayName: Download Build Artifact
+          inputs:
+            buildType: 'current'
+            artifactName: Packages
+            itemPattern: '**/$(pattern)'
+            targetPath: $(Build.ArtifactStagingDirectory)
+        - task: ExtractFiles@1
+          inputs:
+            archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)' 
+            destinationFolder: '$(Build.ArtifactStagingDirectory)/bin'
+          displayName: Extract Package
+        - bash: |
+            mkdir -p ./bin/
+            cp -r -v ${BUILD_ARTIFACTSTAGINGDIRECTORY}/bin/Radarr/. ./bin/
+          displayName: Move Package Contents
+        - bash: |
+            docker run -d --name=postgres14 \
+            -e POSTGRES_PASSWORD=radarr \
+            -e POSTGRES_USER=radarr \
+            -p 5432:5432/tcp \
+            -v /usr/share/zoneinfo/America/Chicago:/etc/localtime:ro \
+            postgres:14
+          displayName: Start postgres
+        - bash: |
+            chmod a+x ${TESTSFOLDER}/test.sh
+            ${TESTSFOLDER}/test.sh Linux Integration Test
+          displayName: Run Integration Tests
+        - task: PublishTestResults@2
+          inputs:
+            testResultsFormat: 'NUnit'
+            testResultsFiles: '**/TestResult.xml'
+            testRunTitle: 'Integration LinuxCore Postgres14 Database Integration Tests'
+            failTaskOnFailedTests: true
+          displayName: Publish Test Results
+
+
+    - job: Integration_LinuxCore_Postgres15
+      displayName: Integration Native LinuxCore with Postgres Database
+      dependsOn: Prepare
+      condition: and(succeeded(), eq(dependencies.Prepare.outputs['setVar.backendNotUpdated'], '0'))
+      variables:
+        pattern: 'Radarr.*.linux-core-x64.tar.gz'
+        Radarr__Postgres__Host: 'localhost'
+        Radarr__Postgres__Port: '5432'
+        Radarr__Postgres__User: 'radarr'
+        Radarr__Postgres__Password: 'radarr'
+
+      pool:
+        vmImage: ${{ variables.linuxImage }}
+
+      steps:
+        - task: UseDotNet@2
+          displayName: 'Install .net core'
+          inputs:
+            version: $(dotnetVersion)
+        - checkout: none
+        - task: DownloadPipelineArtifact@2
+          displayName: Download Test Artifact
+          inputs:
+            buildType: 'current'
+            artifactName: 'linux-x64-tests'
+            targetPath: $(testsFolder)
+        - task: DownloadPipelineArtifact@2
+          displayName: Download Build Artifact
+          inputs:
+            buildType: 'current'
+            artifactName: Packages
+            itemPattern: '**/$(pattern)'
+            targetPath: $(Build.ArtifactStagingDirectory)
+        - task: ExtractFiles@1
+          inputs:
+            archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)' 
+            destinationFolder: '$(Build.ArtifactStagingDirectory)/bin'
+          displayName: Extract Package
+        - bash: |
+            mkdir -p ./bin/
+            cp -r -v ${BUILD_ARTIFACTSTAGINGDIRECTORY}/bin/Radarr/. ./bin/
+          displayName: Move Package Contents
+        - bash: |
+            docker run -d --name=postgres15 \
+            -e POSTGRES_PASSWORD=radarr \
+            -e POSTGRES_USER=radarr \
+            -p 5432:5432/tcp \
+            -v /usr/share/zoneinfo/America/Chicago:/etc/localtime:ro \
+            postgres:15
+          displayName: Start postgres
+        - bash: |
+            chmod a+x ${TESTSFOLDER}/test.sh
+            ${TESTSFOLDER}/test.sh Linux Integration Test
+          displayName: Run Integration Tests
+        - task: PublishTestResults@2
+          inputs:
+            testResultsFormat: 'NUnit'
+            testResultsFiles: '**/TestResult.xml'
+            testRunTitle: 'Integration LinuxCore Postgres15 Database Integration Tests'
+            failTaskOnFailedTests: true
+          displayName: Publish Test Results
+
+    - job: Integration_FreeBSD
+      displayName: Integration Native FreeBSD
+      dependsOn: Prepare
+      condition: and(succeeded(), eq(dependencies.Prepare.outputs['setVar.backendNotUpdated'], '0'))
+      workspace:
+        clean: all
+      variables:
+        pattern: 'Radarr.*.freebsd-core-x64.tar.gz'
+      pool:
+        name: 'FreeBSD'
+
+      steps:
+      - checkout: none
+      - task: DownloadPipelineArtifact@2
+        displayName: Download Test Artifact
+        inputs:
+          buildType: 'current'
+          artifactName: 'freebsd-x64-tests'
+          targetPath: $(testsFolder)
+      - task: DownloadPipelineArtifact@2
+        displayName: Download Build Artifact
+        inputs:
+          buildType: 'current'
+          artifactName: Packages
+          itemPattern: '**/$(pattern)'
+          targetPath: $(Build.ArtifactStagingDirectory)
+      - bash: |
+          mkdir -p ${BUILD_ARTIFACTSTAGINGDIRECTORY}/bin
+          tar xf ${BUILD_ARTIFACTSTAGINGDIRECTORY}/$(pattern) -C ${BUILD_ARTIFACTSTAGINGDIRECTORY}/bin
+        displayName: Extract Package
+      - bash: |
+          mkdir -p ./bin/
+          cp -r -v ${BUILD_ARTIFACTSTAGINGDIRECTORY}/bin/Radarr/. ./bin/
+        displayName: Move Package Contents
+      - bash: |
+          chmod a+x ${TESTSFOLDER}/test.sh
+          ${TESTSFOLDER}/test.sh Linux Integration Test
+        displayName: Run Integration Tests
+      - task: PublishTestResults@2
+        inputs:
+          testResultsFormat: 'NUnit'
+          testResultsFiles: '**/TestResult.xml'
+          testRunTitle: 'FreeBSD Integration Tests'
+          failTaskOnFailedTests: true
+        displayName: Publish Test Results
+
     - job: Integration_Docker
       displayName: Integration Docker
       dependsOn: Prepare
       condition: and(succeeded(), eq(dependencies.Prepare.outputs['setVar.backendNotUpdated'], '0'))
       strategy:
         matrix:
-          mono520:
-            testName: 'Mono 5.20'
-            artifactName: LinuxTests
-            containerImage: servarr/testimages:mono-5.20
-            pattern: 'Radarr.**.linux.tar.gz'
-          mono610:
-            testName: 'Mono 6.10'
-            artifactName: LinuxTests
-            containerImage: servarr/testimages:mono-6.10
-            pattern: 'Radarr.**.linux.tar.gz'
-          mono612:
-            testName: 'Mono 6.12'
-            artifactName: LinuxTests
-            containerImage: servarr/testimages:mono-6.12
-            pattern: 'Radarr.**.linux.tar.gz'
           alpine:
-            testName: 'Musl Net Core'
-            artifactName: LinuxMuslCoreTests
-            containerImage: servarr/testimages:alpine
-            pattern: 'Radarr.**.linux-musl-core-x64.tar.gz'
+            testName: 'linux-musl-x64'
+            artifactName: linux-musl-x64-tests
+            containerImage: ghcr.io/servarr/testimages:alpine
+            pattern: 'Radarr.*.linux-musl-core-x64.tar.gz'
+          linux-x86:
+            testName: 'linux-x86'
+            artifactName: linux-x86-tests
+            containerImage: ghcr.io/servarr/testimages:linux-x86
+            pattern: 'Radarr.*.linux-core-x86.tar.gz'
       pool:
-        vmImage: 'ubuntu-18.04'
+        vmImage: ${{ variables.linuxImage }}
 
       container: $[ variables['containerImage'] ]
 
@@ -581,9 +932,15 @@ stages:
         
       steps:
       - task: UseDotNet@2
-        displayName: 'Install .net core'
+        displayName: 'Install .NET'
         inputs:
           version: $(dotnetVersion)
+        condition: and(succeeded(), ne(variables['testName'], 'linux-x86'))
+      - bash: |
+          SDKURL=$(curl -s https://api.github.com/repos/Servarr/dotnet-linux-x86/releases | jq -rc '.[].assets[].browser_download_url' | grep sdk-${DOTNETVERSION}.*gz$)
+          curl -fsSL $SDKURL | tar xzf - -C /opt/dotnet
+        displayName: 'Install .NET'
+        condition: and(succeeded(), eq(variables['testName'], 'linux-x86'))
       - checkout: none
       - task: DownloadPipelineArtifact@2
         displayName: Download Test Artifact
@@ -629,18 +986,21 @@ stages:
         matrix:
           Linux:
             osName: 'Linux'
-            imageName: 'ubuntu-18.04'
-            pattern: 'Radarr.**.linux-core-x64.tar.gz'
+            artifactName: 'linux-x64'
+            imageName: ${{ variables.linuxImage }}
+            pattern: 'Radarr.*.linux-core-x64.tar.gz'
             failBuild: true
           Mac:
             osName: 'Mac'
-            imageName: 'macOS-10.15'
-            pattern: 'Radarr.**.osx-core-x64.tar.gz'
+            artifactName: 'osx-x64'
+            imageName: ${{ variables.macImage }}
+            pattern: 'Radarr.*.osx-core-x64.tar.gz'
             failBuild: true
           Windows:
             osName: 'Windows'
-            imageName: 'windows-2019'
-            pattern: 'Radarr.**.windows-core-x64.zip'
+            artifactName: 'win-x64'
+            imageName: ${{ variables.windowsImage }}
+            pattern: 'Radarr.*.windows-core-x64.zip'
             failBuild: true
 
       pool:
@@ -656,7 +1016,7 @@ stages:
         displayName: Download Test Artifact
         inputs:
           buildType: 'current'
-          artifactName: '$(osName)CoreTests'
+          artifactName: '$(artifactName)-tests'
           targetPath: $(testsFolder)
       - task: DownloadPipelineArtifact@2
         displayName: Download Build Artifact
@@ -705,7 +1065,7 @@ stages:
     jobs:
     - job: Prepare
       pool:
-        vmImage: 'ubuntu-18.04'
+        vmImage: ${{ variables.linuxImage }}
       steps:
       - checkout: none
       - task: DownloadPipelineArtifact@2
@@ -722,17 +1082,17 @@ stages:
         matrix:
           Linux:
             osName: 'Linux'
-            imageName: 'ubuntu-18.04'
+            imageName: ${{ variables.linuxImage }}
           Windows:
             osName: 'Windows'
-            imageName: 'windows-2019'
+            imageName: ${{ variables.windowsImage }}
       pool:
         vmImage: $(imageName)
       steps:
-      - task: NodeTool@0
+      - task: UseNode@1
         displayName: Set Node.js version
         inputs:
-          versionSpec: '10.x'
+          version: $(nodeVersion)
       - checkout: self
         submodules: true
         fetchDepth: 1
@@ -741,7 +1101,6 @@ stages:
           key: 'yarn | "$(osName)" | yarn.lock'
           restoreKeys: |
              yarn | "$(osName)"
-             yarn
           path: $(yarnCacheFolder)
         displayName: Cache Yarn packages
       - bash: ./build.sh --lint
@@ -750,30 +1109,159 @@ stages:
           FORCE_COLOR: 0
           YARN_CACHE_FOLDER: $(yarnCacheFolder)
 
-  - stage: Github_Release
-    displayName: Github Release
-    dependsOn:
-    - Automation
-    - Integration
-
-    jobs:
-    - job: Github_Release
+    - job: Analyze_Frontend
+      displayName: Frontend
+      condition: eq(variables['System.PullRequest.IsFork'], 'False')
       pool:
-        vmImage: 'ubuntu-18.04'
+        vmImage: ${{ variables.windowsImage }}
       steps:
-      - checkout: none
-      - task: DownloadPipelineArtifact@2
-        displayName: Download Build Artifact
+      - checkout: self # Need history for Sonar analysis
+      - task: SonarCloudPrepare@2
+        env:
+          SONAR_SCANNER_OPTS: ''
         inputs:
-          buildType: 'current'
-          artifactName: Packages
-          itemPattern: '**/*'
-          targetPath: $(Build.ArtifactStagingDirectory)
-      - task: GitHubRelease@0
-        displayName: ‘Create GitHub Release’
+          SonarCloud: 'SonarCloud'
+          organization: 'radarr'
+          scannerMode: 'CLI'
+          configMode: 'manual'
+          cliProjectKey: 'Radarr_Radarr.UI'
+          cliProjectName: 'RadarrUI'
+          cliProjectVersion: '$(radarrVersion)'
+          cliSources: './frontend'
+      - task: SonarCloudAnalyze@2
+      
+    - job: Api_Docs
+      displayName: API Docs
+      dependsOn: Prepare
+      condition: |
+        and
+        (
+          and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop')),
+          and(succeeded(), eq(dependencies.Prepare.outputs['setVar.backendNotUpdated'], '0'))
+        )
+
+      pool:
+        vmImage: ${{ variables.windowsImage }}
+
+      steps:
+      - task: UseDotNet@2
+        displayName: 'Install .net core'
         inputs:
-            gitHubConnection: github.com_nls44
-            repositoryName: '$(Build.Repository.Name)' 
-            #action: 'create'
-            target: '$(Build.SourceVersion)'
-            tagSource: 'auto' # Required when action == Create# Options: auto, manual
+          version: $(dotnetVersion)
+      - checkout: self
+        submodules: true
+        persistCredentials: true
+        fetchDepth: 1    
+      - bash: ./docs.sh Windows
+        displayName: Create openapi.json
+      - bash: |
+          git config --global user.email "development@lidarr.audio"
+          git config --global user.name "Servarr"
+          git checkout -b api-docs
+          git add .
+          git status
+          if git status | grep modified
+          then
+            git commit -am 'Automated API Docs update'
+            git push -f --set-upstream origin api-docs
+            curl -X POST -H "Authorization: token ${GITHUBTOKEN}" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/radarr/radarr/pulls -d '{"head":"api-docs","base":"develop","title":"Update API docs"}'
+          else
+            echo "No changes since last run"
+          fi
+        displayName: Commit API Doc Change
+        continueOnError: true
+        env:
+          GITHUBTOKEN: $(githubToken)
+      - task: CopyFiles@2
+        displayName: 'Copy openapi.json to: $(Build.ArtifactStagingDirectory)'
+        inputs:
+          SourceFolder: '$(Build.SourcesDirectory)'
+          Contents: |
+            **/*openapi.json
+          TargetFolder: '$(Build.ArtifactStagingDirectory)/api_docs'
+      - publish: $(Build.ArtifactStagingDirectory)/api_docs
+        artifact: 'APIDocs'
+        displayName: Publish API Docs Bundle
+        condition: and(succeeded(), eq(variables['System.JobAttempt'], '1'))
+
+    - job: Analyze_Backend
+      displayName: Backend
+      dependsOn: Prepare
+      condition: and(succeeded(), eq(dependencies.Prepare.outputs['setVar.backendNotUpdated'], '0'))
+
+      variables:
+        disable.coverage.autogenerate: 'true'
+        EnableAnalyzers: 'false'
+
+      pool:
+        vmImage: ${{ variables.windowsImage }}
+
+      steps:
+      - task: UseDotNet@2
+        displayName: 'Install .net core'
+        inputs:
+          version: $(dotnetVersion)
+      - checkout: self # Need history for Sonar analysis
+        submodules: true
+      - powershell: Set-Service SCardSvr -StartupType Manual
+        displayName: Enable Windows Test Service
+      - task: SonarCloudPrepare@2
+        condition: eq(variables['System.PullRequest.IsFork'], 'False')
+        inputs:
+          SonarCloud: 'SonarCloud'
+          organization: 'radarr'
+          scannerMode: 'MSBuild'
+          projectKey: 'Radarr_Radarr'
+          projectName: 'Radarr'
+          projectVersion: '$(radarrVersion)'
+          extraProperties: |
+            sonar.exclusions=**/obj/**,**/*.dll,**/NzbDrone.Core.Test/Files/**/*,./frontend/**,**/ExternalModules/**,./src/Libraries/**
+            sonar.coverage.exclusions=**/Radarr.Api.V3/**/*
+            sonar.cs.opencover.reportsPaths=$(Build.SourcesDirectory)/CoverageResults/**/coverage.opencover.xml
+            sonar.cs.nunit.reportsPaths=$(Build.SourcesDirectory)/TestResult.xml
+      - bash: |
+          ./build.sh --backend -f net6.0 -r win-x64
+          TEST_DIR=_tests/net6.0/win-x64/publish/ ./test.sh Windows Unit Coverage
+        displayName: Coverage Unit Tests
+      - task: SonarCloudAnalyze@2
+        condition: eq(variables['System.PullRequest.IsFork'], 'False')
+        displayName: Publish SonarCloud Results
+      - task: reportgenerator@5.3.11
+        displayName: Generate Coverage Report
+        inputs:
+          reports: '$(Build.SourcesDirectory)/CoverageResults/**/coverage.opencover.xml'
+          targetdir: '$(Build.SourcesDirectory)/CoverageResults/combined'
+          reporttypes: 'HtmlInline_AzurePipelines;Cobertura;Badges'
+          publishCodeCoverageResults: true
+
+  - stage: Report_Out
+    dependsOn:
+    - Analyze
+    - Installer
+    - Unit_Test
+    - Integration
+    - Automation
+    condition: eq(variables['system.pullrequest.isfork'], false)
+    displayName: Build Status Report
+    jobs:
+    - job:
+      displayName: Discord Notification
+      pool:
+        vmImage: ${{ variables.linuxImage }}
+      steps:
+        - task: DownloadPipelineArtifact@2
+          continueOnError: true
+          displayName: Download Screenshot Artifact
+          inputs:
+            buildType: 'current'
+            artifactName: 'WindowsAutomationScreenshots'
+            targetPath: $(Build.SourcesDirectory)
+        - checkout: none
+        - pwsh: |
+            iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/Servarr/AzureDiscordNotify/master/DiscordNotify.ps1'))
+          env:
+            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+            DISCORDCHANNELID: $(discordChannelId)
+            DISCORDWEBHOOKKEY: $(discordWebhookKey)
+            DISCORDTHREADID: $(discordThreadId)
+

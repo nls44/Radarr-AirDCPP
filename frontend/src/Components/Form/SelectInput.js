@@ -13,7 +13,7 @@ class SelectInput extends Component {
       name: this.props.name,
       value: event.target.value
     });
-  }
+  };
 
   //
   // Render
@@ -52,6 +52,7 @@ class SelectInput extends Component {
             const {
               key,
               value: optionValue,
+              isDisabled: optionIsDisabled = false,
               ...otherOptionProps
             } = option;
 
@@ -59,9 +60,10 @@ class SelectInput extends Component {
               <option
                 key={key}
                 value={key}
+                disabled={optionIsDisabled}
                 {...otherOptionProps}
               >
-                {optionValue}
+                {typeof optionValue === 'function' ? optionValue() : optionValue}
               </option>
             );
           })
@@ -75,7 +77,7 @@ SelectInput.propTypes = {
   className: PropTypes.string,
   disabledClassName: PropTypes.string,
   name: PropTypes.string.isRequired,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.func]).isRequired,
   values: PropTypes.arrayOf(PropTypes.object).isRequired,
   isDisabled: PropTypes.bool,
   hasError: PropTypes.bool,

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using NzbDrone.Core.ImportLists.ImportListMovies;
+using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaCover;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Movies.Collections;
 using Radarr.Http.REST;
 
 namespace Radarr.Api.V3.ImportLists
@@ -16,6 +18,7 @@ namespace Radarr.Api.V3.ImportLists
 
         public string Title { get; set; }
         public string SortTitle { get; set; }
+        public Language OriginalLanguage { get; set; }
         public MovieStatusType Status { get; set; }
         public string Overview { get; set; }
         public DateTime? InCinemas { get; set; }
@@ -33,11 +36,14 @@ namespace Radarr.Api.V3.ImportLists
         public int TmdbId { get; set; }
         public string Folder { get; set; }
         public string Certification { get; set; }
+        public float Popularity { get; set; }
         public List<string> Genres { get; set; }
         public Ratings Ratings { get; set; }
         public MovieCollection Collection { get; set; }
         public bool IsExcluded { get; set; }
         public bool IsExisting { get; set; }
+        public bool IsTrending { get; set; }
+        public bool IsPopular { get; set; }
 
         public bool IsRecommendation { get; set; }
         public HashSet<int> Lists { get; set; }
@@ -56,27 +62,29 @@ namespace Radarr.Api.V3.ImportLists
             {
                 TmdbId = model.TmdbId,
                 Title = model.Title,
-                SortTitle = model.SortTitle,
-                InCinemas = model.InCinemas,
-                PhysicalRelease = model.PhysicalRelease,
-                DigitalRelease = model.DigitalRelease,
+                SortTitle = model.MovieMetadata.Value.SortTitle,
+                OriginalLanguage = model.MovieMetadata.Value.OriginalLanguage,
+                InCinemas = model.MovieMetadata.Value.InCinemas,
+                PhysicalRelease = model.MovieMetadata.Value.PhysicalRelease,
+                DigitalRelease = model.MovieMetadata.Value.DigitalRelease,
 
-                Status = model.Status,
-                Overview = model.Overview,
+                Status = model.MovieMetadata.Value.Status,
+                Overview = model.MovieMetadata.Value.Overview,
 
-                Images = model.Images,
+                Images = model.MovieMetadata.Value.Images,
 
                 Year = model.Year,
 
-                Runtime = model.Runtime,
+                Runtime = model.MovieMetadata.Value.Runtime,
                 ImdbId = model.ImdbId,
-                Certification = model.Certification,
-                Website = model.Website,
-                Genres = model.Genres,
-                Ratings = model.Ratings,
-                YouTubeTrailerId = model.YouTubeTrailerId,
-                Studio = model.Studio,
-                Collection = model.Collection
+                Certification = model.MovieMetadata.Value.Certification,
+                Website = model.MovieMetadata.Value.Website,
+                Genres = model.MovieMetadata.Value.Genres,
+                Ratings = model.MovieMetadata.Value.Ratings,
+                Popularity = model.MovieMetadata.Value.Popularity,
+                YouTubeTrailerId = model.MovieMetadata.Value.YouTubeTrailerId,
+                Collection = new MovieCollection { Title = model.MovieMetadata.Value.CollectionTitle, TmdbId = model.MovieMetadata.Value.CollectionTmdbId },
+                Studio = model.MovieMetadata.Value.Studio
             };
         }
 
@@ -91,27 +99,29 @@ namespace Radarr.Api.V3.ImportLists
             {
                 TmdbId = model.TmdbId,
                 Title = model.Title,
-                SortTitle = model.SortTitle,
-                InCinemas = model.InCinemas,
-                PhysicalRelease = model.PhysicalRelease,
-                DigitalRelease = model.DigitalRelease,
+                SortTitle = model.MovieMetadata.Value.SortTitle,
+                OriginalLanguage = model.MovieMetadata.Value.OriginalLanguage,
+                InCinemas = model.MovieMetadata.Value.InCinemas,
+                PhysicalRelease = model.MovieMetadata.Value.PhysicalRelease,
+                DigitalRelease = model.MovieMetadata.Value.DigitalRelease,
 
-                Status = model.Status,
-                Overview = model.Overview,
+                Status = model.MovieMetadata.Value.Status,
+                Overview = model.MovieMetadata.Value.Overview,
 
-                Images = model.Images,
+                Images = model.MovieMetadata.Value.Images,
 
                 Year = model.Year,
 
-                Runtime = model.Runtime,
+                Runtime = model.MovieMetadata.Value.Runtime,
                 ImdbId = model.ImdbId,
-                Certification = model.Certification,
-                Website = model.Website,
-                Genres = model.Genres,
-                Ratings = model.Ratings,
-                YouTubeTrailerId = model.YouTubeTrailerId,
-                Studio = model.Studio,
-                Collection = model.Collection,
+                Certification = model.MovieMetadata.Value.Certification,
+                Website = model.MovieMetadata.Value.Website,
+                Genres = model.MovieMetadata.Value.Genres,
+                Ratings = model.MovieMetadata.Value.Ratings,
+                YouTubeTrailerId = model.MovieMetadata.Value.YouTubeTrailerId,
+                Popularity = model.MovieMetadata.Value.Popularity,
+                Studio = model.MovieMetadata.Value.Studio,
+                Collection = new MovieCollection { Title = model.MovieMetadata.Value.CollectionTitle, TmdbId = model.MovieMetadata.Value.CollectionTmdbId },
                 Lists = new HashSet<int> { model.ListId }
             };
         }

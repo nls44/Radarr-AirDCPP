@@ -24,15 +24,15 @@ $hoverScale: 1.05;
   composes: link from '~Components/Link/Link.css';
 
   display: block;
-  color: $defaultColor;
+  color: var(--defaultColor);
 
   &:hover {
-    color: $defaultColor;
+    color: var(--defaultColor);
     text-decoration: none;
   }
 }
 
-.ended {
+.deleted {
   position: absolute;
   top: 0;
   right: 0;
@@ -41,8 +41,8 @@ $hoverScale: 1.05;
   height: 0;
   border-width: 0 25px 25px 0;
   border-style: solid;
-  border-color: transparent $dangerColor transparent transparent;
-  color: $white;
+  border-color: transparent var(--gray) transparent transparent;
+  color: var(--white);
 }
 
 .info {
@@ -80,12 +80,24 @@ $hoverScale: 1.05;
   flex: 1 0 auto;
 }
 
+.overviewContainer {
+  display: flex;
+  justify-content: space-between;
+  flex: 0 1 1000px;
+  flex-direction: column;
+}
+
 .overview {
   composes: link;
 
-  flex: 0 1 1000px;
   overflow: hidden;
   min-height: 0;
+}
+
+.tags {
+  display: flex;
+  justify-content: space-around;
+  overflow: hidden;
 }
 
 @media only screen and (max-width: $breakpointSmall) {
@@ -100,5 +112,5 @@ $hoverScale: 1.05;
 
 .queue {
   padding-left: 2px;
-  border-left: 4px solid $queueColor;
+  border-left: 4px solid var(--queueColor);
 }

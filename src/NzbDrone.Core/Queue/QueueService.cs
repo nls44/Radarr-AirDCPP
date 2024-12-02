@@ -20,7 +20,7 @@ namespace NzbDrone.Core.Queue
     public class QueueService : IQueueService, IHandle<TrackedDownloadRefreshedEvent>
     {
         private readonly IEventAggregator _eventAggregator;
-        private static List<Queue> _queue = new List<Queue>();
+        private static List<Queue> _queue = new ();
 
         public QueueService(IEventAggregator eventAggregator)
         {
@@ -58,13 +58,13 @@ namespace NzbDrone.Core.Queue
         {
             var queue = new Queue
             {
-                Languages = trackedDownload.RemoteMovie?.ParsedMovieInfo.Languages ?? new List<Language> { Language.Unknown },
+                Languages = trackedDownload.RemoteMovie?.Languages ?? new List<Language> { Language.Unknown },
                 Quality = trackedDownload.RemoteMovie?.ParsedMovieInfo.Quality ?? new QualityModel(Quality.Unknown),
                 Title = trackedDownload.DownloadItem.Title,
                 Size = trackedDownload.DownloadItem.TotalSize,
-                Sizeleft = trackedDownload.DownloadItem.RemainingSize,
-                Timeleft = trackedDownload.DownloadItem.RemainingTime,
-                Status = trackedDownload.DownloadItem.Status.ToString(),
+                SizeLeft = trackedDownload.DownloadItem.RemainingSize,
+                TimeLeft = trackedDownload.DownloadItem.RemainingTime,
+                Status = Enum.TryParse(trackedDownload.DownloadItem.Status.ToString(), out QueueStatus outValue) ? outValue : QueueStatus.Unknown,
                 TrackedDownloadStatus = trackedDownload.Status,
                 TrackedDownloadState = trackedDownload.State,
                 StatusMessages = trackedDownload.StatusMessages.ToList(),
@@ -75,14 +75,16 @@ namespace NzbDrone.Core.Queue
                 Movie = movie,
                 DownloadClient = trackedDownload.DownloadItem.DownloadClientInfo.Name,
                 Indexer = trackedDownload.Indexer,
-                OutputPath = trackedDownload.DownloadItem.OutputPath.ToString()
+                OutputPath = trackedDownload.DownloadItem.OutputPath.ToString(),
+                Added = trackedDownload.Added,
+                DownloadClientHasPostImportCategory = trackedDownload.DownloadItem.DownloadClientInfo.HasPostImportCategory
             };
 
-            queue.Id = HashConverter.GetHashInt31(string.Format("trackedDownload-{0}", trackedDownload.DownloadItem.DownloadId));
+            queue.Id = HashConverter.GetHashInt31($"trackedDownload-{trackedDownload.DownloadClient}-{trackedDownload.DownloadItem.DownloadId}");
 
-            if (queue.Timeleft.HasValue)
+            if (queue.TimeLeft.HasValue)
             {
-                queue.EstimatedCompletionTime = DateTime.UtcNow.Add(queue.Timeleft.Value);
+                queue.EstimatedCompletionTime = DateTime.UtcNow.Add(queue.TimeLeft.Value);
             }
 
             return queue;
@@ -90,8 +92,11 @@ namespace NzbDrone.Core.Queue
 
         public void Handle(TrackedDownloadRefreshedEvent message)
         {
-            _queue = message.TrackedDownloads.OrderBy(c => c.DownloadItem.RemainingTime).SelectMany(MapQueue)
-                            .ToList();
+            _queue = message.TrackedDownloads
+                .Where(t => t.IsTrackable)
+                .OrderBy(c => c.DownloadItem.RemainingTime)
+                .SelectMany(MapQueue)
+                .ToList();
 
             _eventAggregator.PublishEvent(new QueueUpdatedEvent());
         }

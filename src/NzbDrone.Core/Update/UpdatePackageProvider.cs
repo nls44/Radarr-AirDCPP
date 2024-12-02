@@ -5,13 +5,14 @@ using NzbDrone.Common.Cloud;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.Analytics;
+using NzbDrone.Core.Datastore;
 
 namespace NzbDrone.Core.Update
 {
     public interface IUpdatePackageProvider
     {
         UpdatePackage GetLatestUpdate(string branch, Version currentVersion);
-        List<UpdatePackage> GetRecentUpdates(string branch, Version currentVersion);
+        List<UpdatePackage> GetRecentUpdates(string branch, Version currentVersion, Version previousVersion = null);
     }
 
     public class UpdatePackageProvider : IUpdatePackageProvider
@@ -20,13 +21,15 @@ namespace NzbDrone.Core.Update
         private readonly IHttpRequestBuilderFactory _requestBuilder;
         private readonly IPlatformInfo _platformInfo;
         private readonly IAnalyticsService _analyticsService;
+        private readonly IMainDatabase _mainDatabase;
 
-        public UpdatePackageProvider(IHttpClient httpClient, IRadarrCloudRequestBuilder requestBuilder, IAnalyticsService analyticsService, IPlatformInfo platformInfo)
+        public UpdatePackageProvider(IHttpClient httpClient, IRadarrCloudRequestBuilder requestBuilder, IAnalyticsService analyticsService, IPlatformInfo platformInfo, IMainDatabase mainDatabase)
         {
             _platformInfo = platformInfo;
             _analyticsService = analyticsService;
             _requestBuilder = requestBuilder.Services;
             _httpClient = httpClient;
+            _mainDatabase = mainDatabase;
         }
 
         public UpdatePackage GetLatestUpdate(string branch, Version currentVersion)
@@ -36,8 +39,10 @@ namespace NzbDrone.Core.Update
                                          .AddQueryParam("version", currentVersion)
                                          .AddQueryParam("os", OsInfo.Os.ToString().ToLowerInvariant())
                                          .AddQueryParam("arch", RuntimeInformation.OSArchitecture)
-                                         .AddQueryParam("runtime", PlatformInfo.Platform.ToString().ToLowerInvariant())
+                                         .AddQueryParam("runtime", "netcore")
                                          .AddQueryParam("runtimeVer", _platformInfo.Version)
+                                         .AddQueryParam("dbType", _mainDatabase.DatabaseType)
+                                         .AddQueryParam("includeMajorVersion", true)
                                          .SetSegment("branch", branch);
 
             if (_analyticsService.IsEnabled)
@@ -56,16 +61,21 @@ namespace NzbDrone.Core.Update
             return update.UpdatePackage;
         }
 
-        public List<UpdatePackage> GetRecentUpdates(string branch, Version currentVersion)
+        public List<UpdatePackage> GetRecentUpdates(string branch, Version currentVersion, Version previousVersion)
         {
             var request = _requestBuilder.Create()
                                          .Resource("/update/{branch}/changes")
                                          .AddQueryParam("version", currentVersion)
                                          .AddQueryParam("os", OsInfo.Os.ToString().ToLowerInvariant())
                                          .AddQueryParam("arch", RuntimeInformation.OSArchitecture)
-                                         .AddQueryParam("runtime", PlatformInfo.Platform.ToString().ToLowerInvariant())
+                                         .AddQueryParam("runtime", "netcore")
                                          .AddQueryParam("runtimeVer", _platformInfo.Version)
                                          .SetSegment("branch", branch);
+
+            if (previousVersion != null && previousVersion != currentVersion)
+            {
+                request.AddQueryParam("prevVersion", previousVersion);
+            }
 
             if (_analyticsService.IsEnabled)
             {

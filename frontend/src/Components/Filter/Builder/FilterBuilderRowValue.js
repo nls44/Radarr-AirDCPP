@@ -56,7 +56,9 @@ function getValue(input, selectedFilterBuilderProp) {
   }
 
   if (selectedFilterBuilderProp.type === filterBuilderTypes.NUMBER) {
-    return parseInt(input);
+    const { numberFractionDigits = 0 } = selectedFilterBuilderProp;
+
+    return Number(Number(input).toFixed(numberFractionDigits));
   }
 
   return input;
@@ -84,7 +86,7 @@ class FilterBuilderRowValue extends Component {
       name: NAME,
       value: [...filterValue, value]
     });
-  }
+  };
 
   onTagDelete = ({ index }) => {
     const {
@@ -98,7 +100,7 @@ class FilterBuilderRowValue extends Component {
       name: NAME,
       value
     });
-  }
+  };
 
   //
   // Render

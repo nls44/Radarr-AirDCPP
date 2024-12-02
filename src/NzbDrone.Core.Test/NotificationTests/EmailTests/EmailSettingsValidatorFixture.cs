@@ -25,7 +25,7 @@ namespace NzbDrone.Core.Test.NotificationTests.EmailTests
             _emailSettings = Builder<EmailSettings>.CreateNew()
                                         .With(s => s.Server = "someserver")
                                         .With(s => s.Port = 567)
-                                        .With(s => s.Ssl = true)
+                                        .With(s => s.UseEncryption = (int)EmailEncryptionType.Always)
                                         .With(s => s.From = "radarr@radarr.video")
                                         .With(s => s.To = new string[] { "radarr@radarr.video" })
                                         .Build();
@@ -62,17 +62,6 @@ namespace NzbDrone.Core.Test.NotificationTests.EmailTests
         }
 
         [TestCase("radarr")]
-        [TestCase("radarr@radarr")]
-        [TestCase("radarr.video")]
-        public void should_not_be_valid_if_from_is_invalid(string email)
-        {
-            _emailSettings.From = email;
-
-            _validator.Validate(_emailSettings).IsValid.Should().BeFalse();
-        }
-
-        [TestCase("radarr")]
-        [TestCase("radarr@radarr")]
         [TestCase("radarr.video")]
         public void should_not_be_valid_if_to_is_invalid(string email)
         {
@@ -82,17 +71,15 @@ namespace NzbDrone.Core.Test.NotificationTests.EmailTests
         }
 
         [TestCase("radarr")]
-        [TestCase("radarr@radarr")]
         [TestCase("radarr.video")]
         public void should_not_be_valid_if_cc_is_invalid(string email)
         {
-            _emailSettings.CC = new string[] { email };
+            _emailSettings.Cc = new string[] { email };
 
             _validator.Validate(_emailSettings).IsValid.Should().BeFalse();
         }
 
         [TestCase("radarr")]
-        [TestCase("radarr@radarr")]
         [TestCase("radarr.video")]
         public void should_not_be_valid_if_bcc_is_invalid(string email)
         {
@@ -105,7 +92,7 @@ namespace NzbDrone.Core.Test.NotificationTests.EmailTests
         public void should_not_be_valid_if_to_bcc_cc_are_all_empty()
         {
             _emailSettings.To = Array.Empty<string>();
-            _emailSettings.CC = Array.Empty<string>();
+            _emailSettings.Cc = Array.Empty<string>();
             _emailSettings.Bcc = Array.Empty<string>();
 
             _validator.Validate(_emailSettings).IsValid.Should().BeFalse();

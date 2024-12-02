@@ -66,7 +66,9 @@ function Table(props) {
             columns.map((column) => {
               const {
                 name,
-                isVisible
+                isVisible,
+                isSortable,
+                ...otherColumnProps
               } = column;
 
               if (!isVisible) {
@@ -84,6 +86,7 @@ function Table(props) {
                     name={name}
                     isSortable={false}
                     {...otherProps}
+                    {...otherColumnProps}
                   >
                     <TableOptionsModalWrapper
                       columns={columns}
@@ -107,7 +110,7 @@ function Table(props) {
                   {...getTableHeaderCellProps(otherProps)}
                   {...column}
                 >
-                  {column.label}
+                  {typeof column.label === 'function' ? column.label() : column.label}
                 </TableHeaderCell>
               );
             })
@@ -121,6 +124,7 @@ function Table(props) {
 }
 
 Table.propTypes = {
+  ...TableHeaderCell.props,
   className: PropTypes.string,
   horizontalScroll: PropTypes.bool.isRequired,
   selectAll: PropTypes.bool.isRequired,

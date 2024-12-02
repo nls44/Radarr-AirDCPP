@@ -4,7 +4,7 @@ import React, { Component } from 'react';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputHelpText from 'Components/Form/FormInputHelpText';
 import FormLabel from 'Components/Form/FormLabel';
-import Link from 'Components/Link/Link';
+import InlineMarkdown from 'Components/Markdown/InlineMarkdown';
 import { sizes } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import QualityProfileFormatItem from './QualityProfileFormatItem';
@@ -20,7 +20,8 @@ function calcOrder(profileFormatItems) {
     if (b.score !== a.score) {
       return b.score - a.score;
     }
-    return a.name > b.name ? 1 : -1;
+
+    return a.name.localeCompare(b.name, undefined, { numeric: true });
   }).map((x) => items[x.format]);
 }
 
@@ -47,7 +48,7 @@ class QualityProfileFormatItems extends Component {
 
     onQualityProfileFormatItemScoreChange(formatId, value);
     this.reorderItems();
-  }
+  };
 
   reorderItems = _.debounce(() => this.setState({ order: calcOrder(this.props.profileFormatItems) }), 1000);
 
@@ -67,10 +68,7 @@ class QualityProfileFormatItems extends Component {
 
     if (profileFormatItems.length < 1) {
       return (
-        <div className={styles.addCustomFormatMessage}>
-          {translate('MoreControlCFText')}
-          <Link to='/settings/customformats'> {translate('CustomFormat')} </Link>
-        </div>
+        <InlineMarkdown className={styles.addCustomFormatMessage} data={translate('WantMoreControlAddACustomFormat')} />
       );
     }
 

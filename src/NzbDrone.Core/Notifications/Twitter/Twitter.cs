@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using FluentValidation.Results;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Exceptions;
+using NzbDrone.Core.Movies;
 using NzbDrone.Core.Validation;
 
 namespace NzbDrone.Core.Notifications.Twitter
@@ -28,9 +29,39 @@ namespace NzbDrone.Core.Notifications.Twitter
             _twitterService.SendNotification($"[Radarr] Imported: {message.Message}", Settings);
         }
 
+        public override void OnMovieAdded(Movie movie)
+        {
+            _twitterService.SendNotification($"[Radarr] Added: {movie.Title}", Settings);
+        }
+
+        public override void OnMovieFileDelete(MovieFileDeleteMessage deleteMessage)
+        {
+            _twitterService.SendNotification($"Movie File Deleted: {deleteMessage.Message}", Settings);
+        }
+
+        public override void OnMovieDelete(MovieDeleteMessage deleteMessage)
+        {
+            _twitterService.SendNotification($"Movie Deleted: {deleteMessage.Message}", Settings);
+        }
+
         public override void OnHealthIssue(HealthCheck.HealthCheck healthCheck)
         {
             _twitterService.SendNotification($"Health Issue: {healthCheck.Message}", Settings);
+        }
+
+        public override void OnHealthRestored(HealthCheck.HealthCheck previousCheck)
+        {
+            _twitterService.SendNotification($"Health Issue Resolved: {previousCheck.Message}", Settings);
+        }
+
+        public override void OnApplicationUpdate(ApplicationUpdateMessage updateMessage)
+        {
+            _twitterService.SendNotification($"Application Updated: {updateMessage.Message}", Settings);
+        }
+
+        public override void OnManualInteractionRequired(ManualInteractionRequiredMessage message)
+        {
+            _twitterService.SendNotification($"Manual Interaction Required: {message.Message}", Settings);
         }
 
         public override object RequestAction(string action, IDictionary<string, string> query)

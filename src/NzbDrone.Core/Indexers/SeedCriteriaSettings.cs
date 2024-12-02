@@ -1,3 +1,4 @@
+using Equ;
 using FluentValidation;
 using NzbDrone.Core.Annotations;
 using NzbDrone.Core.Validation;
@@ -34,14 +35,12 @@ namespace NzbDrone.Core.Indexers
         }
     }
 
-    public class SeedCriteriaSettings
+    public class SeedCriteriaSettings : PropertywiseEquatable<SeedCriteriaSettings>
     {
-        private static readonly SeedCriteriaSettingsValidator Validator = new SeedCriteriaSettingsValidator();
-
-        [FieldDefinition(0, Type = FieldType.Textbox, Label = "Seed Ratio", HelpText = "The ratio a torrent should reach before stopping, empty is download client's default", Advanced = true)]
+        [FieldDefinition(0, Type = FieldType.Number, Label = "IndexerSettingsSeedRatio", HelpText = "IndexerSettingsSeedRatioHelpText")]
         public double? SeedRatio { get; set; }
 
-        [FieldDefinition(1, Type = FieldType.Number, Label = "Seed Time", Unit = "minutes", HelpText = "The time a torrent should be seeded before stopping, empty is download client's default", Advanced = true)]
+        [FieldDefinition(1, Type = FieldType.Number, Label = "IndexerSettingsSeedTime", Unit = "minutes", HelpText = "IndexerSettingsSeedTimeHelpText", Advanced = true)]
         public int? SeedTime { get; set; }
     }
 }

@@ -13,6 +13,7 @@ namespace NzbDrone.Core.ImportLists.Radarr
     {
         List<RadarrMovie> GetMovies(RadarrSettings settings);
         List<RadarrProfile> GetProfiles(RadarrSettings settings);
+        List<RadarrRootFolder> GetRootFolders(RadarrSettings settings);
         List<RadarrTag> GetTags(RadarrSettings settings);
         ValidationFailure Test(RadarrSettings settings);
     }
@@ -30,17 +31,26 @@ namespace NzbDrone.Core.ImportLists.Radarr
 
         public List<RadarrMovie> GetMovies(RadarrSettings settings)
         {
-            return Execute<RadarrMovie>("/api/v3/movie", settings);
+            var requestBuilder = BuildRequest("/api/v3/movie", settings);
+
+            requestBuilder.AddQueryParam("excludeLocalCovers", true);
+
+            return Execute<RadarrMovie>(requestBuilder, settings);
         }
 
         public List<RadarrProfile> GetProfiles(RadarrSettings settings)
         {
-            return Execute<RadarrProfile>("/api/v3/qualityprofile", settings);
+            return Execute<RadarrProfile>(BuildRequest("/api/v3/qualityprofile", settings), settings);
+        }
+
+        public List<RadarrRootFolder> GetRootFolders(RadarrSettings settings)
+        {
+            return Execute<RadarrRootFolder>(BuildRequest("api/v3/rootfolder", settings), settings);
         }
 
         public List<RadarrTag> GetTags(RadarrSettings settings)
         {
-            return Execute<RadarrTag>("/api/v3/tag", settings);
+            return Execute<RadarrTag>(BuildRequest("/api/v3/tag", settings), settings);
         }
 
         public ValidationFailure Test(RadarrSettings settings)
@@ -57,31 +67,48 @@ namespace NzbDrone.Core.ImportLists.Radarr
                     return new ValidationFailure("ApiKey", "API Key is invalid");
                 }
 
-                _logger.Error(ex, "Unable to send test message");
-                return new ValidationFailure("ApiKey", "Unable to send test message");
+                if (ex.Response.HasHttpRedirect)
+                {
+                    _logger.Error(ex, "Radarr returned redirect and is invalid");
+                    return new ValidationFailure("BaseUrl", "Radarr URL is invalid, are you missing a URL base?");
+                }
+
+                _logger.Error(ex, "Unable to connect to import list.");
+                return new ValidationFailure(string.Empty, $"Unable to connect to import list: {ex.Message}. Check the log surrounding this error for details.");
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Unable to send test message");
-                return new ValidationFailure("", "Unable to send test message");
+                _logger.Error(ex, "Unable to connect to import list.");
+                return new ValidationFailure(string.Empty, $"Unable to connect to import list: {ex.Message}. Check the log surrounding this error for details.");
             }
 
             return null;
         }
 
-        private List<TResource> Execute<TResource>(string resource, RadarrSettings settings)
+        private HttpRequestBuilder BuildRequest(string resource, RadarrSettings settings)
+        {
+            var baseUrl = settings.BaseUrl.TrimEnd('/');
+
+            return new HttpRequestBuilder(baseUrl).Resource(resource)
+                .Accept(HttpAccept.Json)
+                .SetHeader("X-Api-Key", settings.ApiKey);
+        }
+
+        private List<TResource> Execute<TResource>(HttpRequestBuilder requestBuilder, RadarrSettings settings)
         {
             if (settings.BaseUrl.IsNullOrWhiteSpace() || settings.ApiKey.IsNullOrWhiteSpace())
             {
                 return new List<TResource>();
             }
 
-            var baseUrl = settings.BaseUrl.TrimEnd('/');
-
-            var request = new HttpRequestBuilder(baseUrl).Resource(resource).Accept(HttpAccept.Json)
-                .SetHeader("X-Api-Key", settings.ApiKey).Build();
+            var request = requestBuilder.Build();
 
             var response = _httpClient.Get(request);
+
+            if ((int)response.StatusCode >= 300)
+            {
+                throw new HttpException(response);
+            }
 
             var results = JsonConvert.DeserializeObject<List<TResource>>(response.Content);
 

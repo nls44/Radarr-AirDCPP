@@ -75,7 +75,7 @@ namespace NzbDrone.Core.Notifications.Xbmc
 
         private string ProcessRequest(XbmcSettings settings, string method, params object[] parameters)
         {
-            var url = string.Format(@"http://{0}/jsonrpc", settings.Address);
+            var url = HttpRequestBuilder.BuildBaseUrl(settings.UseSsl, settings.Host, settings.Port, settings.UrlBase);
             var requestBuilder = new JsonRpcRequestBuilder(url, method, parameters);
 
             requestBuilder.LogResponseContent = true;
@@ -84,7 +84,7 @@ namespace NzbDrone.Core.Notifications.Xbmc
 
             if (!settings.Username.IsNullOrWhiteSpace())
             {
-                request.AddBasicAuthentication(settings.Username, settings.Password);
+                request.Credentials = new BasicNetworkCredential(settings.Username, settings.Password);
             }
 
             var response = _httpClient.Execute(request);

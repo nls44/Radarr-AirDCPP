@@ -7,18 +7,6 @@ function isRelative(ajaxOptions) {
   return !absUrlRegex.test(ajaxOptions.url);
 }
 
-function moveBodyToQuery(ajaxOptions) {
-  if (ajaxOptions.data && ajaxOptions.type === 'DELETE') {
-    if (ajaxOptions.url.contains('?')) {
-      ajaxOptions.url += '&';
-    } else {
-      ajaxOptions.url += '?';
-    }
-    ajaxOptions.url += $.param(ajaxOptions.data);
-    delete ajaxOptions.data;
-  }
-}
-
 function addRootUrl(ajaxOptions) {
   ajaxOptions.url = apiRoot + ajaxOptions.url;
 }
@@ -26,6 +14,15 @@ function addRootUrl(ajaxOptions) {
 function addApiKey(ajaxOptions) {
   ajaxOptions.headers = ajaxOptions.headers || {};
   ajaxOptions.headers['X-Api-Key'] = window.Radarr.apiKey;
+}
+
+function addContentType(ajaxOptions) {
+  if (
+    ajaxOptions.contentType == null &&
+    ajaxOptions.dataType === 'json' &&
+    (ajaxOptions.method === 'PUT' || ajaxOptions.method === 'POST' || ajaxOptions.method === 'DELETE')) {
+    ajaxOptions.contentType = 'application/json';
+  }
 }
 
 export default function createAjaxRequest(originalAjaxOptions) {
@@ -40,12 +37,12 @@ export default function createAjaxRequest(originalAjaxOptions) {
     }
   }
 
-  const ajaxOptions = { dataType: 'json', ...originalAjaxOptions };
+  const ajaxOptions = { ...originalAjaxOptions };
 
   if (isRelative(ajaxOptions)) {
-    moveBodyToQuery(ajaxOptions);
     addRootUrl(ajaxOptions);
     addApiKey(ajaxOptions);
+    addContentType(ajaxOptions);
   }
 
   const request = $.ajax({

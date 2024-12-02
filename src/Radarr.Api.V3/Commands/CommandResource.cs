@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Common.Http;
 using NzbDrone.Core.Messaging.Commands;
 using Radarr.Http.REST;
 
@@ -16,12 +17,15 @@ namespace Radarr.Api.V3.Commands
         public Command Body { get; set; }
         public CommandPriority Priority { get; set; }
         public CommandStatus Status { get; set; }
+        public CommandResult Result { get; set; }
         public DateTime Queued { get; set; }
         public DateTime? Started { get; set; }
         public DateTime? Ended { get; set; }
         public TimeSpan? Duration { get; set; }
         public string Exception { get; set; }
         public CommandTrigger Trigger { get; set; }
+
+        public string ClientUserAgent { get; set; }
 
         [JsonIgnore]
         public string CompletionMessage { get; set; }
@@ -99,12 +103,15 @@ namespace Radarr.Api.V3.Commands
                 Body = model.Body,
                 Priority = model.Priority,
                 Status = model.Status,
+                Result = model.Result,
                 Queued = model.QueuedAt,
                 Started = model.StartedAt,
                 Ended = model.EndedAt,
                 Duration = model.Duration,
                 Exception = model.Exception,
                 Trigger = model.Trigger,
+
+                ClientUserAgent = UserAgentParser.SimplifyUserAgent(model.Body.ClientUserAgent),
 
                 CompletionMessage = model.Body.CompletionMessage,
                 LastExecutionTime = model.Body.LastExecutionTime

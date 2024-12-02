@@ -29,26 +29,26 @@ class QualityProfile extends Component {
 
   onEditQualityProfilePress = () => {
     this.setState({ isEditQualityProfileModalOpen: true });
-  }
+  };
 
   onEditQualityProfileModalClose = () => {
     this.setState({ isEditQualityProfileModalOpen: false });
-  }
+  };
 
   onDeleteQualityProfilePress = () => {
     this.setState({
       isEditQualityProfileModalOpen: false,
       isDeleteQualityProfileModalOpen: true
     });
-  }
+  };
 
   onDeleteQualityProfileModalClose = () => {
     this.setState({ isDeleteQualityProfileModalOpen: false });
-  }
+  };
 
   onConfirmDeleteQualityProfile = () => {
     this.props.onConfirmDeleteQualityProfile(this.props.id);
-  }
+  };
 
   onCloneQualityProfilePress = () => {
     const {
@@ -57,7 +57,7 @@ class QualityProfile extends Component {
     } = this.props;
 
     onCloneQualityProfilePress(id);
-  }
+  };
 
   //
   // Render
@@ -104,7 +104,7 @@ class QualityProfile extends Component {
                 return (
                   <Label
                     key={item.quality.id}
-                    kind={isCutoff ? kinds.INFO : kinds.default}
+                    kind={isCutoff ? kinds.INFO : kinds.DEFAULT}
                     title={isCutoff ? translate('UpgradeUntilThisQualityIsMetOrExceeded') : null}
                   >
                     {item.quality.name}
@@ -120,7 +120,7 @@ class QualityProfile extends Component {
                   className={styles.tooltipLabel}
                   anchor={
                     <Label
-                      kind={isCutoff ? kinds.INFO : kinds.default}
+                      kind={isCutoff ? kinds.INFO : kinds.DEFAULT}
                       title={isCutoff ? translate('Cutoff') : null}
                     >
                       {item.name}
@@ -133,7 +133,7 @@ class QualityProfile extends Component {
                           return (
                             <Label
                               key={groupItem.quality.id}
-                              kind={isCutoff ? kinds.INFO : kinds.default}
+                              kind={isCutoff ? kinds.INFO : kinds.DEFAULT}
                               title={isCutoff ? translate('Cutoff') : null}
                             >
                               {groupItem.quality.name}
@@ -162,7 +162,7 @@ class QualityProfile extends Component {
           isOpen={this.state.isDeleteQualityProfileModalOpen}
           kind={kinds.DANGER}
           title={translate('DeleteQualityProfile')}
-          message={translate('QualityProfileDeleteConfirm', [name])}
+          message={translate('DeleteQualityProfileMessageText', { name })}
           confirmLabel={translate('Delete')}
           isSpinning={isDeleting}
           onConfirm={this.onConfirmDeleteQualityProfile}

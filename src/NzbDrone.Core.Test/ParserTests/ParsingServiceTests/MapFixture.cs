@@ -27,6 +27,8 @@ namespace NzbDrone.Core.Test.ParserTests.ParsingServiceTests
         private ParsedMovieInfo _translationTitleInfo;
         private ParsedMovieInfo _umlautInfo;
         private ParsedMovieInfo _umlautAltInfo;
+        private ParsedMovieInfo _multiLanguageInfo;
+        private ParsedMovieInfo _multiLanguageWithOriginalInfo;
         private MovieSearchCriteria _movieSearchCriteria;
 
         [SetUp]
@@ -34,67 +36,79 @@ namespace NzbDrone.Core.Test.ParserTests.ParsingServiceTests
         {
             _movie = Builder<Movie>.CreateNew()
                                    .With(m => m.Title = "Fack Ju Göthe 2")
-                                   .With(m => m.CleanTitle = "fackjugoethe2")
+                                   .With(m => m.MovieMetadata.Value.CleanTitle = "fackjugoethe2")
                                    .With(m => m.Year = 2015)
-                                   .With(m => m.AlternativeTitles = new List<AlternativeTitle> { new AlternativeTitle("Fack Ju Göthe 2: Same same") })
-                                   .With(m => m.Translations = new List<MovieTranslation> { new MovieTranslation { Title = "Translated Title", CleanTitle = "translatedtitle" } })
-                                   .With(m => m.OriginalLanguage = Language.English)
+                                   .With(m => m.MovieMetadata.Value.AlternativeTitles = new List<AlternativeTitle> { new AlternativeTitle("Fack Ju Göthe 2: Same same") })
+                                   .With(m => m.MovieMetadata.Value.Translations = new List<MovieTranslation> { new MovieTranslation { Title = "Translated Title", CleanTitle = "translatedtitle" } })
+                                   .With(m => m.MovieMetadata.Value.OriginalLanguage = Language.English)
                                    .Build();
 
             _parsedMovieInfo = new ParsedMovieInfo
             {
-                MovieTitle = _movie.Title,
+                MovieTitles = new List<string> { _movie.Title },
                 Languages = new List<Language> { Language.English },
                 Year = _movie.Year,
             };
 
             _wrongYearInfo = new ParsedMovieInfo
             {
-                MovieTitle = _movie.Title,
+                MovieTitles = new List<string> { _movie.Title },
                 Languages = new List<Language> { Language.English },
                 Year = 1900,
             };
 
             _wrongTitleInfo = new ParsedMovieInfo
             {
-                MovieTitle = "Other Title",
+                MovieTitles = new List<string> { "Other Title" },
                 Languages = new List<Language> { Language.English },
                 Year = 2015
             };
 
             _alternativeTitleInfo = new ParsedMovieInfo
             {
-                MovieTitle = _movie.AlternativeTitles.First().Title,
+                MovieTitles = new List<string> { _movie.MovieMetadata.Value.AlternativeTitles.First().Title },
                 Languages = new List<Language> { Language.English },
                 Year = _movie.Year,
             };
 
             _translationTitleInfo = new ParsedMovieInfo
             {
-                MovieTitle = _movie.Translations.First().Title,
+                MovieTitles = new List<string> { _movie.MovieMetadata.Value.Translations.First().Title },
                 Languages = new List<Language> { Language.English },
                 Year = _movie.Year,
             };
 
             _romanTitleInfo = new ParsedMovieInfo
             {
-                MovieTitle = "Fack Ju Göthe II",
+                MovieTitles = new List<string> { "Fack Ju Göthe II" },
                 Languages = new List<Language> { Language.English },
                 Year = _movie.Year,
             };
 
             _umlautInfo = new ParsedMovieInfo
             {
-                MovieTitle = "Fack Ju Goethe 2",
+                MovieTitles = new List<string> { "Fack Ju Goethe 2" },
                 Languages = new List<Language> { Language.English },
                 Year = _movie.Year
             };
 
             _umlautAltInfo = new ParsedMovieInfo
             {
-                MovieTitle = "Fack Ju Goethe 2: Same same",
+                MovieTitles = new List<string> { "Fack Ju Goethe 2: Same same" },
                 Languages = new List<Language> { Language.English },
                 Year = _movie.Year
+            };
+
+            _multiLanguageInfo = new ParsedMovieInfo
+            {
+                MovieTitles = { _movie.Title },
+                Languages = new List<Language> { Language.Original, Language.French }
+            };
+
+            _multiLanguageWithOriginalInfo = new ParsedMovieInfo
+            {
+                MovieTitles = { _movie.Title },
+                Languages = new List<Language> { Language.Original, Language.French, Language.English }
             };
 
             _movieSearchCriteria = new MovieSearchCriteria
@@ -115,10 +129,10 @@ namespace NzbDrone.Core.Test.ParserTests.ParsingServiceTests
         {
             GivenMatchByMovieTitle();
 
-            Subject.Map(_parsedMovieInfo, "", null);
+            Subject.Map(_parsedMovieInfo, "", 0, null);
 
             Mocker.GetMock<IMovieService>()
-                .Verify(v => v.FindByTitle(It.IsAny<string>(), It.IsAny<int>(), null, null, null), Times.Once());
+                .Verify(v => v.FindByTitle(It.IsAny<List<string>>(), It.IsAny<int>(), It.IsAny<List<string>>(), null), Times.Once());
         }
 
         [Test]
@@ -126,59 +140,35 @@ namespace NzbDrone.Core.Test.ParserTests.ParsingServiceTests
         {
             GivenMatchByMovieTitle();
 
-            Subject.Map(_parsedMovieInfo, "", _movieSearchCriteria);
+            Subject.Map(_parsedMovieInfo, "", 0, _movieSearchCriteria);
 
             Mocker.GetMock<IMovieService>()
                   .Verify(v => v.FindByTitle(It.IsAny<string>()), Times.Never());
         }
 
         [Test]
-        public void should_not_match_with_wrong_year()
-        {
-            GivenMatchByMovieTitle();
-            Subject.Map(_wrongYearInfo, "", _movieSearchCriteria).MappingResultType.Should().Be(MappingResultType.WrongYear);
-        }
-
-        [Test]
-        public void should_not_match_wrong_title()
-        {
-            GivenMatchByMovieTitle();
-            Subject.Map(_wrongTitleInfo, "", _movieSearchCriteria).MappingResultType.Should().Be(MappingResultType.WrongTitle);
-        }
-
-        [Test]
-        public void should_return_title_not_found_when_all_is_null()
-        {
-            Mocker.GetMock<IMovieService>()
-                .Setup(s => s.FindByTitle(It.IsAny<string>()))
-                .Returns((Movie)null);
-            Subject.Map(_parsedMovieInfo, "", null).MappingResultType.Should()
-                .Be(MappingResultType.TitleNotFound);
-        }
-
-        [Test]
         public void should_match_alternative_title()
         {
-            Subject.Map(_alternativeTitleInfo, "", _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
+            Subject.Map(_alternativeTitleInfo, "", 0, _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
         }
 
         [Test]
         public void should_match_translation_title()
         {
-            Subject.Map(_translationTitleInfo, "", _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
+            Subject.Map(_translationTitleInfo, "", 0, _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
         }
 
         [Test]
         public void should_match_roman_title()
         {
-            Subject.Map(_romanTitleInfo, "", _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
+            Subject.Map(_romanTitleInfo, "", 0, _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
         }
 
         [Test]
         public void should_match_umlauts()
         {
-            Subject.Map(_umlautInfo, "", _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
-            Subject.Map(_umlautAltInfo, "", _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
+            Subject.Map(_umlautInfo, "", 0, _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
+            Subject.Map(_umlautAltInfo, "", 0, _movieSearchCriteria).Movie.Should().Be(_movieSearchCriteria.Movie);
         }
     }
 }

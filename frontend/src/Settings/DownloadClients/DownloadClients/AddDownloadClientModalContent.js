@@ -44,9 +44,9 @@ class AddDownloadClientModalContent extends Component {
 
           {
             !isSchemaFetching && !!schemaError &&
-              <div>
-                {translate('UnableToAddANewDownloadClientPleaseTryAgain')}
-              </div>
+              <Alert kind={kinds.DANGER}>
+                {translate('AddDownloadClientError')}
+              </Alert>
           }
 
           {
@@ -55,10 +55,10 @@ class AddDownloadClientModalContent extends Component {
 
                 <Alert kind={kinds.INFO}>
                   <div>
-                    {translate('RadarrSupportsAnyDownloadClient')}
+                    {translate('SupportedDownloadClients')}
                   </div>
                   <div>
-                    {translate('ForMoreInformationOnTheIndividualDownloadClients')}
+                    {translate('SupportedDownloadClientsMoreInfo')}
                   </div>
                 </Alert>
 

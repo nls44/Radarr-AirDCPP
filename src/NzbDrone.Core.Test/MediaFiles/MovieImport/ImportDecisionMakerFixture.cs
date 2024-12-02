@@ -12,7 +12,7 @@ using NzbDrone.Core.MediaFiles.MovieImport.Aggregation;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
-using NzbDrone.Core.Profiles;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Test.Framework;
 using NzbDrone.Test.Common;
@@ -21,7 +21,7 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
 {
     [TestFixture]
 
-    //TODO: Add tests to ensure helpers for augmenters are correctly passed.
+    // TODO: Add tests to ensure helpers for augmenters are correctly passed.
     public class ImportDecisionMakerFixture : CoreTest<ImportDecisionMaker>
     {
         private List<string> _videoFiles;
@@ -59,7 +59,7 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
 
             _movie = Builder<Movie>.CreateNew()
                                      .With(e => e.Path = @"C:\Test\Movie".AsOsAgnostic())
-                                     .With(e => e.Profile = new Profile { Items = Qualities.QualityFixture.GetDefaultQualities() })
+                                     .With(e => e.QualityProfile = new QualityProfile { Items = Qualities.QualityFixture.GetDefaultQualities() })
                                      .Build();
 
             _quality = new QualityModel(Quality.DVD);
@@ -68,12 +68,12 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
             {
                 Movie = _movie,
                 Quality = _quality,
-                Path = @"C:\Test\Unsorted\The.Office.2018.DVDRip.XviD-OSiTV.avi"
+                Path = @"C:\Test\Unsorted\The.Movie.2018.DVDRip.XviD-OSiTV.avi"
             };
 
             _fileInfo = new ParsedMovieInfo
             {
-                MovieTitle = "The Office",
+                MovieTitles = new List<string> { "The Movie" },
                 Year = 2018,
                 Quality = _quality
             };
@@ -82,7 +82,7 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
                 .Setup(c => c.ParseMinimalPathMovieInfo(It.IsAny<string>()))
                 .Returns(_fileInfo);
 
-            GivenVideoFiles(new List<string> { @"C:\Test\Unsorted\The.Office.2018.DVDRip.XviD-OSiTV.avi".AsOsAgnostic() });
+            GivenVideoFiles(new List<string> { @"C:\Test\Unsorted\The.Movie.2018.DVDRip.XviD-OSiTV.avi".AsOsAgnostic() });
         }
 
         private void GivenSpecifications(params Mock<IImportDecisionEngineSpecification>[] mocks)
@@ -102,8 +102,8 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
         private void GivenAugmentationSuccess()
         {
             Mocker.GetMock<IAggregationService>()
-                  .Setup(s => s.Augment(It.IsAny<LocalMovie>(), It.IsAny<DownloadClientItem>(), It.IsAny<bool>()))
-                  .Callback<LocalMovie, DownloadClientItem, bool>((localMovie, downloadClientItem, otherFiles) =>
+                  .Setup(s => s.Augment(It.IsAny<LocalMovie>(), It.IsAny<DownloadClientItem>()))
+                  .Callback<LocalMovie, DownloadClientItem>((localMovie, downloadClientItem) =>
                   {
                       localMovie.Movie = _localMovie.Movie;
                   });
@@ -173,14 +173,14 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
             GivenSpecifications(_pass1);
 
             Mocker.GetMock<IAggregationService>()
-                  .Setup(c => c.Augment(It.IsAny<LocalMovie>(), It.IsAny<DownloadClientItem>(), It.IsAny<bool>()))
+                  .Setup(c => c.Augment(It.IsAny<LocalMovie>(), It.IsAny<DownloadClientItem>()))
                   .Throws<TestException>();
 
             _videoFiles = new List<string>
                 {
-                    "The.Office.S03E115.DVDRip.XviD-OSiTV",
-                    "The.Office.S03E115.DVDRip.XviD-OSiTV",
-                    "The.Office.S03E115.DVDRip.XviD-OSiTV"
+                    "The.Movie.2021.DVDRip.XviD-OSiTV",
+                    "The.Movie.2021.DVDRip.XviD-OSiTV",
+                    "The.Movie.2021.DVDRip.XviD-OSiTV"
                 };
 
             GivenVideoFiles(_videoFiles);
@@ -188,7 +188,7 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
             Subject.GetImportDecisions(_videoFiles, _movie);
 
             Mocker.GetMock<IAggregationService>()
-                  .Verify(c => c.Augment(It.IsAny<LocalMovie>(), It.IsAny<DownloadClientItem>(), It.IsAny<bool>()), Times.Exactly(_videoFiles.Count));
+                  .Verify(c => c.Augment(It.IsAny<LocalMovie>(), It.IsAny<DownloadClientItem>()), Times.Exactly(_videoFiles.Count));
 
             ExceptionVerification.ExpectedErrors(3);
         }
@@ -209,7 +209,7 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
             var fileNames = _videoFiles.Select(System.IO.Path.GetFileName);
 
             Mocker.GetMock<IAggregationService>()
-                  .Setup(c => c.Augment(It.IsAny<LocalMovie>(), It.IsAny<DownloadClientItem>(), It.IsAny<bool>()))
+                  .Setup(c => c.Augment(It.IsAny<LocalMovie>(), It.IsAny<DownloadClientItem>()))
                   .Throws<TestException>();
         }
 
@@ -217,12 +217,12 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
         public void should_return_a_decision_when_exception_is_caught()
         {
             Mocker.GetMock<IAggregationService>()
-                  .Setup(c => c.Augment(It.IsAny<LocalMovie>(), It.IsAny<DownloadClientItem>(), It.IsAny<bool>()))
+                  .Setup(c => c.Augment(It.IsAny<LocalMovie>(), It.IsAny<DownloadClientItem>()))
                   .Throws<TestException>();
 
             _videoFiles = new List<string>
                 {
-                    "The.Office.S03E115.DVDRip.XviD-OSiTV"
+                    "The.Movie.2021.DVDRip.XviD-OSiTV"
                 };
 
             GivenVideoFiles(_videoFiles);

@@ -1,10 +1,11 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using FluentAssertions;
 using FluentValidation.Results;
 using NUnit.Framework;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Notifications;
-using NzbDrone.Core.ThingiProvider;
 using NzbDrone.Core.Validation;
 using NzbDrone.Test.Common;
 
@@ -13,9 +14,9 @@ namespace NzbDrone.Core.Test.NotificationTests
     [TestFixture]
     public class NotificationBaseFixture : TestBase
     {
-        private class TestSetting : IProviderConfig
+        private class TestSetting : NotificationSettingsBase<TestSetting>
         {
-            public NzbDroneValidationResult Validate()
+            public override NzbDroneValidationResult Validate()
             {
                 return new NzbDroneValidationResult();
             }
@@ -57,19 +58,44 @@ namespace NzbDrone.Core.Test.NotificationTests
                 TestLogger.Info("OnDownload was called");
             }
 
-            public override void OnMovieRename(Movie movie)
+            public override void OnMovieRename(Movie movie, List<RenamedMovieFile> renamedFiles)
             {
                 TestLogger.Info("OnRename was called");
             }
 
-            public override void OnDelete(DeleteMessage message)
+            public override void OnMovieAdded(Movie movie)
             {
-                TestLogger.Info("OnDelete was called");
+                TestLogger.Info("OnMovieAdded was called");
+            }
+
+            public override void OnMovieFileDelete(MovieFileDeleteMessage message)
+            {
+                TestLogger.Info("OnMovieFileDelete was called");
+            }
+
+            public override void OnMovieDelete(MovieDeleteMessage deleteMessage)
+            {
+                TestLogger.Info("OnMovieDelete was called");
             }
 
             public override void OnHealthIssue(NzbDrone.Core.HealthCheck.HealthCheck artist)
             {
                 TestLogger.Info("OnHealthIssue was called");
+            }
+
+            public override void OnHealthRestored(Core.HealthCheck.HealthCheck healthCheck)
+            {
+                TestLogger.Info("OnHealthRestored was called");
+            }
+
+            public override void OnApplicationUpdate(ApplicationUpdateMessage updateMessage)
+            {
+                TestLogger.Info("OnApplicationUpdate was called");
+            }
+
+            public override void OnManualInteractionRequired(ManualInteractionRequiredMessage message)
+            {
+                TestLogger.Info("OnManualInteractionRequired was called");
             }
         }
 
@@ -105,8 +131,14 @@ namespace NzbDrone.Core.Test.NotificationTests
             notification.SupportsOnDownload.Should().BeTrue();
             notification.SupportsOnUpgrade.Should().BeTrue();
             notification.SupportsOnRename.Should().BeTrue();
-            notification.SupportsOnDelete.Should().BeTrue();
+            notification.SupportsOnMovieAdded.Should().BeTrue();
+            notification.SupportsOnMovieDelete.Should().BeTrue();
+            notification.SupportsOnMovieFileDelete.Should().BeTrue();
+            notification.SupportsOnMovieFileDeleteForUpgrade.Should().BeTrue();
             notification.SupportsOnHealthIssue.Should().BeTrue();
+            notification.SupportsOnHealthRestored.Should().BeTrue();
+            notification.SupportsOnApplicationUpdate.Should().BeTrue();
+            notification.SupportsOnManualInteractionRequired.Should().BeTrue();
         }
 
         [Test]
@@ -118,8 +150,14 @@ namespace NzbDrone.Core.Test.NotificationTests
             notification.SupportsOnDownload.Should().BeFalse();
             notification.SupportsOnUpgrade.Should().BeFalse();
             notification.SupportsOnRename.Should().BeFalse();
-            notification.SupportsOnDelete.Should().BeFalse();
+            notification.SupportsOnMovieAdded.Should().BeFalse();
+            notification.SupportsOnMovieDelete.Should().BeFalse();
+            notification.SupportsOnMovieFileDelete.Should().BeFalse();
+            notification.SupportsOnMovieFileDeleteForUpgrade.Should().BeFalse();
             notification.SupportsOnHealthIssue.Should().BeFalse();
+            notification.SupportsOnHealthRestored.Should().BeFalse();
+            notification.SupportsOnApplicationUpdate.Should().BeFalse();
+            notification.SupportsOnManualInteractionRequired.Should().BeFalse();
         }
     }
 }

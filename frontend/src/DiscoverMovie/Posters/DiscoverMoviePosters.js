@@ -36,15 +36,16 @@ function calculateColumnWidth(width, posterSize, isSmallScreen) {
 function calculateRowHeight(posterHeight, sortKey, isSmallScreen, posterOptions) {
   const {
     detailedProgressBar,
-    showTitle
+    showTitle,
+    showTmdbRating,
+    showImdbRating,
+    showRottenTomatoesRating,
+    showTraktRating
   } = posterOptions;
-
-  const nextAiringHeight = 19;
 
   const heights = [
     posterHeight,
     detailedProgressBar ? detailedProgressBarHeight : progressBarHeight,
-    nextAiringHeight,
     isSmallScreen ? columnPaddingSmallScreen : columnPadding
   ];
 
@@ -52,8 +53,51 @@ function calculateRowHeight(posterHeight, sortKey, isSmallScreen, posterOptions)
     heights.push(19);
   }
 
+  if (showTmdbRating) {
+    heights.push(19);
+  }
+
+  if (showImdbRating) {
+    heights.push(19);
+  }
+
+  if (showRottenTomatoesRating) {
+    heights.push(19);
+  }
+
+  if (showTraktRating) {
+    heights.push(19);
+  }
+
   switch (sortKey) {
     case 'studio':
+    case 'inCinemas':
+    case 'digitalRelease':
+    case 'physicalRelease':
+    case 'runtime':
+    case 'certification':
+      heights.push(19);
+      break;
+    case 'tmdbRating':
+      if (!showTmdbRating) {
+        heights.push(19);
+      }
+      break;
+    case 'imdbRating':
+      if (!showImdbRating) {
+        heights.push(19);
+      }
+      break;
+    case 'rottenTomatoesRating':
+      if (!showRottenTomatoesRating) {
+        heights.push(19);
+      }
+      break;
+    case 'traktRating':
+      if (!showTraktRating) {
+        heights.push(19);
+      }
+      break;
     default:
       // No need to add a height of 0
   }
@@ -139,7 +183,7 @@ class DiscoverMoviePosters extends Component {
 
   setGridRef = (ref) => {
     this._grid = ref;
-  }
+  };
 
   calculateGrid = (width = this.state.width, isSmallScreen) => {
     const {
@@ -161,7 +205,7 @@ class DiscoverMoviePosters extends Component {
       posterHeight,
       rowHeight
     });
-  }
+  };
 
   cellRenderer = ({ key, rowIndex, columnIndex, style }) => {
     const {
@@ -182,7 +226,11 @@ class DiscoverMoviePosters extends Component {
     } = this.state;
 
     const {
-      showTitle
+      showTitle,
+      showTmdbRating,
+      showImdbRating,
+      showRottenTomatoesRating,
+      showTraktRating
     } = posterOptions;
 
     const movieIdx = rowIndex * columnCount + columnIndex;
@@ -208,6 +256,10 @@ class DiscoverMoviePosters extends Component {
           posterWidth={posterWidth}
           posterHeight={posterHeight}
           showTitle={showTitle}
+          showTmdbRating={showTmdbRating}
+          showImdbRating={showImdbRating}
+          showRottenTomatoesRating={showRottenTomatoesRating}
+          showTraktRating={showTraktRating}
           showRelativeDates={showRelativeDates}
           shortDateFormat={shortDateFormat}
           timeFormat={timeFormat}
@@ -217,14 +269,14 @@ class DiscoverMoviePosters extends Component {
         />
       </div>
     );
-  }
+  };
 
   //
   // Listeners
 
   onMeasure = ({ width }) => {
     this.calculateGrid(width, this.props.isSmallScreen);
-  }
+  };
 
   //
   // Render

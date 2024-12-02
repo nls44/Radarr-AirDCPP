@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Text.RegularExpressions;
 using NzbDrone.Common.Extensions;
 
 namespace NzbDrone.Common.Disk
@@ -9,6 +9,8 @@ namespace NzbDrone.Common.Disk
     {
         private readonly string _path;
         private readonly OsPathKind _kind;
+
+        private static readonly Regex UncPathRegex = new Regex(@"(?<unc>^\\\\(?:\?\\UNC\\)?[^\\]+\\[^\\]+)(?:\\|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public OsPath(string path)
         {
@@ -97,6 +99,29 @@ namespace NzbDrone.Common.Disk
             return path;
         }
 
+        private static string TrimTrailingSlash(string path, OsPathKind kind)
+        {
+            switch (kind)
+            {
+                case OsPathKind.Windows when !path.EndsWith(":\\"):
+                    while (!path.EndsWith(":\\") && path.EndsWith('\\'))
+                    {
+                        path = path[..^1];
+                    }
+
+                    return path;
+                case OsPathKind.Unix when path != "/":
+                    while (path != "/" && path.EndsWith('/'))
+                    {
+                        path = path[..^1];
+                    }
+
+                    return path;
+            }
+
+            return path;
+        }
+
         public OsPathKind Kind => _kind;
 
         public bool IsWindowsPath => _kind == OsPathKind.Windows;
@@ -131,7 +156,19 @@ namespace NzbDrone.Common.Disk
 
                 if (index == -1)
                 {
-                    return new OsPath(null);
+                    return Null;
+                }
+
+                var rootLength = GetRootLength();
+
+                if (rootLength == _path.Length)
+                {
+                    return Null;
+                }
+
+                if (rootLength > index + 1)
+                {
+                    return new OsPath(_path.Substring(0, rootLength));
                 }
 
                 return new OsPath(_path.Substring(0, index), _kind).AsDirectory();
@@ -139,6 +176,8 @@ namespace NzbDrone.Common.Disk
         }
 
         public string FullPath => _path;
+
+        public string PathWithoutTrailingSlash => TrimTrailingSlash(_path, _kind);
 
         public string FileName
         {
@@ -162,7 +201,31 @@ namespace NzbDrone.Common.Disk
             }
         }
 
-        public bool IsValid => _path.IsPathValid();
+        public string Name
+        {
+            // Meant to behave similar to DirectoryInfo.Name
+
+            get
+            {
+                var index = GetFileNameIndex();
+
+                if (index == -1)
+                {
+                    return PathWithoutTrailingSlash;
+                }
+
+                var rootLength = GetRootLength();
+
+                if (rootLength > index + 1)
+                {
+                    return _path.Substring(0, rootLength);
+                }
+
+                return TrimTrailingSlash(_path.Substring(index).TrimStart('/', '\\'), _kind);
+            }
+        }
+
+        public bool IsValid => _path.IsPathValid(PathValidationType.CurrentOs);
 
         private int GetFileNameIndex()
         {
@@ -191,10 +254,49 @@ namespace NzbDrone.Common.Disk
             return index;
         }
 
+        private int GetRootLength()
+        {
+            if (!IsRooted)
+            {
+                return 0;
+            }
+
+            if (_kind == OsPathKind.Unix)
+            {
+                return 1;
+            }
+
+            if (_kind == OsPathKind.Windows)
+            {
+                if (HasWindowsDriveLetter(_path))
+                {
+                    return 3;
+                }
+
+                var uncMatch = UncPathRegex.Match(_path);
+
+                // \\?\UNC\server\share\ or \\server\share
+                if (uncMatch.Success)
+                {
+                    return uncMatch.Groups["unc"].Length;
+                }
+
+                // \\?\C:\
+                if (_path.StartsWith(@"\\?\"))
+                {
+                    return 7;
+                }
+            }
+
+            return 0;
+        }
+
         private string[] GetFragments()
         {
             return _path.Split(new char[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
         }
+
+        public static OsPath Null => new (null);
 
         public override string ToString()
         {
@@ -256,7 +358,7 @@ namespace NzbDrone.Common.Disk
 
             var stringComparison = (Kind == OsPathKind.Windows || other.Kind == OsPathKind.Windows) ? StringComparison.InvariantCultureIgnoreCase : StringComparison.InvariantCulture;
 
-            for (int i = 0; i < leftFragments.Length; i++)
+            for (var i = 0; i < leftFragments.Length; i++)
             {
                 if (!string.Equals(leftFragments[i], rightFragments[i], stringComparison))
                 {
@@ -269,6 +371,11 @@ namespace NzbDrone.Common.Disk
 
         public bool Equals(OsPath other)
         {
+            return Equals(other, false);
+        }
+
+        public bool Equals(OsPath other, bool ignoreTrailingSlash)
+        {
             if (ReferenceEquals(other, null))
             {
                 return false;
@@ -279,8 +386,8 @@ namespace NzbDrone.Common.Disk
                 return true;
             }
 
-            var left = _path;
-            var right = other._path;
+            var left = ignoreTrailingSlash ? PathWithoutTrailingSlash : _path;
+            var right = ignoreTrailingSlash ? other.PathWithoutTrailingSlash : other._path;
 
             if (Kind == OsPathKind.Windows || other.Kind == OsPathKind.Windows)
             {
@@ -373,12 +480,12 @@ namespace NzbDrone.Common.Disk
 
             var newFragments = new List<string>();
 
-            for (int j = i; j < rightFragments.Length; j++)
+            for (var j = i; j < rightFragments.Length; j++)
             {
                 newFragments.Add("..");
             }
 
-            for (int j = i; j < leftFragments.Length; j++)
+            for (var j = i; j < leftFragments.Length; j++)
             {
                 newFragments.Add(leftFragments[j]);
             }

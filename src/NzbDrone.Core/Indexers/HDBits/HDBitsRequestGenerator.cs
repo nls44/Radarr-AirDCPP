@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using Newtonsoft.Json;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
 using NzbDrone.Common.Serializer;
@@ -34,17 +36,18 @@ namespace NzbDrone.Core.Indexers.HDBits
 
         private bool TryAddSearchParameters(TorrentQuery query, SearchCriteriaBase searchCriteria)
         {
-            if (searchCriteria.Movie.ImdbId.IsNullOrWhiteSpace())
+            if (searchCriteria.Movie.MovieMetadata.Value.ImdbId.IsNullOrWhiteSpace())
             {
                 return false;
             }
 
-            var imdbId = int.Parse(searchCriteria.Movie.ImdbId.Substring(2));
+            var imdbId = int.Parse(searchCriteria.Movie.MovieMetadata.Value.ImdbId.Substring(2));
 
             if (imdbId != 0)
             {
-                query.ImdbInfo = query.ImdbInfo ?? new ImdbInfo();
+                query.ImdbInfo ??= new ImdbInfo();
                 query.ImdbInfo.Id = imdbId;
+
                 return true;
             }
 
@@ -60,7 +63,7 @@ namespace NzbDrone.Core.Indexers.HDBits
                 .Resource("/api/torrents")
                 .Build();
 
-            request.Method = HttpMethod.POST;
+            request.Method = HttpMethod.Post;
             const string appJson = "application/json";
             request.Headers.Accept = appJson;
             request.Headers.ContentType = appJson;
@@ -72,7 +75,10 @@ namespace NzbDrone.Core.Indexers.HDBits
             query.Codec = Settings.Codecs.ToArray();
             query.Medium = Settings.Mediums.ToArray();
 
+            query.Limit = 100;
+
             request.SetContent(query.ToJson());
+            request.ContentSummary = query.ToJson(Formatting.None);
 
             yield return new IndexerRequest(request);
         }

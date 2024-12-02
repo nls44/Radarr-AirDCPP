@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import React from 'react';
+import Alert from 'Components/Alert';
 import Form from 'Components/Form/Form';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputGroup from 'Components/Form/FormInputGroup';
@@ -13,6 +14,7 @@ import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
 import { inputTypes, kinds } from 'Helpers/Props';
+import AdvancedSettingsButton from 'Settings/AdvancedSettingsButton';
 import translate from 'Utilities/String/translate';
 import styles from './EditIndexerModalContent.css';
 
@@ -31,6 +33,7 @@ function EditIndexerModalContent(props) {
     onSavePress,
     onTestPress,
     onDeleteIndexerPress,
+    onAdvancedSettingsPress,
     ...otherProps
   } = props;
 
@@ -43,14 +46,17 @@ function EditIndexerModalContent(props) {
     enableInteractiveSearch,
     supportsRss,
     supportsSearch,
+    tags,
     fields,
-    priority
+    priority,
+    protocol,
+    downloadClientId
   } = item;
 
   return (
     <ModalContent onModalClose={onModalClose}>
       <ModalHeader>
-        {`${id ? translate('EditIndexer') : translate('AddIndexer')} - ${implementationName}`}
+        {id ? translate('EditIndexerImplementation', { implementationName }) : translate('AddIndexerImplementation', { implementationName })}
       </ModalHeader>
 
       <ModalBody>
@@ -61,9 +67,9 @@ function EditIndexerModalContent(props) {
 
         {
           !isFetching && !!error &&
-            <div>
-              {translate('UnableToAddANewIndexerPleaseTryAgain')}
-            </div>
+            <Alert kind={kinds.DANGER}>
+              {translate('AddIndexerError')}
+            </Alert>
         }
 
         {
@@ -81,12 +87,13 @@ function EditIndexerModalContent(props) {
               </FormGroup>
 
               <FormGroup>
-                <FormLabel>{translate('EnableRSS')}</FormLabel>
+                <FormLabel>{translate('EnableRss')}</FormLabel>
 
                 <FormInputGroup
                   type={inputTypes.CHECK}
                   name="enableRss"
-                  helpTextWarning={supportsRss.value ? undefined : translate('RSSIsNotSupportedWithThisIndexer')}
+                  helpText={supportsRss.value ? translate('EnableRssHelpText') : undefined}
+                  helpTextWarning={supportsRss.value ? undefined : translate('RssIsNotSupportedWithThisIndexer')}
                   isDisabled={!supportsRss.value}
                   {...enableRss}
                   onChange={onInputChange}
@@ -100,7 +107,7 @@ function EditIndexerModalContent(props) {
                   type={inputTypes.CHECK}
                   name="enableAutomaticSearch"
                   helpText={supportsSearch.value ? translate('EnableAutomaticSearchHelpText') : undefined}
-                  helpTextWarning={supportsSearch.value ? undefined : translate('EnableAutomaticSearchHelpTextWarning')}
+                  helpTextWarning={supportsSearch.value ? undefined : translate('SearchIsNotSupportedWithThisIndexer')}
                   isDisabled={!supportsSearch.value}
                   {...enableAutomaticSearch}
                   onChange={onInputChange}
@@ -114,7 +121,7 @@ function EditIndexerModalContent(props) {
                   type={inputTypes.CHECK}
                   name="enableInteractiveSearch"
                   helpText={supportsSearch.value ? translate('EnableInteractiveSearchHelpText') : undefined}
-                  helpTextWarning={supportsSearch.value ? undefined : translate('EnableInteractiveSearchHelpTextWarning')}
+                  helpTextWarning={supportsSearch.value ? undefined : translate('SearchIsNotSupportedWithThisIndexer')}
                   isDisabled={!supportsSearch.value}
                   {...enableInteractiveSearch}
                   onChange={onInputChange}
@@ -135,6 +142,7 @@ function EditIndexerModalContent(props) {
                   );
                 })
               }
+
               <FormGroup
                 advancedSettings={advancedSettings}
                 isAdvanced={true}
@@ -148,6 +156,35 @@ function EditIndexerModalContent(props) {
                   min={1}
                   max={50}
                   {...priority}
+                  onChange={onInputChange}
+                />
+              </FormGroup>
+
+              <FormGroup
+                advancedSettings={advancedSettings}
+                isAdvanced={true}
+              >
+                <FormLabel>{translate('DownloadClient')}</FormLabel>
+
+                <FormInputGroup
+                  type={inputTypes.DOWNLOAD_CLIENT_SELECT}
+                  name="downloadClientId"
+                  helpText={translate('IndexerDownloadClientHelpText')}
+                  {...downloadClientId}
+                  includeAny={true}
+                  protocol={protocol.value}
+                  onChange={onInputChange}
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <FormLabel>{translate('Tags')}</FormLabel>
+
+                <FormInputGroup
+                  type={inputTypes.TAG}
+                  name="tags"
+                  helpText={translate('IndexerTagMovieHelpText')}
+                  {...tags}
                   onChange={onInputChange}
                 />
               </FormGroup>
@@ -165,6 +202,12 @@ function EditIndexerModalContent(props) {
               {translate('Delete')}
             </Button>
         }
+
+        <AdvancedSettingsButton
+          advancedSettings={advancedSettings}
+          onAdvancedSettingsPress={onAdvancedSettingsPress}
+          showLabel={false}
+        />
 
         <SpinnerErrorButton
           isSpinning={isTesting}
@@ -205,6 +248,7 @@ EditIndexerModalContent.propTypes = {
   onModalClose: PropTypes.func.isRequired,
   onSavePress: PropTypes.func.isRequired,
   onTestPress: PropTypes.func.isRequired,
+  onAdvancedSettingsPress: PropTypes.func.isRequired,
   onDeleteIndexerPress: PropTypes.func
 };
 

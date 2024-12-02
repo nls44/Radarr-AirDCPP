@@ -8,6 +8,7 @@ using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.Extras.Files
 {
@@ -19,7 +20,8 @@ namespace NzbDrone.Core.Extras.Files
         IEnumerable<ExtraFile> CreateAfterMovieImport(Movie movie, MovieFile movieFile);
         IEnumerable<ExtraFile> CreateAfterMovieFolder(Movie movie, string movieFolder);
         IEnumerable<ExtraFile> MoveFilesAfterRename(Movie movie, List<MovieFile> movieFiles);
-        ExtraFile Import(Movie movie, MovieFile movieFile, string path, string extension, bool readOnly);
+        bool CanImportFile(LocalMovie localMovie, MovieFile movieFile, string path, string extension, bool readOnly);
+        IEnumerable<ExtraFile> ImportFiles(LocalMovie localMovie, MovieFile movieFile, List<string> files, bool isReadOnly);
     }
 
     public abstract class ExtraFileManager<TExtraFile> : IManageExtraFiles
@@ -47,7 +49,8 @@ namespace NzbDrone.Core.Extras.Files
         public abstract IEnumerable<ExtraFile> CreateAfterMovieImport(Movie movie, MovieFile movieFile);
         public abstract IEnumerable<ExtraFile> CreateAfterMovieFolder(Movie movie, string movieFolder);
         public abstract IEnumerable<ExtraFile> MoveFilesAfterRename(Movie movie, List<MovieFile> movieFiles);
-        public abstract ExtraFile Import(Movie movie, MovieFile movieFile, string path, string extension, bool readOnly);
+        public abstract bool CanImportFile(LocalMovie localMovie, MovieFile movieFile, string path, string extension, bool readOnly);
+        public abstract IEnumerable<ExtraFile> ImportFiles(LocalMovie localMovie, MovieFile movieFile, List<string> files, bool isReadOnly);
 
         protected TExtraFile ImportFile(Movie movie, MovieFile movieFile, string path, bool readOnly, string extension, string fileNameSuffix = null)
         {
@@ -91,6 +94,8 @@ namespace NzbDrone.Core.Extras.Files
 
         protected TExtraFile MoveFile(Movie movie, MovieFile movieFile, TExtraFile extraFile, string fileNameSuffix = null)
         {
+            _logger.Trace("Renaming extra file: {0}", extraFile);
+
             var newFolder = Path.GetDirectoryName(Path.Combine(movie.Path, movieFile.RelativePath));
             var filenameBuilder = new StringBuilder(Path.GetFileNameWithoutExtension(movieFile.RelativePath));
 
@@ -108,8 +113,12 @@ namespace NzbDrone.Core.Extras.Files
             {
                 try
                 {
+                    _logger.Trace("Renaming extra file: {0} to {1}", extraFile, newFileName);
+
                     _diskProvider.MoveFile(existingFileName, newFileName);
                     extraFile.RelativePath = movie.Path.GetRelativePath(newFileName);
+
+                    _logger.Trace("Renamed extra file from: {0}", extraFile);
 
                     return extraFile;
                 }

@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
@@ -55,7 +54,7 @@ function createRemotePathMappingSelector() {
         items
       } = remotePathMappings;
 
-      const mapping = id ? _.find(items, { id }) : newRemotePathMapping;
+      const mapping = id ? items.find((i) => i.id === id) : newRemotePathMapping;
       const settings = selectSettings(mapping, pendingChanges, saveError);
 
       return {
@@ -115,11 +114,11 @@ class EditRemotePathMappingModalContentConnector extends Component {
 
   onInputChange = ({ name, value }) => {
     this.props.dispatchSetRemotePathMappingValue({ name, value });
-  }
+  };
 
   onSavePress = () => {
     this.props.dispatchSaveRemotePathMapping({ id: this.props.id });
-  }
+  };
 
   //
   // Render

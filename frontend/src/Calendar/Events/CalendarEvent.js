@@ -25,6 +25,7 @@ class CalendarEvent extends Component {
       title,
       titleSlug,
       genres,
+      date,
       monitored,
       certification,
       hasFile,
@@ -32,88 +33,103 @@ class CalendarEvent extends Component {
       queueItem,
       showMovieInformation,
       showCutoffUnmetIcon,
-      colorImpairedMode,
-      date
+      fullColorEvents,
+      colorImpairedMode
     } = this.props;
 
     const isDownloading = !!(queueItem || grabbed);
     const isMonitored = monitored;
-    const statusStyle = getStatusStyle(hasFile, isDownloading, isAvailable, isMonitored);
+    const statusStyle = getStatusStyle(hasFile, isDownloading, isMonitored, isAvailable);
     const joinedGenres = genres.slice(0, 2).join(', ');
     const link = `/movie/${titleSlug}`;
     const eventType = [];
 
-    if (moment(date).isSame(moment(inCinemas), 'day')) {
+    if (inCinemas && moment(date).isSame(moment(inCinemas), 'day')) {
       eventType.push('Cinemas');
     }
 
-    if (moment(date).isSame(moment(physicalRelease), 'day')) {
+    if (physicalRelease && moment(date).isSame(moment(physicalRelease), 'day')) {
       eventType.push('Physical');
     }
 
-    if (moment(date).isSame(moment(digitalRelease), 'day')) {
+    if (digitalRelease && moment(date).isSame(moment(digitalRelease), 'day')) {
       eventType.push('Digital');
     }
 
     return (
-      <div>
+      <div
+        className={classNames(
+          styles.event,
+          styles[statusStyle],
+          colorImpairedMode && 'colorImpaired',
+          fullColorEvents && 'fullColor'
+        )}
+      >
         <Link
-          className={classNames(
-            styles.event,
-            styles.link,
-            styles[statusStyle],
-            colorImpairedMode && 'colorImpaired'
-          )}
-          // component="div"
+          className={styles.underlay}
           to={link}
-        >
+        />
+
+        <div className={styles.overlay} >
           <div className={styles.info}>
             <div className={styles.movieTitle}>
               {title}
             </div>
 
-            {
-              !!queueItem &&
-                <span className={styles.statusIcon}>
-                  <CalendarEventQueueDetails
-                    {...queueItem}
-                  />
-                </span>
-            }
+            <div
+              className={classNames(
+                styles.statusContainer,
+                fullColorEvents && 'fullColor'
+              )}
+            >
+              {
+                queueItem ?
+                  <span className={styles.statusIcon}>
+                    <CalendarEventQueueDetails
+                      {...queueItem}
+                      fullColorEvents={fullColorEvents}
+                    />
+                  </span> :
+                  null
+              }
 
-            {
-              !queueItem && grabbed &&
-                <Icon
-                  className={styles.statusIcon}
-                  name={icons.DOWNLOADING}
-                  title={translate('MovieIsDownloading')}
-                />
-            }
+              {
+                !queueItem && grabbed ?
+                  <Icon
+                    className={styles.statusIcon}
+                    name={icons.DOWNLOADING}
+                    title={translate('MovieIsDownloading')}
+                  /> :
+                  null
+              }
 
-            {
-              showCutoffUnmetIcon &&
-              !!movieFile &&
-              movieFile.qualityCutoffNotMet &&
-                <Icon
-                  className={styles.statusIcon}
-                  name={icons.MOVIE_FILE}
-                  kind={kinds.WARNING}
-                  title={translate('QualityCutoffHasNotBeenMet')}
-                />
-            }
+              {
+                showCutoffUnmetIcon &&
+                !!movieFile &&
+                movieFile.qualityCutoffNotMet ?
+                  <Icon
+                    className={styles.statusIcon}
+                    name={icons.MOVIE_FILE}
+                    kind={kinds.WARNING}
+                    title={translate('QualityCutoffNotMet')}
+                  /> :
+                  null
+              }
+            </div>
           </div>
 
           {
-            showMovieInformation &&
+            showMovieInformation ?
               <div className={styles.movieInfo}>
                 <div className={styles.genres}>
                   {joinedGenres}
                 </div>
-              </div>
+              </div> :
+              null
           }
 
           {
-            showMovieInformation &&
+            showMovieInformation ?
               <div className={styles.movieInfo}>
                 <div className={styles.genres}>
                   {eventType.join(', ')}
@@ -121,10 +137,10 @@ class CalendarEvent extends Component {
                 <div>
                   {certification}
                 </div>
-              </div>
+              </div> :
+              null
           }
-        </Link>
-
+        </div>
       </div>
     );
   }
@@ -140,16 +156,18 @@ CalendarEvent.propTypes = {
   inCinemas: PropTypes.string,
   physicalRelease: PropTypes.string,
   digitalRelease: PropTypes.string,
+  date: PropTypes.string.isRequired,
   monitored: PropTypes.bool.isRequired,
   certification: PropTypes.string,
   hasFile: PropTypes.bool.isRequired,
   grabbed: PropTypes.bool,
   queueItem: PropTypes.object,
-  showMovieInformation: PropTypes.bool.isRequired,
-  showCutoffUnmetIcon: PropTypes.bool.isRequired,
-  timeFormat: PropTypes.string.isRequired,
-  colorImpairedMode: PropTypes.bool.isRequired,
-  date: PropTypes.string.isRequired
+  // These props come from the connector, not marked as required to appease TS for now.
+  showMovieInformation: PropTypes.bool,
+  showCutoffUnmetIcon: PropTypes.bool,
+  fullColorEvents: PropTypes.bool,
+  timeFormat: PropTypes.string,
+  colorImpairedMode: PropTypes.bool
 };
 
 CalendarEvent.defaultProps = {

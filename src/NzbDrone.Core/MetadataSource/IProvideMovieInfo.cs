@@ -1,15 +1,19 @@
 using System;
 using System.Collections.Generic;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Movies.Collections;
 using NzbDrone.Core.Movies.Credits;
 
 namespace NzbDrone.Core.MetadataSource
 {
     public interface IProvideMovieInfo
     {
-        Movie GetMovieByImdbId(string imdbId);
-        Tuple<Movie, List<Credit>> GetMovieInfo(int tmdbId);
-        List<Movie> GetBulkMovieInfo(List<int> tmdbIds);
+        MovieMetadata GetMovieByImdbId(string imdbId);
+        Tuple<MovieMetadata, List<Credit>> GetMovieInfo(int tmdbId);
+        MovieCollection GetCollectionInfo(int tmdbId);
+        List<MovieMetadata> GetBulkMovieInfo(List<int> tmdbIds);
+        List<MovieMetadata> GetTrendingMovies();
+        List<MovieMetadata> GetPopularMovies();
 
         HashSet<int> GetChangedMovies(DateTime startTime);
     }

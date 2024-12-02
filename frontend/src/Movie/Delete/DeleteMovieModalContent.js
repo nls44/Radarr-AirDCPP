@@ -5,6 +5,7 @@ import FormInputGroup from 'Components/Form/FormInputGroup';
 import FormLabel from 'Components/Form/FormLabel';
 import Icon from 'Components/Icon';
 import Button from 'Components/Link/Button';
+import InlineMarkdown from 'Components/Markdown/InlineMarkdown';
 import ModalBody from 'Components/Modal/ModalBody';
 import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
@@ -23,8 +24,7 @@ class DeleteMovieModalContent extends Component {
     super(props, context);
 
     this.state = {
-      deleteFiles: false,
-      addImportExclusion: false
+      deleteFiles: false
     };
   }
 
@@ -33,19 +33,15 @@ class DeleteMovieModalContent extends Component {
 
   onDeleteFilesChange = ({ value }) => {
     this.setState({ deleteFiles: value });
-  }
-
-  onAddImportExclusionChange = ({ value }) => {
-    this.setState({ addImportExclusion: value });
-  }
+  };
 
   onDeleteMovieConfirmed = () => {
     const deleteFiles = this.state.deleteFiles;
-    const addImportExclusion = this.state.addImportExclusion;
+    const addImportExclusion = this.props.deleteOptions.addImportExclusion;
 
-    this.setState({ deleteFiles: false, addImportExclusion: false });
+    this.setState({ deleteFiles: false });
     this.props.onDeletePress(deleteFiles, addImportExclusion);
-  }
+  };
 
   //
   // Render
@@ -54,32 +50,26 @@ class DeleteMovieModalContent extends Component {
     const {
       title,
       path,
-      statistics,
-      onModalClose
+      statistics = {},
+      deleteOptions,
+      onModalClose,
+      onDeleteOptionChange
     } = this.props;
 
     const {
-      movieFileCount,
-      sizeOnDisk
+      movieFileCount = 0,
+      sizeOnDisk = 0
     } = statistics;
 
     const deleteFiles = this.state.deleteFiles;
-    const addImportExclusion = this.state.addImportExclusion;
-
-    let deleteFilesLabel = translate('DeleteFilesLabel', [movieFileCount]);
-    let deleteFilesHelpText = translate('DeleteFilesHelpText');
-
-    if (movieFileCount === 0) {
-      deleteFilesLabel = translate('DeleteMovieFolderLabel');
-      deleteFilesHelpText = translate('DeleteMovieFolderHelpText');
-    }
+    const addImportExclusion = deleteOptions.addImportExclusion;
 
     return (
       <ModalContent
         onModalClose={onModalClose}
       >
         <ModalHeader>
-          {translate('DeleteHeader', [title])}
+          {translate('DeleteHeader', { title })}
         </ModalHeader>
 
         <ModalBody>
@@ -93,35 +83,6 @@ class DeleteMovieModalContent extends Component {
           </div>
 
           <FormGroup>
-            <FormLabel>{deleteFilesLabel}</FormLabel>
-
-            <FormInputGroup
-              type={inputTypes.CHECK}
-              name="deleteFiles"
-              value={deleteFiles}
-              helpText={deleteFilesHelpText}
-              kind={kinds.DANGER}
-              onChange={this.onDeleteFilesChange}
-            />
-          </FormGroup>
-
-          {
-            deleteFiles &&
-              <div className={styles.deleteFilesMessage}>
-                <div>
-                  {translate('DeleteTheMovieFolder', [path])}
-                </div>
-
-                {
-                  !!movieFileCount &&
-                    <div>
-                      {movieFileCount} {translate('MovieFilesTotaling')} {formatBytes(sizeOnDisk)}
-                    </div>
-                }
-              </div>
-          }
-
-          <FormGroup>
             <FormLabel>
               {translate('AddListExclusion')}
             </FormLabel>
@@ -130,11 +91,40 @@ class DeleteMovieModalContent extends Component {
               type={inputTypes.CHECK}
               name="addImportExclusion"
               value={addImportExclusion}
-              helpText={translate('AddImportExclusionHelpText')}
+              helpText={translate('AddListExclusionMovieHelpText')}
               kind={kinds.DANGER}
-              onChange={this.onAddImportExclusionChange}
+              onChange={onDeleteOptionChange}
             />
           </FormGroup>
+
+          <FormGroup>
+            <FormLabel>{movieFileCount === 0 ? translate('DeleteMovieFolder') : translate('DeleteMovieFiles', { movieFileCount })}</FormLabel>
+
+            <FormInputGroup
+              type={inputTypes.CHECK}
+              name="deleteFiles"
+              value={deleteFiles}
+              helpText={movieFileCount === 0 ? translate('DeleteMovieFolderHelpText') : translate('DeleteMovieFilesHelpText')}
+              kind={kinds.DANGER}
+              onChange={this.onDeleteFilesChange}
+            />
+          </FormGroup>
+
+          {
+            deleteFiles ?
+              <div className={styles.deleteFilesMessage}>
+                <div><InlineMarkdown data={translate('DeleteMovieFolderConfirmation', { path })} blockClassName={styles.folderPath} /></div>
+
+                {
+                  movieFileCount ?
+                    <div className={styles.deleteCount}>
+                      {translate('DeleteMovieFolderMovieCount', { movieFileCount, size: formatBytes(sizeOnDisk) })}
+                    </div> :
+                    null
+                }
+              </div> :
+              null
+          }
 
         </ModalBody>
 
@@ -159,14 +149,15 @@ DeleteMovieModalContent.propTypes = {
   title: PropTypes.string.isRequired,
   path: PropTypes.string.isRequired,
   statistics: PropTypes.object.isRequired,
+  hasFile: PropTypes.bool.isRequired,
+  deleteOptions: PropTypes.object.isRequired,
+  onDeleteOptionChange: PropTypes.func.isRequired,
   onDeletePress: PropTypes.func.isRequired,
   onModalClose: PropTypes.func.isRequired
 };
 
 DeleteMovieModalContent.defaultProps = {
-  statistics: {
-    movieFileCount: 0
-  }
+  statistics: {}
 };
 
 export default DeleteMovieModalContent;

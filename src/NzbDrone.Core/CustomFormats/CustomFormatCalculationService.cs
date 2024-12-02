@@ -2,8 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using NLog;
 using NzbDrone.Common.Extensions;
-using NzbDrone.Core.Blacklisting;
+using NzbDrone.Core.Blocklisting;
 using NzbDrone.Core.History;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
@@ -14,28 +15,138 @@ namespace NzbDrone.Core.CustomFormats
 {
     public interface ICustomFormatCalculationService
     {
-        List<CustomFormat> ParseCustomFormat(ParsedMovieInfo movieInfo);
+        List<CustomFormat> ParseCustomFormat(RemoteMovie remoteMovie, long size);
+        List<CustomFormat> ParseCustomFormat(MovieFile movieFile, Movie movie);
         List<CustomFormat> ParseCustomFormat(MovieFile movieFile);
-        List<CustomFormat> ParseCustomFormat(Blacklist blacklist);
-        List<CustomFormat> ParseCustomFormat(MovieHistory history);
+        List<CustomFormat> ParseCustomFormat(Blocklist blocklist, Movie movie);
+        List<CustomFormat> ParseCustomFormat(MovieHistory history, Movie movie);
+        List<CustomFormat> ParseCustomFormat(LocalMovie localMovie);
     }
 
     public class CustomFormatCalculationService : ICustomFormatCalculationService
     {
         private readonly ICustomFormatService _formatService;
-        private readonly IParsingService _parsingService;
-        private readonly IMovieService _movieService;
+        private readonly Logger _logger;
 
-        public CustomFormatCalculationService(ICustomFormatService formatService,
-                                              IParsingService parsingService,
-                                              IMovieService movieService)
+        public CustomFormatCalculationService(ICustomFormatService formatService, Logger logger)
         {
             _formatService = formatService;
-            _parsingService = parsingService;
-            _movieService = movieService;
+            _logger = logger;
         }
 
-        public static List<CustomFormat> ParseCustomFormat(ParsedMovieInfo movieInfo, List<CustomFormat> allCustomFormats)
+        public List<CustomFormat> ParseCustomFormat(RemoteMovie remoteMovie, long size)
+        {
+            var input = new CustomFormatInput
+            {
+                MovieInfo = remoteMovie.ParsedMovieInfo,
+                Movie = remoteMovie.Movie,
+                Size = size,
+                Languages = remoteMovie.Languages,
+                IndexerFlags = remoteMovie.Release?.IndexerFlags ?? 0
+            };
+
+            return ParseCustomFormat(input);
+        }
+
+        public List<CustomFormat> ParseCustomFormat(MovieFile movieFile, Movie movie)
+        {
+            return ParseCustomFormat(movieFile, movie, _formatService.All());
+        }
+
+        public List<CustomFormat> ParseCustomFormat(MovieFile movieFile)
+        {
+            return ParseCustomFormat(movieFile, movieFile.Movie, _formatService.All());
+        }
+
+        public List<CustomFormat> ParseCustomFormat(Blocklist blocklist, Movie movie)
+        {
+            var parsed = Parser.Parser.ParseMovieTitle(blocklist.SourceTitle);
+
+            var movieInfo = new ParsedMovieInfo
+            {
+                MovieTitles = new List<string>() { movie.Title },
+                SimpleReleaseTitle = parsed?.SimpleReleaseTitle ?? blocklist.SourceTitle.SimplifyReleaseTitle(),
+                ReleaseTitle = parsed?.ReleaseTitle ?? blocklist.SourceTitle,
+                Edition = parsed?.Edition,
+                Quality = blocklist.Quality,
+                Languages = blocklist.Languages,
+                ReleaseGroup = parsed?.ReleaseGroup
+            };
+
+            var input = new CustomFormatInput
+            {
+                MovieInfo = movieInfo,
+                Movie = movie,
+                Size = blocklist.Size ?? 0,
+                Languages = blocklist.Languages,
+                IndexerFlags = blocklist.IndexerFlags
+            };
+
+            return ParseCustomFormat(input);
+        }
+
+        public List<CustomFormat> ParseCustomFormat(MovieHistory history, Movie movie)
+        {
+            var parsed = Parser.Parser.ParseMovieTitle(history.SourceTitle);
+
+            long.TryParse(history.Data.GetValueOrDefault("size"), out var size);
+            Enum.TryParse(history.Data.GetValueOrDefault("indexerFlags"), true, out IndexerFlags indexerFlags);
+
+            var movieInfo = new ParsedMovieInfo
+            {
+                MovieTitles = new List<string>() { movie.Title },
+                SimpleReleaseTitle = parsed?.SimpleReleaseTitle ?? history.SourceTitle.SimplifyReleaseTitle(),
+                ReleaseTitle = parsed?.ReleaseTitle ?? history.SourceTitle,
+                Edition = parsed?.Edition,
+                Quality = history.Quality,
+                Languages = history.Languages,
+                ReleaseGroup = parsed?.ReleaseGroup,
+            };
+
+            var input = new CustomFormatInput
+            {
+                MovieInfo = movieInfo,
+                Movie = movie,
+                Size = size,
+                Languages = history.Languages,
+                IndexerFlags = indexerFlags
+            };
+
+            return ParseCustomFormat(input);
+        }
+
+        public List<CustomFormat> ParseCustomFormat(LocalMovie localMovie)
+        {
+            var movieInfo = new ParsedMovieInfo
+            {
+                MovieTitles = new List<string>() { localMovie.Movie.Title },
+                SimpleReleaseTitle = localMovie.SceneName.IsNotNullOrWhiteSpace() ? localMovie.SceneName.SimplifyReleaseTitle() : Path.GetFileName(localMovie.Path).SimplifyReleaseTitle(),
+                ReleaseTitle = localMovie.SceneName,
+                Quality = localMovie.Quality,
+                Edition = localMovie.Edition,
+                Languages = localMovie.Languages,
+                ReleaseGroup = localMovie.ReleaseGroup
+            };
+
+            var input = new CustomFormatInput
+            {
+                MovieInfo = movieInfo,
+                Movie = localMovie.Movie,
+                Size = localMovie.Size,
+                Languages = localMovie.Languages,
+                IndexerFlags = localMovie.IndexerFlags,
+                Filename = Path.GetFileName(localMovie.Path)
+            };
+
+            return ParseCustomFormat(input);
+        }
+
+        private List<CustomFormat> ParseCustomFormat(CustomFormatInput input)
+        {
+            return ParseCustomFormat(input, _formatService.All());
+        }
+
+        private static List<CustomFormat> ParseCustomFormat(CustomFormatInput input, List<CustomFormat> allCustomFormats)
         {
             var matches = new List<CustomFormat>();
 
@@ -45,7 +156,7 @@ namespace NzbDrone.Core.CustomFormats
                     .GroupBy(t => t.GetType())
                     .Select(g => new SpecificationMatchesGroup
                     {
-                        Matches = g.ToDictionary(t => t, t => t.IsSatisfiedBy(movieInfo))
+                        Matches = g.ToDictionary(t => t, t => t.IsSatisfiedBy(input))
                     })
                     .ToList();
 
@@ -55,107 +166,50 @@ namespace NzbDrone.Core.CustomFormats
                 }
             }
 
-            return matches;
+            return matches.OrderBy(x => x.Name).ToList();
         }
 
-        public static List<CustomFormat> ParseCustomFormat(MovieFile movieFile, List<CustomFormat> allCustomFormats)
+        private List<CustomFormat> ParseCustomFormat(MovieFile movieFile, Movie movie, List<CustomFormat> allCustomFormats)
         {
-            var sceneName = string.Empty;
+            var releaseTitle = string.Empty;
+
             if (movieFile.SceneName.IsNotNullOrWhiteSpace())
             {
-                sceneName = movieFile.SceneName;
+                _logger.Trace("Using scene name for release title: {0}", movieFile.SceneName);
+                releaseTitle = movieFile.SceneName;
             }
             else if (movieFile.OriginalFilePath.IsNotNullOrWhiteSpace())
             {
-                sceneName = movieFile.OriginalFilePath;
+                _logger.Trace("Using original file path for release title: {0}", Path.GetFileName(movieFile.OriginalFilePath));
+                releaseTitle = Path.GetFileName(movieFile.OriginalFilePath);
             }
             else if (movieFile.RelativePath.IsNotNullOrWhiteSpace())
             {
-                sceneName = Path.GetFileName(movieFile.RelativePath);
+                _logger.Trace("Using relative path for release title: {0}", Path.GetFileName(movieFile.RelativePath));
+                releaseTitle = Path.GetFileName(movieFile.RelativePath);
             }
 
-            var info = new ParsedMovieInfo
+            var movieInfo = new ParsedMovieInfo
             {
-                MovieTitle = movieFile.Movie.Title,
-                SimpleReleaseTitle = sceneName.SimplifyReleaseTitle(),
+                MovieTitles = new List<string>() { movie.Title },
+                SimpleReleaseTitle = releaseTitle.SimplifyReleaseTitle(),
                 Quality = movieFile.Quality,
                 Languages = movieFile.Languages,
                 ReleaseGroup = movieFile.ReleaseGroup,
-                Edition = movieFile.Edition,
-                Year = movieFile.Movie.Year,
-                ImdbId = movieFile.Movie.ImdbId,
-                ExtraInfo = new Dictionary<string, object>
-                {
-                    { "IndexerFlags", movieFile.IndexerFlags },
-                    { "Size", movieFile.Size },
-                    { "Filename", System.IO.Path.GetFileName(movieFile.RelativePath) }
-                }
+                Edition = movieFile.Edition
             };
 
-            return ParseCustomFormat(info, allCustomFormats);
-        }
-
-        public List<CustomFormat> ParseCustomFormat(ParsedMovieInfo movieInfo)
-        {
-            return ParseCustomFormat(movieInfo, _formatService.All());
-        }
-
-        public List<CustomFormat> ParseCustomFormat(MovieFile movieFile)
-        {
-            return ParseCustomFormat(movieFile, _formatService.All());
-        }
-
-        public List<CustomFormat> ParseCustomFormat(Blacklist blacklist)
-        {
-            var movie = _movieService.GetMovie(blacklist.MovieId);
-            var parsed = _parsingService.ParseMovieInfo(blacklist.SourceTitle, null);
-
-            var info = new ParsedMovieInfo
+            var input = new CustomFormatInput
             {
-                MovieTitle = movie.Title,
-                SimpleReleaseTitle = parsed?.SimpleReleaseTitle ?? blacklist.SourceTitle.SimplifyReleaseTitle(),
-                Quality = blacklist.Quality,
-                Languages = blacklist.Languages,
-                ReleaseGroup = parsed?.ReleaseGroup,
-                Edition = parsed?.Edition,
-                Year = movie.Year,
-                ImdbId = movie.ImdbId,
-                ExtraInfo = new Dictionary<string, object>
-                {
-                    { "IndexerFlags", blacklist.IndexerFlags },
-                    { "Size", blacklist.Size }
-                }
+                MovieInfo = movieInfo,
+                Movie = movie,
+                Size = movieFile.Size,
+                Languages = movieFile.Languages,
+                IndexerFlags = movieFile.IndexerFlags,
+                Filename = Path.GetFileName(movieFile.RelativePath)
             };
 
-            return ParseCustomFormat(info);
-        }
-
-        public List<CustomFormat> ParseCustomFormat(MovieHistory history)
-        {
-            var movie = _movieService.GetMovie(history.MovieId);
-            var parsed = _parsingService.ParseMovieInfo(history.SourceTitle, null);
-
-            Enum.TryParse(history.Data.GetValueOrDefault("indexerFlags"), true, out IndexerFlags flags);
-            long.TryParse(history.Data.GetValueOrDefault("size"), out var size);
-
-            var info = new ParsedMovieInfo
-            {
-                MovieTitle = movie.Title,
-                SimpleReleaseTitle = parsed?.SimpleReleaseTitle ?? history.SourceTitle.SimplifyReleaseTitle(),
-                Quality = history.Quality,
-                Languages = history.Languages,
-                ReleaseGroup = parsed?.ReleaseGroup,
-                Edition = parsed?.Edition,
-                Year = movie.Year,
-                ImdbId = movie.ImdbId,
-                ExtraInfo = new Dictionary<string, object>
-                {
-                    { "IndexerFlags", flags },
-                    { "Size", size }
-                }
-            };
-
-            return ParseCustomFormat(info);
+            return ParseCustomFormat(input, allCustomFormats);
         }
     }
 }

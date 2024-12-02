@@ -1,18 +1,22 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
-import HeartRating from 'Components/HeartRating';
 import Icon from 'Components/Icon';
+import ImdbRating from 'Components/ImdbRating';
 import ImportListListConnector from 'Components/ImportListListConnector';
 import IconButton from 'Components/Link/IconButton';
 import Link from 'Components/Link/Link';
-import RelativeDateCellConnector from 'Components/Table/Cells/RelativeDateCellConnector';
+import RottenTomatoRating from 'Components/RottenTomatoRating';
+import RelativeDateCell from 'Components/Table/Cells/RelativeDateCell';
 import VirtualTableRowCell from 'Components/Table/Cells/VirtualTableRowCell';
 import VirtualTableSelectCell from 'Components/Table/Cells/VirtualTableSelectCell';
+import TmdbRating from 'Components/TmdbRating';
 import Popover from 'Components/Tooltip/Popover';
+import TraktRating from 'Components/TraktRating';
 import AddNewDiscoverMovieModal from 'DiscoverMovie/AddNewDiscoverMovieModal';
 import ExcludeMovieModal from 'DiscoverMovie/Exclusion/ExcludeMovieModal';
 import { icons } from 'Helpers/Props';
 import MovieDetailsLinks from 'Movie/Details/MovieDetailsLinks';
+import MoviePopularityIndex from 'Movie/MoviePopularityIndex';
 import formatRuntime from 'Utilities/Date/formatRuntime';
 import translate from 'Utilities/String/translate';
 import ListMovieStatusCell from './ListMovieStatusCell';
@@ -37,19 +41,19 @@ class DiscoverMovieRow extends Component {
 
   onAddMoviePress = () => {
     this.setState({ isNewAddMovieModalOpen: true });
-  }
+  };
 
   onAddMovieModalClose = () => {
     this.setState({ isNewAddMovieModalOpen: false });
-  }
+  };
 
   onExcludeMoviePress = () => {
     this.setState({ isExcludeMovieModalOpen: true });
-  }
+  };
 
   onExcludeMovieModalClose = () => {
     this.setState({ isExcludeMovieModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -61,6 +65,7 @@ class DiscoverMovieRow extends Component {
       imdbId,
       youTubeTrailerId,
       title,
+      originalLanguage,
       studio,
       inCinemas,
       physicalRelease,
@@ -72,12 +77,16 @@ class DiscoverMovieRow extends Component {
       images,
       genres,
       ratings,
+      popularity,
       certification,
+      movieRuntimeFormat,
       collection,
       columns,
       isExisting,
       isExcluded,
       isRecommendation,
+      isTrending,
+      isPopular,
       isSelected,
       lists,
       onSelectedChange
@@ -164,7 +173,15 @@ class DiscoverMovieRow extends Component {
                   key={name}
                   className={styles[name]}
                 >
-                  {collection ? collection.name : null }
+                  {collection ? collection.title : null }
+                </VirtualTableRowCell>
+              );
+            }
+
+            if (name === 'originalLanguage') {
+              return (
+                <VirtualTableRowCell key={name} className={styles[name]}>
+                  {originalLanguage.name}
                 </VirtualTableRowCell>
               );
             }
@@ -182,10 +199,11 @@ class DiscoverMovieRow extends Component {
 
             if (name === 'inCinemas') {
               return (
-                <RelativeDateCellConnector
+                <RelativeDateCell
                   key={name}
                   className={styles[name]}
                   date={inCinemas}
+                  timeForToday={false}
                   component={VirtualTableRowCell}
                 />
               );
@@ -193,10 +211,11 @@ class DiscoverMovieRow extends Component {
 
             if (name === 'physicalRelease') {
               return (
-                <RelativeDateCellConnector
+                <RelativeDateCell
                   key={name}
                   className={styles[name]}
                   date={physicalRelease}
+                  timeForToday={false}
                   component={VirtualTableRowCell}
                 />
               );
@@ -204,10 +223,11 @@ class DiscoverMovieRow extends Component {
 
             if (name === 'digitalRelease') {
               return (
-                <RelativeDateCellConnector
+                <RelativeDateCell
                   key={name}
                   className={styles[name]}
                   date={digitalRelease}
+                  timeForToday={false}
                   component={VirtualTableRowCell}
                 />
               );
@@ -219,7 +239,7 @@ class DiscoverMovieRow extends Component {
                   key={name}
                   className={styles[name]}
                 >
-                  {formatRuntime(runtime)}
+                  {formatRuntime(runtime, movieRuntimeFormat)}
                 </VirtualTableRowCell>
               );
             }
@@ -239,15 +259,54 @@ class DiscoverMovieRow extends Component {
               );
             }
 
-            if (name === 'ratings') {
+            if (name === 'tmdbRating') {
               return (
                 <VirtualTableRowCell
                   key={name}
                   className={styles[name]}
                 >
-                  <HeartRating
-                    rating={ratings.value}
-                  />
+                  {ratings.tmdb ? <TmdbRating ratings={ratings} /> : null}
+                </VirtualTableRowCell>
+              );
+            }
+
+            if (name === 'imdbRating') {
+              return (
+                <VirtualTableRowCell
+                  key={name}
+                  className={styles[name]}
+                >
+                  {ratings.imdb ? <ImdbRating ratings={ratings} /> : null}
+                </VirtualTableRowCell>
+              );
+            }
+
+            if (name === 'rottenTomatoesRating') {
+              return (
+                <VirtualTableRowCell
+                  key={name}
+                  className={styles[name]}
+                >
+                  {ratings.rottenTomatoes ? <RottenTomatoRating ratings={ratings} /> : null}
+                </VirtualTableRowCell>
+              );
+            }
+
+            if (name === 'traktRating') {
+              return (
+                <VirtualTableRowCell
+                  key={name}
+                  className={styles[name]}
+                >
+                  {ratings.trakt ? <TraktRating ratings={ratings} /> : null}
+                </VirtualTableRowCell>
+              );
+            }
+
+            if (name === 'popularity') {
+              return (
+                <VirtualTableRowCell key={name} className={styles[name]}>
+                  <MoviePopularityIndex popularity={popularity} />
                 </VirtualTableRowCell>
               );
             }
@@ -285,9 +344,50 @@ class DiscoverMovieRow extends Component {
                   {
                     isRecommendation ?
                       <Icon
+                        className={styles.statusIcon}
                         name={icons.RECOMMENDED}
                         size={12}
                         title={translate('MovieIsRecommend')}
+                      /> :
+                      null
+                  }
+                </VirtualTableRowCell>
+              );
+            }
+
+            if (name === 'isTrending') {
+              return (
+                <VirtualTableRowCell
+                  key={name}
+                  className={styles[name]}
+                >
+                  {
+                    isTrending ?
+                      <Icon
+                        className={styles.statusIcon}
+                        name={icons.TRENDING}
+                        size={12}
+                        title={translate('MovieIsTrending')}
+                      /> :
+                      null
+                  }
+                </VirtualTableRowCell>
+              );
+            }
+
+            if (name === 'isPopular') {
+              return (
+                <VirtualTableRowCell
+                  key={name}
+                  className={styles[name]}
+                >
+                  {
+                    isPopular ?
+                      <Icon
+                        className={styles.statusIcon}
+                        name={icons.POPULAR}
+                        size={12}
+                        title={translate('MovieIsPopular')}
                       /> :
                       null
                   }
@@ -363,6 +463,7 @@ DiscoverMovieRow.propTypes = {
   youTubeTrailerId: PropTypes.string,
   status: PropTypes.string.isRequired,
   title: PropTypes.string.isRequired,
+  originalLanguage: PropTypes.object.isRequired,
   year: PropTypes.number.isRequired,
   overview: PropTypes.string.isRequired,
   folder: PropTypes.string.isRequired,
@@ -374,13 +475,17 @@ DiscoverMovieRow.propTypes = {
   runtime: PropTypes.number,
   genres: PropTypes.arrayOf(PropTypes.string).isRequired,
   ratings: PropTypes.object.isRequired,
+  popularity: PropTypes.number.isRequired,
   certification: PropTypes.string,
   collection: PropTypes.object,
+  movieRuntimeFormat: PropTypes.string.isRequired,
   columns: PropTypes.arrayOf(PropTypes.object).isRequired,
   isExisting: PropTypes.bool.isRequired,
   isExcluded: PropTypes.bool.isRequired,
   isSelected: PropTypes.bool,
   isRecommendation: PropTypes.bool.isRequired,
+  isPopular: PropTypes.bool.isRequired,
+  isTrending: PropTypes.bool.isRequired,
   lists: PropTypes.arrayOf(PropTypes.number).isRequired,
   onSelectedChange: PropTypes.func.isRequired
 };

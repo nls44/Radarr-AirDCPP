@@ -3,7 +3,9 @@ import { createAction } from 'redux-actions';
 import { batchActions } from 'redux-batched-actions';
 import { sortDirections } from 'Helpers/Props';
 import { createThunk, handleThunks } from 'Store/thunks';
+import sortByProp from 'Utilities/Array/sortByProp';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
+import naturalExpansion from 'Utilities/String/naturalExpansion';
 import { set, update, updateItem } from './baseActions';
 import createHandleActions from './Creators/createHandleActions';
 import createSetClientSideCollectionSortReducer from './Creators/Reducers/createSetClientSideCollectionSortReducer';
@@ -27,15 +29,16 @@ export const defaultState = {
   isReprocessing: false,
   error: null,
   items: [],
-  sortKey: 'quality',
-  sortDirection: sortDirections.DESCENDING,
+  sortKey: 'relativePath',
+  sortDirection: sortDirections.ASCENDING,
+  favoriteFolders: [],
   recentFolders: [],
-  importMode: 'move',
+  importMode: 'chooseImportMode',
   sortPredicates: {
     relativePath: function(item, direction) {
       const relativePath = item.relativePath;
 
-      return relativePath.toLowerCase();
+      return naturalExpansion(relativePath.toLowerCase());
     },
 
     movie: function(item, direction) {
@@ -46,11 +49,18 @@ export const defaultState = {
 
     quality: function(item, direction) {
       return item.qualityWeight || 0;
+    },
+
+    customFormats: function(item, direction) {
+      return item.customFormatScore;
     }
   }
 };
 
 export const persistState = [
+  'interactiveImport.sortKey',
+  'interactiveImport.sortDirection',
+  'interactiveImport.favoriteFolders',
   'interactiveImport.recentFolders',
   'interactiveImport.importMode'
 ];
@@ -66,6 +76,8 @@ export const UPDATE_INTERACTIVE_IMPORT_ITEMS = 'interactiveImport/updateInteract
 export const CLEAR_INTERACTIVE_IMPORT = 'interactiveImport/clearInteractiveImport';
 export const ADD_RECENT_FOLDER = 'interactiveImport/addRecentFolder';
 export const REMOVE_RECENT_FOLDER = 'interactiveImport/removeRecentFolder';
+export const ADD_FAVORITE_FOLDER = 'interactiveImport/addFavoriteFolder';
+export const REMOVE_FAVORITE_FOLDER = 'interactiveImport/removeFavoriteFolder';
 export const SET_INTERACTIVE_IMPORT_MODE = 'interactiveImport/setInteractiveImportMode';
 
 //
@@ -79,6 +91,8 @@ export const updateInteractiveImportItems = createAction(UPDATE_INTERACTIVE_IMPO
 export const clearInteractiveImport = createAction(CLEAR_INTERACTIVE_IMPORT);
 export const addRecentFolder = createAction(ADD_RECENT_FOLDER);
 export const removeRecentFolder = createAction(REMOVE_RECENT_FOLDER);
+export const addFavoriteFolder = createAction(ADD_FAVORITE_FOLDER);
+export const removeFavoriteFolder = createAction(REMOVE_FAVORITE_FOLDER);
 export const setInteractiveImportMode = createAction(SET_INTERACTIVE_IMPORT_MODE);
 
 //
@@ -148,7 +162,11 @@ export const actionHandlers = handleThunks({
       return {
         id,
         path: item.path,
-        movieId: item.movie.id,
+        movieId: item.movie ? item.movie.id : undefined,
+        quality: item.quality,
+        languages: item.languages,
+        releaseGroup: item.releaseGroup,
+        indexerFlags: item.indexerFlags,
         downloadId: item.downloadId
       };
     });
@@ -253,9 +271,31 @@ export const reducers = createHandleActions({
     return Object.assign({}, state, { recentFolders });
   },
 
+  [ADD_FAVORITE_FOLDER]: function(state, { payload }) {
+    const folder = payload.folder;
+    const favoriteFolder = { folder };
+    const favoriteFolders = [...state.favoriteFolders, favoriteFolder].sort(sortByProp('folder'));
+
+    return Object.assign({}, state, { favoriteFolders });
+  },
+
+  [REMOVE_FAVORITE_FOLDER]: function(state, { payload }) {
+    const folder = payload.folder;
+    const favoriteFolders = state.favoriteFolders.reduce((acc, item) => {
+      if (item.folder !== folder) {
+        acc.push(item);
+      }
+
+      return acc;
+    }, []);
+
+    return Object.assign({}, state, { favoriteFolders });
+  },
+
   [CLEAR_INTERACTIVE_IMPORT]: function(state) {
     const newState = {
       ...defaultState,
+      favoriteFolders: state.favoriteFolders,
       recentFolders: state.recentFolders,
       importMode: state.importMode
     };

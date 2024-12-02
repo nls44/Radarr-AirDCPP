@@ -5,6 +5,8 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Aggregation.Aggregators
 {
     public interface IAggregateLocalMovie
     {
-        LocalMovie Aggregate(LocalMovie localMovie, DownloadClientItem downloadClientItem, bool otherFiles);
+        int Order { get; }
+
+        LocalMovie Aggregate(LocalMovie localMovie, DownloadClientItem downloadClientItem);
     }
 }

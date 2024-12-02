@@ -7,7 +7,9 @@ using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.Blocklisting;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.Localization;
 using NzbDrone.Core.MediaFiles.TorrentInfo;
 using NzbDrone.Core.Organizer;
 using NzbDrone.Core.Parser.Model;
@@ -27,11 +29,12 @@ namespace NzbDrone.Core.Download.Clients.Blackhole
                                 ITorrentFileInfoReader torrentFileInfoReader,
                                 IHttpClient httpClient,
                                 IConfigService configService,
-                                INamingConfigService namingConfigService,
                                 IDiskProvider diskProvider,
                                 IRemotePathMappingService remotePathMappingService,
+                                ILocalizationService localizationService,
+                                IBlocklistService blocklistService,
                                 Logger logger)
-            : base(torrentFileInfoReader, httpClient, configService, namingConfigService, diskProvider, remotePathMappingService, logger)
+            : base(torrentFileInfoReader, httpClient, configService, diskProvider, remotePathMappingService, localizationService, blocklistService, logger)
         {
             _scanWatchFolder = scanWatchFolder;
 
@@ -80,15 +83,15 @@ namespace NzbDrone.Core.Download.Clients.Blackhole
             return null;
         }
 
-        public override string Name => "Torrent Blackhole";
+        public override string Name => _localizationService.GetLocalizedString("TorrentBlackhole");
 
         public override IEnumerable<DownloadClientItem> GetItems()
         {
             foreach (var item in _scanWatchFolder.GetItems(Settings.WatchFolder, ScanGracePeriod))
             {
-                yield return new DownloadClientItem
+                var queueItem = new DownloadClientItem
                 {
-                    DownloadClientInfo = DownloadClientItemClientInfo.FromDownloadClient(this),
+                    DownloadClientInfo = DownloadClientItemClientInfo.FromDownloadClient(this, false),
                     DownloadId = Definition.Name + "_" + item.DownloadId,
                     Category = "radarr",
                     Title = item.Title,
@@ -98,22 +101,24 @@ namespace NzbDrone.Core.Download.Clients.Blackhole
 
                     OutputPath = item.OutputPath,
 
-                    Status = item.Status,
-
-                    CanMoveFiles = !Settings.ReadOnly,
-                    CanBeRemoved = !Settings.ReadOnly
+                    Status = item.Status
                 };
+
+                queueItem.CanMoveFiles = !Settings.ReadOnly;
+                queueItem.CanBeRemoved = queueItem.DownloadClientInfo.RemoveCompletedDownloads;
+
+                yield return queueItem;
             }
         }
 
-        public override void RemoveItem(string downloadId, bool deleteData)
+        public override void RemoveItem(DownloadClientItem item, bool deleteData)
         {
             if (!deleteData)
             {
                 throw new NotSupportedException("Blackhole cannot remove DownloadItem without deleting the data as well, ignoring.");
             }
 
-            DeleteItemData(downloadId);
+            DeleteItemData(item);
         }
 
         public override DownloadClientInfo GetStatus()

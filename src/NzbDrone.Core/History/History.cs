@@ -10,6 +10,8 @@ namespace NzbDrone.Core.History
     public class MovieHistory : ModelBase
     {
         public const string DOWNLOAD_CLIENT = "downloadClient";
+        public const string MOVIE_MATCH_TYPE = "movieMatchType";
+        public const string RELEASE_SOURCE = "releaseSource";
 
         public MovieHistory()
         {

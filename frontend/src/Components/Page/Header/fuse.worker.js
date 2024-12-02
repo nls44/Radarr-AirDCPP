@@ -9,6 +9,8 @@ const fuseOptions = {
   keys: [
     'title',
     'alternateTitles.title',
+    'tmdbId',
+    'imdbId',
     'tags.label'
   ]
 };
@@ -32,7 +34,7 @@ function getSuggestions(movies, value) {
               key: 'title'
             }
           ],
-          arrayIndex: 0
+          refIndex: 0
         });
         if (suggestions.length > limit) {
           break;

@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
@@ -10,11 +13,14 @@ namespace NzbDrone.Common.Http
     {
         public HttpRequest(string url, HttpAccept httpAccept = null)
         {
+            Method = HttpMethod.Get;
             Url = new HttpUri(url);
             Headers = new HttpHeader();
+            ConnectionKeepAlive = true;
             AllowAutoRedirect = true;
             StoreRequestCookie = true;
             IgnorePersistentCookies = false;
+            LogHttpError = true;
             Cookies = new Dictionary<string, string>();
 
             if (!RuntimeInfo.IsProduction)
@@ -33,17 +39,22 @@ namespace NzbDrone.Common.Http
         public HttpHeader Headers { get; set; }
         public byte[] ContentData { get; set; }
         public string ContentSummary { get; set; }
+        public ICredentials Credentials { get; set; }
         public bool SuppressHttpError { get; set; }
+        public IEnumerable<HttpStatusCode> SuppressHttpErrorStatusCodes { get; set; }
         public bool UseSimplifiedUserAgent { get; set; }
         public bool AllowAutoRedirect { get; set; }
         public bool ConnectionKeepAlive { get; set; }
         public bool LogResponseContent { get; set; }
+        public bool LogHttpError { get; set; }
         public Dictionary<string, string> Cookies { get; private set; }
         public bool IgnorePersistentCookies { get; set; }
         public bool StoreRequestCookie { get; set; }
         public bool StoreResponseCookie { get; set; }
         public TimeSpan RequestTimeout { get; set; }
         public TimeSpan RateLimit { get; set; }
+        public string RateLimitKey { get; set; }
+        public Stream ResponseStream { get; set; }
 
         public override string ToString()
         {
@@ -79,13 +90,6 @@ namespace NzbDrone.Common.Http
         {
             var encoding = HttpHeader.GetEncodingFromContentType(Headers.ContentType);
             ContentData = encoding.GetBytes(data);
-        }
-
-        public void AddBasicAuthentication(string username, string password)
-        {
-            var authInfo = Convert.ToBase64String(Encoding.GetEncoding("ISO-8859-1").GetBytes($"{username}:{password}"));
-
-            Headers.Set("Authorization", "Basic " + authInfo);
         }
     }
 }

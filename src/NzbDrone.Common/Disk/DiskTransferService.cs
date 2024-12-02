@@ -43,8 +43,8 @@ namespace NzbDrone.Common.Disk
 
         public TransferMode TransferFolder(string sourcePath, string targetPath, TransferMode mode)
         {
-            Ensure.That(sourcePath, () => sourcePath).IsValidPath();
-            Ensure.That(targetPath, () => targetPath).IsValidPath();
+            Ensure.That(sourcePath, () => sourcePath).IsValidPath(PathValidationType.CurrentOs);
+            Ensure.That(targetPath, () => targetPath).IsValidPath(PathValidationType.CurrentOs);
 
             sourcePath = ResolveRealParentPath(sourcePath);
             targetPath = ResolveRealParentPath(targetPath);
@@ -140,8 +140,8 @@ namespace NzbDrone.Common.Disk
         {
             var filesCopied = 0;
 
-            Ensure.That(sourcePath, () => sourcePath).IsValidPath();
-            Ensure.That(targetPath, () => targetPath).IsValidPath();
+            Ensure.That(sourcePath, () => sourcePath).IsValidPath(PathValidationType.CurrentOs);
+            Ensure.That(targetPath, () => targetPath).IsValidPath(PathValidationType.CurrentOs);
 
             sourcePath = ResolveRealParentPath(sourcePath);
             targetPath = ResolveRealParentPath(targetPath);
@@ -255,8 +255,8 @@ namespace NzbDrone.Common.Disk
 
         public TransferMode TransferFile(string sourcePath, string targetPath, TransferMode mode, bool overwrite = false)
         {
-            Ensure.That(sourcePath, () => sourcePath).IsValidPath();
-            Ensure.That(targetPath, () => targetPath).IsValidPath();
+            Ensure.That(sourcePath, () => sourcePath).IsValidPath(PathValidationType.CurrentOs);
+            Ensure.That(targetPath, () => targetPath).IsValidPath(PathValidationType.CurrentOs);
 
             sourcePath = ResolveRealParentPath(sourcePath);
             targetPath = ResolveRealParentPath(targetPath);
@@ -482,12 +482,7 @@ namespace NzbDrone.Common.Disk
             try
             {
                 _diskProvider.CopyFile(sourcePath, targetPath);
-
-                var targetSize = _diskProvider.GetFileSize(targetPath);
-                if (targetSize != originalSize)
-                {
-                    throw new IOException(string.Format("File copy incomplete. [{0}] was {1} bytes long instead of {2} bytes.", targetPath, targetSize, originalSize));
-                }
+                VerifyFile(sourcePath, targetPath, originalSize, "copy");
             }
             catch
             {
@@ -501,18 +496,38 @@ namespace NzbDrone.Common.Disk
             try
             {
                 _diskProvider.MoveFile(sourcePath, targetPath);
-
-                var targetSize = _diskProvider.GetFileSize(targetPath);
-                if (targetSize != originalSize)
-                {
-                    throw new IOException(string.Format("File move incomplete, data loss may have occurred. [{0}] was {1} bytes long instead of the expected {2}.", targetPath, targetSize, originalSize));
-                }
+                VerifyFile(sourcePath, targetPath, originalSize, "move");
             }
-            catch
+            catch (Exception ex)
             {
-                RollbackPartialMove(sourcePath, targetPath);
+                if (ex is not FileAlreadyExistsException)
+                {
+                    RollbackPartialMove(sourcePath, targetPath);
+                }
+
                 throw;
             }
+        }
+
+        private void VerifyFile(string sourcePath, string targetPath, long originalSize, string action)
+        {
+            var targetSize = _diskProvider.GetFileSize(targetPath);
+
+            if (targetSize == originalSize)
+            {
+                return;
+            }
+
+            _logger.Debug("File {0} incomplete, waiting in case filesystem is not synchronized. [{1}] was {2} bytes long instead of the expected {3}.", action, targetPath, targetSize, originalSize);
+            WaitForIO();
+            targetSize = _diskProvider.GetFileSize(targetPath);
+
+            if (targetSize == originalSize)
+            {
+                return;
+            }
+
+            throw new IOException(string.Format("File {0} incomplete, data loss may have occurred. [{1}] was {2} bytes long instead of the expected {3}.", action, targetPath, targetSize, originalSize));
         }
 
         private bool ShouldIgnore(DirectoryInfo folder)

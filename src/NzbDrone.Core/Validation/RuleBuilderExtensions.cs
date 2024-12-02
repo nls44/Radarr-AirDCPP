@@ -1,11 +1,15 @@
+using System;
 using System.Text.RegularExpressions;
 using FluentValidation;
 using FluentValidation.Validators;
+using NzbDrone.Common.Extensions;
 
 namespace NzbDrone.Core.Validation
 {
     public static class RuleBuilderExtensions
     {
+        private static readonly Regex HostRegex = new Regex("^[-_a-z0-9.]+$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         public static IRuleBuilderOptions<T, int> ValidId<T>(this IRuleBuilder<T, int> ruleBuilder)
         {
             return ruleBuilder.SetValidator(new GreaterThanValidator(0));
@@ -24,16 +28,18 @@ namespace NzbDrone.Core.Validation
         public static IRuleBuilderOptions<T, string> ValidHost<T>(this IRuleBuilder<T, string> ruleBuilder)
         {
             ruleBuilder.SetValidator(new NotEmptyValidator(null));
-            return ruleBuilder.SetValidator(new RegularExpressionValidator("^[-_a-z0-9.]+$", RegexOptions.IgnoreCase)).WithMessage("must be valid Host without http://");
+
+            return ruleBuilder.Must(x => HostRegex.IsMatch(x) || x.IsValidIpAddress()).WithMessage("must be valid Host without http://");
         }
 
         public static IRuleBuilderOptions<T, string> ValidRootUrl<T>(this IRuleBuilder<T, string> ruleBuilder)
         {
             ruleBuilder.SetValidator(new NotEmptyValidator(null));
-            return ruleBuilder.SetValidator(new RegularExpressionValidator("^https?://[-_a-z0-9.]+", RegexOptions.IgnoreCase)).WithMessage("must be valid URL that starts with http(s)://");
+
+            return ruleBuilder.Must(x => x.IsValidUrl() && x.StartsWith("http", StringComparison.InvariantCultureIgnoreCase)).WithMessage("must be valid URL that starts with http(s)://");
         }
 
-        public static IRuleBuilderOptions<T, string> ValidUrlBase<T>(this IRuleBuilder<T, string> ruleBuilder, string example = "/sonarr")
+        public static IRuleBuilderOptions<T, string> ValidUrlBase<T>(this IRuleBuilder<T, string> ruleBuilder, string example = "/radarr")
         {
             return ruleBuilder.SetValidator(new RegularExpressionValidator(@"^(?!\/?https?://[-_a-z0-9.]+)", RegexOptions.IgnoreCase)).WithMessage($"Must be a valid URL path (ie: '{example}')");
         }
@@ -60,6 +66,25 @@ namespace NzbDrone.Core.Validation
         public static IRuleBuilderOptions<T, TProp> AsWarning<T, TProp>(this IRuleBuilderOptions<T, TProp> ruleBuilder)
         {
             return ruleBuilder.WithState(v => NzbDroneValidationState.Warning);
+        }
+
+        public static IRuleBuilderOptions<T, string> ContainsRadarr<T>(this IRuleBuilder<T, string> ruleBuilder)
+        {
+            ruleBuilder.SetValidator(new NotEmptyValidator(null));
+            return ruleBuilder.SetValidator(new RegularExpressionValidator("radarr", RegexOptions.IgnoreCase)).WithMessage("Must contain Radarr");
+        }
+
+        public static IRuleBuilderOptions<T, string> ValidParsedStringRange<T>(this IRuleBuilder<T, string> ruleBuilder, int minValue, int maxValue)
+        {
+            return ruleBuilder.Must(x =>
+            {
+                if (int.TryParse(x, out var value))
+                {
+                    return value >= minValue && value <= maxValue;
+                }
+
+                return false;
+            }).WithMessage($"Must be greater than or equal to '{minValue}' and less than or equal to '{maxValue}'");
         }
     }
 }

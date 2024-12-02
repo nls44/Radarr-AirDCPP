@@ -20,12 +20,14 @@ namespace NzbDrone.Core.ImportLists
     public abstract class HttpImportListBase<TSettings> : ImportListBase<TSettings>
         where TSettings : IProviderConfig, new()
     {
+        protected const int MaxNumResultsPerQuery = 1000;
+
         protected readonly IHttpClient _httpClient;
 
         public override bool Enabled => true;
-        public bool SupportsPaging => PageSize > 20;
+        public override bool EnableAuto => false;
 
-        public virtual int PageSize => 20;
+        public virtual int PageSize => 0;
         public virtual TimeSpan RateLimit => TimeSpan.FromSeconds(2);
 
         public abstract IImportListRequestGenerator GetRequestGenerator();
@@ -39,35 +41,51 @@ namespace NzbDrone.Core.ImportLists
 
         public override ImportListFetchResult Fetch()
         {
-            var generator = GetRequestGenerator();
-            return FetchMovies(generator.GetMovies());
+            return FetchMovies(g => g.GetMovies());
         }
 
-        protected virtual ImportListFetchResult FetchMovies(ImportListPageableRequestChain pageableRequestChain, bool isRecent = false)
+        protected virtual ImportListFetchResult FetchMovies(Func<IImportListRequestGenerator, ImportListPageableRequestChain> pageableRequestChainSelector, bool isRecent = false)
         {
             var movies = new List<ImportListMovie>();
             var url = string.Empty;
-
-            var parser = GetParser();
 
             var anyFailure = true;
 
             try
             {
-                for (int i = 0; i < pageableRequestChain.Tiers; i++)
+                var generator = GetRequestGenerator();
+                var parser = GetParser();
+
+                var pageableRequestChain = pageableRequestChainSelector(generator);
+
+                for (var i = 0; i < pageableRequestChain.Tiers; i++)
                 {
                     var pageableRequests = pageableRequestChain.GetTier(i);
+
                     foreach (var pageableRequest in pageableRequests)
                     {
-                        var pagedReleases = new List<ImportListMovie>();
+                        var pagedMovies = new List<ImportListMovie>();
+
                         foreach (var request in pageableRequest)
                         {
                             url = request.Url.FullUri;
+
                             var page = FetchPage(request, parser);
-                            pagedReleases.AddRange(page);
+
+                            pagedMovies.AddRange(page);
+
+                            if (pagedMovies.Count >= MaxNumResultsPerQuery)
+                            {
+                                break;
+                            }
+
+                            if (!IsFullPage(page))
+                            {
+                                break;
+                            }
                         }
 
-                        movies.AddRange(pagedReleases);
+                        movies.AddRange(pagedMovies.Where(IsValidItem));
                     }
 
                     if (movies.Any())
@@ -81,8 +99,7 @@ namespace NzbDrone.Core.ImportLists
             }
             catch (WebException webException)
             {
-                if (webException.Status == WebExceptionStatus.NameResolutionFailure ||
-                    webException.Status == WebExceptionStatus.ConnectFailure)
+                if (webException.Status is WebExceptionStatus.NameResolutionFailure or WebExceptionStatus.ConnectFailure)
                 {
                     _importListStatusService.RecordConnectionFailure(Definition.Id);
                 }
@@ -103,14 +120,8 @@ namespace NzbDrone.Core.ImportLists
             }
             catch (TooManyRequestsException ex)
             {
-                if (ex.RetryAfter != TimeSpan.Zero)
-                {
-                    _importListStatusService.RecordFailure(Definition.Id, ex.RetryAfter);
-                }
-                else
-                {
-                    _importListStatusService.RecordFailure(Definition.Id, TimeSpan.FromHours(1));
-                }
+                var retryTime = ex.RetryAfter != TimeSpan.Zero ? ex.RetryAfter : TimeSpan.FromHours(1);
+                _importListStatusService.RecordFailure(Definition.Id, retryTime);
 
                 _logger.Warn("API Request Limit reached for {0}", this);
             }
@@ -152,6 +163,21 @@ namespace NzbDrone.Core.ImportLists
             return new ImportListFetchResult { Movies = CleanupListItems(movies), AnyFailure = anyFailure };
         }
 
+        protected virtual bool IsValidItem(ImportListMovie listItem)
+        {
+            if (listItem.Title.IsNullOrWhiteSpace() && listItem.ImdbId.IsNullOrWhiteSpace() && listItem.TmdbId == 0)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        protected virtual bool IsFullPage(IList<ImportListMovie> page)
+        {
+            return PageSize != 0 && page.Count >= PageSize;
+        }
+
         protected virtual IList<ImportListMovie> FetchPage(ImportListRequest request, IParseImportListResponse parser)
         {
             var response = FetchImportListResponse(request);
@@ -189,7 +215,7 @@ namespace NzbDrone.Core.ImportLists
                 if (releases.Empty())
                 {
                     return new NzbDroneValidationFailure(string.Empty,
-                               "No results were returned from your import list, please check your settings.")
+                               "No results were returned from your import list, please check your settings and the log for details.")
                     { IsWarning = true };
                 }
             }
@@ -199,21 +225,21 @@ namespace NzbDrone.Core.ImportLists
             }
             catch (UnsupportedFeedException ex)
             {
-                _logger.Warn(ex, "Import List feed is not supported");
+                _logger.Warn(ex, "Import list feed is not supported");
 
-                return new ValidationFailure(string.Empty, "Import List feed is not supported: " + ex.Message);
+                return new ValidationFailure(string.Empty, "Import list feed is not supported: " + ex.Message);
             }
             catch (ImportListException ex)
             {
                 _logger.Warn(ex, "Unable to connect to list");
 
-                return new ValidationFailure(string.Empty, "Unable to connect to list. " + ex.Message);
+                return new ValidationFailure(string.Empty, $"Unable to connect to import list: {ex.Message}. Check the log surrounding this error for details.");
             }
             catch (Exception ex)
             {
-                _logger.Warn(ex, "Unable to connect to list");
+                _logger.Warn(ex, "Unable to connect to import list");
 
-                return new ValidationFailure(string.Empty, "Unable to connect to list, check the log for more details");
+                return new ValidationFailure(string.Empty, $"Unable to connect to import list: {ex.Message}. Check the log surrounding this error for details.");
             }
 
             return null;

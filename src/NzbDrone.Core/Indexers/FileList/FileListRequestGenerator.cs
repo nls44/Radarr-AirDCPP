@@ -24,16 +24,16 @@ namespace NzbDrone.Core.Indexers.FileList
         {
             var pageableRequests = new IndexerPageableRequestChain();
 
-            if (searchCriteria.Movie.ImdbId.IsNotNullOrWhiteSpace())
+            if (searchCriteria.Movie.MovieMetadata.Value.ImdbId.IsNotNullOrWhiteSpace())
             {
-                pageableRequests.Add(GetRequest("search-torrents", string.Format("&type=imdb&query={0}", searchCriteria.Movie.ImdbId)));
+                pageableRequests.Add(GetRequest("search-torrents", $"&type=imdb&query={searchCriteria.Movie.MovieMetadata.Value.ImdbId}"));
             }
-            else
+            else if (searchCriteria.Movie.Year > 0)
             {
-                foreach (var queryTitle in searchCriteria.QueryTitles)
+                foreach (var queryTitle in searchCriteria.CleanSceneTitles)
                 {
-                    var titleYearSearchQuery = string.Format("{0}+{1}", queryTitle, searchCriteria.Movie.Year);
-                    pageableRequests.Add(GetRequest("search-torrents", string.Format("&type=name&query={0}", titleYearSearchQuery.Trim())));
+                    var titleYearSearchQuery = $"{queryTitle}+{searchCriteria.Movie.Year}";
+                    pageableRequests.Add(GetRequest("search-torrents", $"&type=name&query={titleYearSearchQuery.Trim()}"));
                 }
             }
 
@@ -44,9 +44,12 @@ namespace NzbDrone.Core.Indexers.FileList
         {
             var categoriesQuery = string.Join(",", Settings.Categories.Distinct());
 
-            var baseUrl = string.Format("{0}/api.php?action={1}&category={2}&username={3}&passkey={4}{5}", Settings.BaseUrl.TrimEnd('/'), searchType, categoriesQuery, Settings.Username.Trim(), Settings.Passkey.Trim(), parameters);
+            var baseUrl = $"{Settings.BaseUrl.TrimEnd('/')}/api.php?action={searchType}&category={categoriesQuery}{parameters}";
 
-            yield return new IndexerRequest(baseUrl, HttpAccept.Json);
+            var request = new IndexerRequest(baseUrl, HttpAccept.Json);
+            request.HttpRequest.Credentials = new BasicNetworkCredential(Settings.Username.Trim(), Settings.Passkey.Trim());
+
+            yield return request;
         }
     }
 }

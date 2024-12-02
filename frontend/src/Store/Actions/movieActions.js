@@ -1,5 +1,7 @@
 import _ from 'lodash';
+import moment from 'moment';
 import { createAction } from 'redux-actions';
+import { batchActions } from 'redux-batched-actions';
 import { filterTypePredicates, filterTypes, sortDirections } from 'Helpers/Props';
 import { createThunk, handleThunks } from 'Store/thunks';
 // import { batchActions } from 'redux-batched-actions';
@@ -7,7 +9,7 @@ import createAjaxRequest from 'Utilities/createAjaxRequest';
 import dateFilterPredicate from 'Utilities/Date/dateFilterPredicate';
 import padNumber from 'Utilities/Number/padNumber';
 import translate from 'Utilities/String/translate';
-import { updateItem } from './baseActions';
+import { set, updateItem } from './baseActions';
 import createFetchHandler from './Creators/createFetchHandler';
 import createHandleActions from './Creators/createHandleActions';
 import createRemoveItemHandler from './Creators/createRemoveItemHandler';
@@ -22,12 +24,12 @@ export const section = 'movies';
 export const filters = [
   {
     key: 'all',
-    label: translate('All'),
+    label: () => translate('All'),
     filters: []
   },
   {
     key: 'monitored',
-    label: translate('MonitoredOnly'),
+    label: () => translate('MonitoredOnly'),
     filters: [
       {
         key: 'monitored',
@@ -38,7 +40,7 @@ export const filters = [
   },
   {
     key: 'unmonitored',
-    label: translate('Unmonitored'),
+    label: () => translate('Unmonitored'),
     filters: [
       {
         key: 'monitored',
@@ -49,7 +51,7 @@ export const filters = [
   },
   {
     key: 'missing',
-    label: translate('Missing'),
+    label: () => translate('Missing'),
     filters: [
       {
         key: 'monitored',
@@ -65,7 +67,7 @@ export const filters = [
   },
   {
     key: 'wanted',
-    label: translate('Wanted'),
+    label: () => translate('Wanted'),
     filters: [
       {
         key: 'monitored',
@@ -86,7 +88,7 @@ export const filters = [
   },
   {
     key: 'cutoffunmet',
-    label: translate('CutoffUnmet'),
+    label: () => translate('CutoffUnmet'),
     filters: [
       {
         key: 'monitored',
@@ -116,7 +118,30 @@ export const filterPredicates = {
     const predicate = filterTypePredicates[type];
     const { collection } = item;
 
-    return predicate(collection ? collection.name : '', filterValue);
+    return predicate(collection && collection.title ? collection.title : '', filterValue);
+  },
+
+  originalLanguage: function(item, filterValue, type) {
+    const predicate = filterTypePredicates[type];
+    const { originalLanguage } = item;
+
+    return predicate(originalLanguage ? originalLanguage.name : '', filterValue);
+  },
+
+  releaseGroups: function(item, filterValue, type) {
+    const predicate = filterTypePredicates[type];
+    const { statistics = {} } = item;
+    const { releaseGroups = [] } = statistics;
+
+    return predicate(releaseGroups, filterValue);
+  },
+
+  sizeOnDisk: function(item, filterValue, type) {
+    const predicate = filterTypePredicates[type];
+    const { statistics = {} } = item;
+    const sizeOnDisk = statistics && statistics.sizeOnDisk ? statistics.sizeOnDisk : 0;
+
+    return predicate(sizeOnDisk, filterValue);
   },
 
   inCinemas: function(item, filterValue, type) {
@@ -131,10 +156,64 @@ export const filterPredicates = {
     return dateFilterPredicate(item.digitalRelease, filterValue, type);
   },
 
-  ratings: function(item, filterValue, type) {
+  releaseDate: function(item, filterValue, type) {
+    return dateFilterPredicate(item.releaseDate, filterValue, type);
+  },
+
+  tmdbRating: function({ ratings = {} }, filterValue, type) {
     const predicate = filterTypePredicates[type];
 
-    return predicate(item.ratings.value * 10, filterValue);
+    const rating = ratings.tmdb ? ratings.tmdb.value : 0;
+
+    return predicate(rating * 10, filterValue);
+  },
+
+  tmdbVotes: function({ ratings = {} }, filterValue, type) {
+    const predicate = filterTypePredicates[type];
+
+    const rating = ratings.tmdb ? ratings.tmdb.votes : 0;
+
+    return predicate(rating, filterValue);
+  },
+
+  imdbRating: function({ ratings = {} }, filterValue, type) {
+    const predicate = filterTypePredicates[type];
+
+    const rating = ratings.imdb ? ratings.imdb.value : 0;
+
+    return predicate(rating, filterValue);
+  },
+
+  imdbVotes: function({ ratings = {} }, filterValue, type) {
+    const predicate = filterTypePredicates[type];
+
+    const rating = ratings.imdb ? ratings.imdb.votes : 0;
+
+    return predicate(rating, filterValue);
+  },
+
+  rottenTomatoesRating: function({ ratings = {} }, filterValue, type) {
+    const predicate = filterTypePredicates[type];
+
+    const rating = ratings.rottenTomatoes ? ratings.rottenTomatoes.value : 0;
+
+    return predicate(rating, filterValue);
+  },
+
+  traktRating: function({ ratings = {} }, filterValue, type) {
+    const predicate = filterTypePredicates[type];
+
+    const rating = ratings.trakt ? ratings.trakt.value : 0;
+
+    return predicate(rating * 10, filterValue);
+  },
+
+  traktVotes: function({ ratings = {} }, filterValue, type) {
+    const predicate = filterTypePredicates[type];
+
+    const rating = ratings.trakt ? ratings.trakt.votes : 0;
+
+    return predicate(rating, filterValue);
   },
 
   qualityCutoffNotMet: function(item) {
@@ -192,6 +271,72 @@ export const sortPredicates = {
     }
 
     return padNumber(result.toString(), 2) + qualityName;
+  },
+
+  year: function(item) {
+    return item.year || undefined;
+  },
+
+  inCinemas: function(item, direction) {
+    const { inCinemas } = item;
+
+    if (inCinemas) {
+      return moment(inCinemas).unix();
+    }
+
+    if (direction === sortDirections.DESCENDING) {
+      return -1 * Number.MAX_VALUE;
+    }
+
+    return Number.MAX_VALUE;
+  },
+
+  physicalRelease: function(item, direction) {
+    const { physicalRelease } = item;
+
+    if (physicalRelease) {
+      return moment(physicalRelease).unix();
+    }
+
+    if (direction === sortDirections.DESCENDING) {
+      return -1 * Number.MAX_VALUE;
+    }
+
+    return Number.MAX_VALUE;
+  },
+
+  digitalRelease: function(item, direction) {
+    const { digitalRelease } = item;
+
+    if (digitalRelease) {
+      return moment(digitalRelease).unix();
+    }
+
+    if (direction === sortDirections.DESCENDING) {
+      return -1 * Number.MAX_VALUE;
+    }
+
+    return Number.MAX_VALUE;
+  },
+
+  releaseDate: function(item, direction) {
+    const { releaseDate } = item;
+
+    if (releaseDate) {
+      return moment(releaseDate).unix();
+    }
+
+    if (direction === sortDirections.DESCENDING) {
+      return -1 * Number.MAX_VALUE;
+    }
+
+    return Number.MAX_VALUE;
+  },
+
+  sizeOnDisk: function(item) {
+    const { statistics = {} } = item;
+
+    return statistics.sizeOnDisk || 0;
   }
 };
 
@@ -204,11 +349,20 @@ export const defaultState = {
   error: null,
   isSaving: false,
   saveError: null,
+  isDeleting: false,
+  deleteError: null,
   items: [],
   sortKey: 'sortTitle',
   sortDirection: sortDirections.ASCENDING,
-  pendingChanges: {}
+  pendingChanges: {},
+  deleteOptions: {
+    addImportExclusion: false
+  }
 };
+
+export const persistState = [
+  'movies.deleteOptions'
+];
 
 //
 // Actions Types
@@ -217,6 +371,10 @@ export const FETCH_MOVIES = 'movies/fetchMovies';
 export const SET_MOVIE_VALUE = 'movies/setMovieValue';
 export const SAVE_MOVIE = 'movies/saveMovie';
 export const DELETE_MOVIE = 'movies/deleteMovie';
+export const SAVE_MOVIE_EDITOR = 'movies/saveMovieEditor';
+export const BULK_DELETE_MOVIE = 'movies/bulkDeleteMovie';
+
+export const SET_DELETE_OPTION = 'movies/setDeleteOption';
 
 export const TOGGLE_MOVIE_MONITORED = 'movies/toggleMovieMonitored';
 
@@ -244,12 +402,15 @@ export const deleteMovie = createThunk(DELETE_MOVIE, (payload) => {
   return {
     ...payload,
     queryParams: {
-      deleteFiles: payload.deleteFiles
+      deleteFiles: payload.deleteFiles,
+      addImportExclusion: payload.addImportExclusion
     }
   };
 });
 
 export const toggleMovieMonitored = createThunk(TOGGLE_MOVIE_MONITORED);
+export const saveMovieEditor = createThunk(SAVE_MOVIE_EDITOR);
+export const bulkDeleteMovie = createThunk(BULK_DELETE_MOVIE);
 
 export const setMovieValue = createAction(SET_MOVIE_VALUE, (payload) => {
   return {
@@ -257,6 +418,8 @@ export const setMovieValue = createAction(SET_MOVIE_VALUE, (payload) => {
     ...payload
   };
 });
+
+export const setDeleteOption = createAction(SET_DELETE_OPTION);
 
 //
 // Helpers
@@ -276,7 +439,27 @@ export const actionHandlers = handleThunks({
 
   [FETCH_MOVIES]: createFetchHandler(section, '/movie'),
   [SAVE_MOVIE]: createSaveProviderHandler(section, '/movie', { getAjaxOptions: getSaveAjaxOptions }),
-  [DELETE_MOVIE]: createRemoveItemHandler(section, '/movie'),
+  [DELETE_MOVIE]: (getState, payload, dispatch) => {
+    createRemoveItemHandler(section, '/movie')(getState, payload, dispatch);
+
+    if (!payload.collectionTmdbId) {
+      return;
+    }
+
+    const collectionToUpdate = getState().movieCollections.items.find((collection) => collection.tmdbId === payload.collectionTmdbId);
+
+    // Skip updating if the last movie in the collection is being deleted
+    if (collectionToUpdate.movies.length - collectionToUpdate.missingMovies === 1) {
+      return;
+    }
+
+    const collectionData = { ...collectionToUpdate, missingMovies: collectionToUpdate.missingMovies + 1 };
+
+    dispatch(updateItem({
+      section: 'movieCollections',
+      ...collectionData
+    }));
+  },
 
   [TOGGLE_MOVIE_MONITORED]: (getState, payload, dispatch) => {
     const {
@@ -318,8 +501,79 @@ export const actionHandlers = handleThunks({
         isSaving: false
       }));
     });
-  }
+  },
 
+  [SAVE_MOVIE_EDITOR]: function(getState, payload, dispatch) {
+    dispatch(set({
+      section,
+      isSaving: true
+    }));
+
+    const promise = createAjaxRequest({
+      url: '/movie/editor',
+      method: 'PUT',
+      data: JSON.stringify(payload),
+      dataType: 'json'
+    }).request;
+
+    promise.done((data) => {
+      dispatch(batchActions([
+        ...data.map((movie) => {
+          return updateItem({
+            id: movie.id,
+            section: 'movies',
+            ...movie
+          });
+        }),
+
+        set({
+          section,
+          isSaving: false,
+          saveError: null
+        })
+      ]));
+    });
+
+    promise.fail((xhr) => {
+      dispatch(set({
+        section,
+        isSaving: false,
+        saveError: xhr
+      }));
+    });
+  },
+
+  [BULK_DELETE_MOVIE]: function(getState, payload, dispatch) {
+    dispatch(set({
+      section,
+      isDeleting: true
+    }));
+
+    const promise = createAjaxRequest({
+      url: '/movie/editor',
+      method: 'DELETE',
+      data: JSON.stringify(payload),
+      dataType: 'json'
+    }).request;
+
+    promise.done(() => {
+      // SignaR will take care of removing the movie from the collection
+
+      dispatch(set({
+        section,
+        isDeleting: false,
+        deleteError: null
+      }));
+    });
+
+    promise.fail((xhr) => {
+      dispatch(set({
+        section,
+        isDeleting: false,
+        deleteError: xhr
+      }));
+    });
+  }
 });
 
 //
@@ -327,6 +581,14 @@ export const actionHandlers = handleThunks({
 
 export const reducers = createHandleActions({
 
-  [SET_MOVIE_VALUE]: createSetSettingValueReducer(section)
+  [SET_MOVIE_VALUE]: createSetSettingValueReducer(section),
+  [SET_DELETE_OPTION]: (state, { payload }) => {
+    return {
+      ...state,
+      deleteOptions: {
+        ...payload
+      }
+    };
+  }
 
 }, defaultState, section);

@@ -1,24 +1,35 @@
-.missing {
-  padding-left: 2px;
-  border-left: 4px solid $dangerColor;
-}
-
-.downloaded {
-  padding-left: 2px;
-  border-left: 4px solid $successColor;
-}
-
-.notAvailable {
-  padding-left: 2px;
-  border-left: 4px solid $primaryColor;
-}
-
-.unmonitored {
-  padding-left: 2px;
-  border-left: 4px solid $warningColor;
-}
-
 .queue {
   padding-left: 2px;
-  border-left: 4px solid $queueColor;
+  border-left: 4px solid var(--queueColor);
+}
+
+.continuing {
+  padding-left: 2px;
+  border-left: 4px solid var(--primaryColor);
+}
+
+.availNotMonitored {
+  padding-left: 2px;
+  border-left: 4px solid var(--darkGray);
+}
+
+.ended {
+  padding-left: 2px;
+  border-left: 4px solid var(--successColor);
+}
+
+.missingMonitored {
+  padding-left: 2px;
+  border-left: 4px solid var(--dangerColor);
+}
+
+.missingUnmonitored {
+  padding-left: 2px;
+  border-left: 4px solid var(--warningColor);
+}
+
+.deleted {
+  padding-left: 2px;
+  border-left: 4px solid var(--inverseLabelColor);
+  color: var(--dangerColor);
 }

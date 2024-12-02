@@ -68,6 +68,10 @@ namespace NzbDrone.Core.Test.UpdateTests
                   .Setup(c => c.FolderWritable(It.IsAny<string>()))
                   .Returns(true);
 
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(v => v.FileExists(It.Is<string>(s => s.EndsWith("Radarr.Update".ProcessNameToExe()))))
+                  .Returns(true);
+
             _sandboxFolder = Mocker.GetMock<IAppFolderInfo>().Object.GetUpdateSandboxFolder();
         }
 
@@ -84,17 +88,6 @@ namespace NzbDrone.Core.Test.UpdateTests
             Mocker.GetMock<IDiskProvider>()
                   .Setup(s => s.FileExists(path, StringComparison.Ordinal))
                   .Returns(true);
-        }
-
-        [Test]
-        public void should_not_update_if_inside_docker()
-        {
-            Mocker.GetMock<IOsInfo>().Setup(x => x.IsDocker).Returns(true);
-
-            Subject.Execute(new ApplicationUpdateCommand());
-
-            Mocker.GetMock<IProcessProvider>()
-                .Verify(c => c.Start(It.IsAny<string>(), It.Is<string>(s => s.StartsWith("12")), null, null, null), Times.Never());
         }
 
         [Test]
@@ -149,12 +142,27 @@ namespace NzbDrone.Core.Test.UpdateTests
         }
 
         [Test]
-        public void should_start_update_client()
+        public void should_start_update_client_if_updater_exists()
         {
             Subject.Execute(new ApplicationUpdateCommand());
 
             Mocker.GetMock<IProcessProvider>()
                 .Verify(c => c.Start(It.IsAny<string>(), It.Is<string>(s => s.StartsWith("12")), null, null, null), Times.Once());
+        }
+
+        [Test]
+        public void should_return_with_warning_if_updater_doesnt_exists()
+        {
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(v => v.FileExists(It.Is<string>(s => s.EndsWith("Radarr.Update".ProcessNameToExe()))))
+                  .Returns(false);
+
+            Subject.Execute(new ApplicationUpdateCommand());
+
+            Mocker.GetMock<IProcessProvider>()
+                .Verify(c => c.Start(It.IsAny<string>(), It.IsAny<string>(), null, null, null), Times.Never());
+
+            ExceptionVerification.ExpectedWarns(1);
         }
 
         [Test]
@@ -317,6 +325,28 @@ namespace NzbDrone.Core.Test.UpdateTests
 
             Mocker.GetMock<IConfigFileProvider>()
                   .Verify(v => v.SaveConfigDictionary(It.Is<Dictionary<string, object>>(d => d.ContainsKey("Branch") && (string)d["Branch"] == "fake")), Times.Once());
+        }
+
+        [Test]
+        public void should_not_update_with_built_in_updater_inside_docker_container()
+        {
+            Mocker.GetMock<IDeploymentInfoProvider>().Setup(x => x.PackageUpdateMechanism).Returns(UpdateMechanism.Docker);
+
+            Subject.Execute(new ApplicationUpdateCommand());
+
+            Mocker.GetMock<IProcessProvider>()
+                .Verify(c => c.Start(It.IsAny<string>(), It.Is<string>(s => s.StartsWith("12")), null, null, null), Times.Never());
+        }
+
+        [Test]
+        public void should_not_update_with_built_in_updater_when_external_updater_is_configured()
+        {
+            Mocker.GetMock<IDeploymentInfoProvider>().Setup(x => x.IsExternalUpdateMechanism).Returns(true);
+
+            Subject.Execute(new ApplicationUpdateCommand());
+
+            Mocker.GetMock<IProcessProvider>()
+                .Verify(c => c.Start(It.IsAny<string>(), It.Is<string>(s => s.StartsWith("12")), null, null, null), Times.Never());
         }
 
         [TearDown]

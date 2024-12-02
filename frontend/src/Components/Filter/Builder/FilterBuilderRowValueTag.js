@@ -2,11 +2,12 @@ import PropTypes from 'prop-types';
 import React from 'react';
 import TagInputTag from 'Components/Form/TagInputTag';
 import { kinds } from 'Helpers/Props';
+import translate from 'Utilities/String/translate';
 import styles from './FilterBuilderRowValueTag.css';
 
 function FilterBuilderRowValueTag(props) {
   return (
-    <span
+    <div
       className={styles.tag}
     >
       <TagInputTag
@@ -15,12 +16,13 @@ function FilterBuilderRowValueTag(props) {
       />
 
       {
-        !props.isLastTag &&
-          <span className={styles.or}>
-            or
-          </span>
+        props.isLastTag ?
+          null :
+          <div className={styles.or}>
+            {translate('Or')}
+          </div>
       }
-    </span>
+    </div>
   );
 }
 

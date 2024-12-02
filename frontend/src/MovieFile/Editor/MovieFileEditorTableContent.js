@@ -1,55 +1,11 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
-import IconButton from 'Components/Link/IconButton';
 import Table from 'Components/Table/Table';
 import TableBody from 'Components/Table/TableBody';
-import { icons } from 'Helpers/Props';
+import { sortDirections } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import MovieFileEditorRow from './MovieFileEditorRow';
 import styles from './MovieFileEditorTableContent.css';
-
-const columns = [
-  {
-    name: 'title',
-    label: translate('RelativePath'),
-    isVisible: true
-  },
-  {
-    name: 'videoCodec',
-    label: translate('VideoCodec'),
-    isVisible: true
-  },
-  {
-    name: 'audioInfo',
-    label: translate('AudioInfo'),
-    isVisible: true
-  },
-  {
-    name: 'size',
-    label: translate('Size'),
-    isVisible: true
-  },
-  {
-    name: 'languages',
-    label: translate('Languages'),
-    isVisible: true
-  },
-  {
-    name: 'quality',
-    label: translate('Quality'),
-    isVisible: true
-  },
-  {
-    name: 'quality.customFormats',
-    label: translate('Formats'),
-    isVisible: true
-  },
-  {
-    name: 'action',
-    label: React.createElement(IconButton, { name: icons.ADVANCED_SETTINGS }),
-    isVisible: true
-  }
-];
 
 class MovieFileEditorTableContent extends Component {
 
@@ -58,7 +14,12 @@ class MovieFileEditorTableContent extends Component {
 
   render() {
     const {
-      items
+      items,
+      columns,
+      sortKey,
+      sortDirection,
+      onSortPress,
+      onTableOptionChange
     } = this.props;
 
     return (
@@ -66,19 +27,26 @@ class MovieFileEditorTableContent extends Component {
         {
           !items.length &&
             <div className={styles.blankpad}>
-              No movie files to manage.
+              {translate('NoMovieFilesToManage')}
             </div>
         }
 
         {
           !!items.length &&
-            <Table columns={columns}>
+            <Table
+              columns={columns}
+              sortKey={sortKey}
+              sortDirection={sortDirection}
+              onSortPress={onSortPress}
+              onTableOptionChange={onTableOptionChange}
+            >
               <TableBody>
                 {
                   items.map((item) => {
                     return (
                       <MovieFileEditorRow
                         key={item.id}
+                        columns={columns}
                         {...item}
                         onDeletePress={this.props.onDeletePress}
                       />
@@ -98,6 +66,11 @@ MovieFileEditorTableContent.propTypes = {
   movieId: PropTypes.number,
   isDeleting: PropTypes.bool.isRequired,
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
+  columns: PropTypes.arrayOf(PropTypes.object).isRequired,
+  sortKey: PropTypes.string.isRequired,
+  sortDirection: PropTypes.oneOf(sortDirections.all),
+  onTableOptionChange: PropTypes.func.isRequired,
+  onSortPress: PropTypes.func.isRequired,
   onDeletePress: PropTypes.func.isRequired
 };
 

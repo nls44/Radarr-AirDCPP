@@ -28,12 +28,12 @@ namespace NzbDrone.Core.Test.Datastore.Migration
         [TestCase("R_576", "ResolutionSpecification", false, false, (int)Resolution.R576p)]
         [TestCase("R_480", "ResolutionSpecification", false, false, (int)Resolution.R480p)]
         [TestCase("R_2160", "ResolutionSpecification", false, false, (int)Resolution.R2160p)]
-        [TestCase("S_BLURAY", "SourceSpecification", false, false, (int)Source.BLURAY)]
-        [TestCase("s_tv", "SourceSpecification", false, false, (int)Source.TV)]
-        [TestCase("s_workPRINT", "SourceSpecification", false, false, (int)Source.WORKPRINT)]
-        [TestCase("s_Dvd", "SourceSpecification", false, false, (int)Source.DVD)]
-        [TestCase("S_WEBdL", "SourceSpecification", false, false, (int)Source.WEBDL)]
-        [TestCase("S_CAM", "SourceSpecification", false, false, (int)Source.CAM)]
+        [TestCase("S_BLURAY", "SourceSpecification", false, false, (int)QualitySource.BLURAY)]
+        [TestCase("s_tv", "SourceSpecification", false, false, (int)QualitySource.TV)]
+        [TestCase("s_workPRINT", "SourceSpecification", false, false, (int)QualitySource.WORKPRINT)]
+        [TestCase("s_Dvd", "SourceSpecification", false, false, (int)QualitySource.DVD)]
+        [TestCase("S_WEBdL", "SourceSpecification", false, false, (int)QualitySource.WEBDL)]
+        [TestCase("S_CAM", "SourceSpecification", false, false, (int)QualitySource.CAM)]
         [TestCase("L_English", "LanguageSpecification", false, false, 1)]
         [TestCase("L_Italian", "LanguageSpecification", false, false, 5)]
         [TestCase("L_iTa", "LanguageSpecification", false, false, 5)]
@@ -80,7 +80,7 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                     });
                 });
 
-            var json = db.Query<string>("SELECT Specifications FROM CustomFormats").First();
+            var json = db.Query<string>("SELECT \"Specifications\" FROM \"CustomFormats\"").First();
 
             ValidateFormatTag(json, "ReleaseTitleSpecification", false, false);
             json.Should().Contain($"\"name\": \"Test\"");
@@ -99,7 +99,7 @@ namespace NzbDrone.Core.Test.Datastore.Migration
                     });
                 });
 
-            var json = db.Query<string>("SELECT Specifications FROM CustomFormats").First();
+            var json = db.Query<string>("SELECT \"Specifications\" FROM \"CustomFormats\"").First();
 
             ValidateFormatTag(json, "ReleaseTitleSpecification", false, false);
             ValidateFormatTag(json, "EditionSpecification", false, false);
@@ -110,8 +110,16 @@ namespace NzbDrone.Core.Test.Datastore.Migration
         private void ValidateFormatTag(string json, string type, bool required, bool negated)
         {
             json.Should().Contain($"\"type\": \"{type}\"");
-            json.Should().Contain($"\"required\": {required.ToString().ToLower()}");
-            json.Should().Contain($"\"negate\": {negated.ToString().ToLower()}");
+
+            if (required)
+            {
+                json.Should().Contain($"\"required\": true");
+            }
+
+            if (negated)
+            {
+                json.Should().Contain($"\"negate\": true");
+            }
         }
     }
 }

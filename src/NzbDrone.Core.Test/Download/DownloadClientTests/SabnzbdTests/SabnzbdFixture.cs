@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using FizzWare.NBuilder;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
@@ -22,6 +24,7 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.SabnzbdTests
         private SabnzbdHistory _completed;
         private SabnzbdConfig _config;
         private SabnzbdFullStatus _fullStatus;
+        private DownloadClientItem _downloadClientItem;
 
         [SetUp]
         public void Setup()
@@ -99,6 +102,12 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.SabnzbdTests
                         }
             };
 
+            _downloadClientItem = Builder<DownloadClientItem>
+                                  .CreateNew()
+                                  .With(d => d.Status = DownloadItemStatus.Completed)
+                                  .With(d => d.DownloadId = _completed.Items.First().Id)
+                                  .Build();
+
             Mocker.GetMock<ISabnzbdProxy>()
                   .Setup(v => v.GetVersion(It.IsAny<SabnzbdSettings>()))
                   .Returns("1.2.3");
@@ -166,7 +175,7 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.SabnzbdTests
             }
 
             Mocker.GetMock<ISabnzbdProxy>()
-                .Setup(s => s.GetHistory(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<SabnzbdSettings>()))
+                .Setup(s => s.GetHistory(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<SabnzbdSettings>()))
                 .Returns(history);
         }
 
@@ -290,28 +299,28 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.SabnzbdTests
             Subject.GetItems().Should().BeEmpty();
         }
 
-        [TestCase("[ TOWN ]-[ http://www.town.ag ]-[ ANIME ]-[Usenet Provider >> http://www.ssl- <<] - [Commie] Aldnoah Zero 18 [234C8FC7]", "[ TOWN ]-[ http++www.town.ag ]-[ ANIME ]-[Usenet Provider  http++www.ssl- ] - [Commie] Aldnoah Zero 18 [234C8FC7].nzb")]
-        public void Download_should_use_clean_title(string title, string filename)
+        [TestCase("[ TOWN ]-[ http://www.town.ag ]-[ ANIME ]-[Usenet Provider >> http://www.ssl- <<] - [Commie] Aldnoah Zero 18 [234C8FC7]", "[ TOWN ]-[ http-++www.town.ag ]-[ ANIME ]-[Usenet Provider  http-++www.ssl- ] - [Commie] Aldnoah Zero 18 [234C8FC7].nzb")]
+        public async Task Download_should_use_clean_title(string title, string filename)
         {
             GivenSuccessfulDownload();
 
             var remoteMovie = CreateRemoteMovie();
             remoteMovie.Release.Title = title;
 
-            var id = Subject.Download(remoteMovie);
+            var id = await Subject.Download(remoteMovie, CreateIndexer());
 
             Mocker.GetMock<ISabnzbdProxy>()
                 .Verify(v => v.DownloadNzb(It.IsAny<byte[]>(), filename, It.IsAny<string>(), It.IsAny<int>(), It.IsAny<SabnzbdSettings>()), Times.Once());
         }
 
         [Test]
-        public void Download_should_return_unique_id()
+        public async Task Download_should_return_unique_id()
         {
             GivenSuccessfulDownload();
 
             var remoteMovie = CreateRemoteMovie();
 
-            var id = Subject.Download(remoteMovie);
+            var id = await Subject.Download(remoteMovie, CreateIndexer());
 
             id.Should().NotBeNullOrEmpty();
         }
@@ -345,7 +354,7 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.SabnzbdTests
 
         [Test]
         [Ignore("Series")]
-        public void Download_should_use_sabRecentTvPriority_when_recentEpisode_is_true()
+        public async Task Download_should_use_sabRecentTvPriority_when_recentEpisode_is_true()
         {
             Mocker.GetMock<ISabnzbdProxy>()
                     .Setup(s => s.DownloadNzb(It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string>(), (int)SabnzbdPriority.High, It.IsAny<SabnzbdSettings>()))
@@ -358,7 +367,7 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.SabnzbdTests
                                                       .Build()
                                                       .ToList();*/
 
-            Subject.Download(remoteMovie);
+            await Subject.Download(remoteMovie, CreateIndexer());
 
             Mocker.GetMock<ISabnzbdProxy>()
                   .Verify(v => v.DownloadNzb(It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string>(), (int)SabnzbdPriority.High, It.IsAny<SabnzbdSettings>()), Times.Once());
@@ -443,6 +452,63 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.SabnzbdTests
             result.OutputRootFolders.First().Should().Be(fullCategoryDir);
         }
 
+        [TestCase("0")]
+        [TestCase("15d")]
+        [TestCase("")]
+        [TestCase(null)]
+        public void should_set_history_removes_completed_downloads_false(string historyRetention)
+        {
+            _config.Misc.history_retention = historyRetention;
+
+            var downloadClientInfo = Subject.GetStatus();
+
+            downloadClientInfo.RemovesCompletedDownloads.Should().BeFalse();
+        }
+
+        [TestCase("-1")]
+        [TestCase("15")]
+        [TestCase("3")]
+        [TestCase("3d")]
+        public void should_set_history_removes_completed_downloads_true(string historyRetention)
+        {
+            _config.Misc.history_retention = historyRetention;
+
+            var downloadClientInfo = Subject.GetStatus();
+
+            downloadClientInfo.RemovesCompletedDownloads.Should().BeTrue();
+        }
+
+        [TestCase("all", 0)]
+        [TestCase("days-archive", 15)]
+        [TestCase("days-delete", 15)]
+        public void should_set_history_removes_completed_downloads_false_for_separate_properties(string option, int number)
+        {
+            _config.Misc.history_retention_option = option;
+            _config.Misc.history_retention_number = number;
+
+            var downloadClientInfo = Subject.GetStatus();
+
+            downloadClientInfo.RemovesCompletedDownloads.Should().BeFalse();
+        }
+
+        [TestCase("number-archive", 10)]
+        [TestCase("number-delete", 10)]
+        [TestCase("number-archive", 0)]
+        [TestCase("number-delete", 0)]
+        [TestCase("days-archive", 3)]
+        [TestCase("days-delete", 3)]
+        [TestCase("all-archive", 0)]
+        [TestCase("all-delete", 0)]
+        public void should_set_history_removes_completed_downloads_true_for_separate_properties(string option, int number)
+        {
+            _config.Misc.history_retention_option = option;
+            _config.Misc.history_retention_number = number;
+
+            var downloadClientInfo = Subject.GetStatus();
+
+            downloadClientInfo.RemovesCompletedDownloads.Should().BeTrue();
+        }
+
         [TestCase(@"Y:\sabnzbd\root", @"completed\downloads", @"vv", @"Y:\sabnzbd\root\completed\downloads", @"Y:\sabnzbd\root\completed\downloads\vv")]
         [TestCase(@"Y:\sabnzbd\root", @"completed", @"vv", @"Y:\sabnzbd\root\completed", @"Y:\sabnzbd\root\completed\vv")]
         [TestCase(@"/sabnzbd/root", @"completed/downloads", @"vv", @"/sabnzbd/root/completed/downloads", @"/sabnzbd/root/completed/downloads/vv")]
@@ -511,6 +577,52 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.SabnzbdTests
         }
 
         [Test]
+        public void should_test_success_if_sorters_are_empty()
+        {
+            _config.Misc.enable_tv_sorting = false;
+            _config.Misc.tv_categories = null;
+            _config.Sorters = new List<SabnzbdSorter>();
+
+            var result = new NzbDroneValidationResult(Subject.Test());
+
+            result.IsValid.Should().BeTrue();
+        }
+
+        [Test]
+        public void should_test_failed_if_sorter_is_enabled_for_non_tv_category()
+        {
+            _config.Misc.enable_tv_sorting = false;
+            _config.Misc.tv_categories = null;
+            _config.Sorters = Builder<SabnzbdSorter>.CreateListOfSize(1)
+                .All()
+                .With(s => s.is_active = true)
+                .With(s => s.sort_cats = new List<string> { "movie-custom" })
+                .Build()
+                .ToList();
+
+            var result = new NzbDroneValidationResult(Subject.Test());
+
+            result.IsValid.Should().BeTrue();
+        }
+
+        [Test]
+        public void should_test_failed_if_sorter_is_enabled_for_tv_category()
+        {
+            _config.Misc.enable_tv_sorting = false;
+            _config.Misc.tv_categories = null;
+            _config.Sorters = Builder<SabnzbdSorter>.CreateListOfSize(1)
+                .All()
+                .With(s => s.is_active = true)
+                .With(s => s.sort_cats = new List<string> { "movie" })
+                .Build()
+                .ToList();
+
+            var result = new NzbDroneValidationResult(Subject.Test());
+
+            result.IsValid.Should().BeFalse();
+        }
+
+        [Test]
         public void should_test_success_if_tv_sorting_disabled()
         {
             _config.Misc.enable_tv_sorting = false;
@@ -576,6 +688,118 @@ namespace NzbDrone.Core.Test.Download.DownloadClientTests.SabnzbdTests
             var result = new NzbDroneValidationResult(Subject.Test());
 
             result.IsValid.Should().BeFalse();
+        }
+
+        [Test]
+        public void should_remove_output_path_folder_when_deleting_a_completed_item_and_delete_data_is_true()
+        {
+            var path = @"C:\Test\Series.Title.S01E01".AsOsAgnostic();
+            _downloadClientItem.OutputPath = new OsPath(path);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(s => s.FolderExists(path))
+                  .Returns(true);
+
+            _completed.Items.First().Storage = path;
+
+            GivenQueue(null);
+            GivenHistory(_completed);
+
+            Subject.RemoveItem(_downloadClientItem, true);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Verify(v => v.DeleteFolder(path, true), Times.Once);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Verify(v => v.DeleteFile(path), Times.Never);
+        }
+
+        [Test]
+        public void should_remove_output_path_file_when_deleting_a_completed_item_and_delete_data_is_true()
+        {
+            var path = @"C:\Test\Series.Title.S01E01.mkv".AsOsAgnostic();
+            _downloadClientItem.OutputPath = new OsPath(path);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(s => s.FolderExists(path))
+                  .Returns(false);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(s => s.FileExists(path))
+                  .Returns(true);
+
+            _completed.Items.First().Storage = path;
+
+            GivenQueue(null);
+            GivenHistory(_completed);
+
+            Subject.RemoveItem(_downloadClientItem, true);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Verify(v => v.DeleteFolder(path, true), Times.Never);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Verify(v => v.DeleteFile(path), Times.Once);
+        }
+
+        [Test]
+        public void should_not_remove_output_path_file_when_deleting_a_completed_item_and_delete_data_is_true_if_it_does_not_exist()
+        {
+            var path = @"C:\Test\Series.Title.S01E01.mkv".AsOsAgnostic();
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(s => s.FolderExists(path))
+                  .Returns(false);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(s => s.FileExists(path))
+                  .Returns(false);
+
+            _completed.Items.First().Storage = path;
+
+            GivenQueue(null);
+            GivenHistory(_completed);
+
+            Subject.RemoveItem(_downloadClientItem, true);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Verify(v => v.DeleteFolder(path, true), Times.Never);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Verify(v => v.DeleteFile(path), Times.Never);
+        }
+
+        [Test]
+        public void should_not_remove_output_path_file_when_deleting_a_completed_item_and_delete_data_is_false()
+        {
+            var path = @"C:\Test\Series.Title.S01E01.mkv".AsOsAgnostic();
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(s => s.FolderExists(path))
+                  .Returns(false);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Setup(s => s.FileExists(path))
+                  .Returns(false);
+
+            _completed.Items.First().Storage = path;
+
+            GivenQueue(null);
+            GivenHistory(_completed);
+
+            Subject.RemoveItem(_downloadClientItem, false);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Verify(v => v.FolderExists(path), Times.Never);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Verify(v => v.FileExists(path), Times.Never);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Verify(v => v.DeleteFolder(path, true), Times.Never);
+
+            Mocker.GetMock<IDiskProvider>()
+                  .Verify(v => v.DeleteFile(path), Times.Never);
         }
     }
 }

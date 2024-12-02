@@ -8,19 +8,23 @@ import styles from './Legend.css';
 
 function Legend(props) {
   const {
+    view,
     showCutoffUnmetIcon,
+    fullColorEvents,
     colorImpairedMode
   } = props;
 
   const iconsToShow = [];
+  const isAgendaView = view === 'agenda';
 
   if (showCutoffUnmetIcon) {
     iconsToShow.push(
       <LegendIconItem
-        name={translate('CutoffUnmet')}
+        name={translate('CutoffNotMet')}
         icon={icons.MOVIE_FILE}
         kind={kinds.WARNING}
-        tooltip={translate('QualityOrLangCutoffHasNotBeenMet')}
+        fullColorEvents={fullColorEvents}
+        tooltip={translate('QualityCutoffNotMet')}
       />
     );
   }
@@ -29,45 +33,58 @@ function Legend(props) {
     <div className={styles.legend}>
       <div>
         <LegendItem
-          style='ended'
+          status="downloaded"
           name={translate('DownloadedAndMonitored')}
+          isAgendaView={isAgendaView}
+          fullColorEvents={fullColorEvents}
           colorImpairedMode={colorImpairedMode}
         />
 
         <LegendItem
-          style='availNotMonitored'
+          status="unmonitored"
           name={translate('DownloadedButNotMonitored')}
+          isAgendaView={isAgendaView}
+          fullColorEvents={fullColorEvents}
           colorImpairedMode={colorImpairedMode}
         />
       </div>
 
       <div>
         <LegendItem
-          style='missingMonitored'
+          status="missingMonitored"
           name={translate('MissingMonitoredAndConsideredAvailable')}
+          isAgendaView={isAgendaView}
+          fullColorEvents={fullColorEvents}
           colorImpairedMode={colorImpairedMode}
         />
 
         <LegendItem
-          style='missingUnmonitored'
+          status="missingUnmonitored"
           name={translate('MissingNotMonitored')}
+          isAgendaView={isAgendaView}
+          fullColorEvents={fullColorEvents}
           colorImpairedMode={colorImpairedMode}
         />
       </div>
 
       <div>
         <LegendItem
-          style='queue'
+          status="queue"
           name={translate('Queued')}
+          isAgendaView={isAgendaView}
+          fullColorEvents={fullColorEvents}
           colorImpairedMode={colorImpairedMode}
         />
 
         <LegendItem
-          style='continuing'
+          status="continuing"
           name={translate('Unreleased')}
+          isAgendaView={isAgendaView}
+          fullColorEvents={fullColorEvents}
           colorImpairedMode={colorImpairedMode}
         />
       </div>
+
       {
         iconsToShow.length > 0 &&
           <div>
@@ -79,7 +96,9 @@ function Legend(props) {
 }
 
 Legend.propTypes = {
+  view: PropTypes.string.isRequired,
   showCutoffUnmetIcon: PropTypes.bool.isRequired,
+  fullColorEvents: PropTypes.bool.isRequired,
   colorImpairedMode: PropTypes.bool.isRequired
 };
 

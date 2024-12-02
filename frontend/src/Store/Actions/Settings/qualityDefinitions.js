@@ -77,8 +77,10 @@ export default {
 
       const promise = createAjaxRequest({
         method: 'PUT',
-        url: '/qualityDefinition/update',
-        data: JSON.stringify(upatedDefinitions)
+        url: '/qualitydefinition/update',
+        data: JSON.stringify(upatedDefinitions),
+        contentType: 'application/json',
+        dataType: 'json'
       }).request;
 
       promise.done((data) => {

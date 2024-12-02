@@ -8,7 +8,7 @@ namespace NzbDrone.Core.Datastore.Migration
     {
         protected override void MainDbUpgrade()
         {
-            //Cleanup cases of Sonarr Interference with Radarr db
+            // Cleanup cases of Sonarr Interference with Radarr db
             if (Schema.Table("PendingReleases").Column("Reason").Exists())
             {
                 Delete.Column("Reason").FromTable("PendingReleases");
@@ -21,7 +21,7 @@ namespace NzbDrone.Core.Datastore.Migration
             Rename.Column("EnableSearch").OnTable("Indexers").To("EnableAutomaticSearch");
             Alter.Table("Indexers").AddColumn("EnableInteractiveSearch").AsBoolean().Nullable();
 
-            Execute.Sql("UPDATE Indexers SET EnableInteractiveSearch = EnableAutomaticSearch");
+            Execute.Sql("UPDATE \"Indexers\" SET \"EnableInteractiveSearch\" = \"EnableAutomaticSearch\"");
 
             Alter.Table("Indexers").AlterColumn("EnableInteractiveSearch").AsBoolean().NotNullable();
 

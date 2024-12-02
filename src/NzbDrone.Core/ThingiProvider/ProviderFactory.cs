@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FluentValidation.Results;
+using Microsoft.Extensions.DependencyInjection;
 using NLog;
-using NzbDrone.Common.Composition;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.ThingiProvider.Events;
@@ -15,7 +15,7 @@ namespace NzbDrone.Core.ThingiProvider
         where TProvider : IProvider
     {
         private readonly IProviderRepository<TProviderDefinition> _providerRepository;
-        private readonly IContainer _container;
+        private readonly IServiceProvider _container;
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
 
@@ -23,7 +23,7 @@ namespace NzbDrone.Core.ThingiProvider
 
         protected ProviderFactory(IProviderRepository<TProviderDefinition> providerRepository,
                                   IEnumerable<TProvider> providers,
-                                  IContainer container,
+                                  IServiceProvider container,
                                   IEventAggregator eventAggregator,
                                   Logger logger)
         {
@@ -91,16 +91,32 @@ namespace NzbDrone.Core.ThingiProvider
             return Active().Select(GetInstance).ToList();
         }
 
+        public bool Exists(int id)
+        {
+            return _providerRepository.Find(id) != null;
+        }
+
         public TProviderDefinition Get(int id)
         {
             return _providerRepository.Get(id);
         }
 
+        public IEnumerable<TProviderDefinition> Get(IEnumerable<int> ids)
+        {
+            return _providerRepository.Get(ids);
+        }
+
+        public TProviderDefinition Find(int id)
+        {
+            return _providerRepository.Find(id);
+        }
+
         public virtual TProviderDefinition Create(TProviderDefinition definition)
         {
-            var addedDefinition = _providerRepository.Insert(definition);
-            _eventAggregator.PublishEvent(new ProviderAddedEvent<TProvider>(definition));
-            return addedDefinition;
+            var result = _providerRepository.Insert(definition);
+            _eventAggregator.PublishEvent(new ProviderAddedEvent<TProvider>(result));
+
+            return result;
         }
 
         public virtual void Update(TProviderDefinition definition)
@@ -109,16 +125,38 @@ namespace NzbDrone.Core.ThingiProvider
             _eventAggregator.PublishEvent(new ProviderUpdatedEvent<TProvider>(definition));
         }
 
+        public virtual IEnumerable<TProviderDefinition> Update(IEnumerable<TProviderDefinition> definitions)
+        {
+            _providerRepository.UpdateMany(definitions.ToList());
+
+            foreach (var definition in definitions)
+            {
+                _eventAggregator.PublishEvent(new ProviderUpdatedEvent<TProvider>(definition));
+            }
+
+            return definitions;
+        }
+
         public void Delete(int id)
         {
             _providerRepository.Delete(id);
             _eventAggregator.PublishEvent(new ProviderDeletedEvent<TProvider>(id));
         }
 
+        public void Delete(IEnumerable<int> ids)
+        {
+            _providerRepository.DeleteMany(ids);
+
+            foreach (var id in ids)
+            {
+                _eventAggregator.PublishEvent(new ProviderDeletedEvent<TProvider>(id));
+            }
+        }
+
         public TProvider GetInstance(TProviderDefinition definition)
         {
             var type = GetImplementation(definition);
-            var instance = (TProvider)_container.Resolve(type);
+            var instance = (TProvider)_container.GetRequiredService(type);
             instance.Definition = definition;
             SetProviderCharacteristics(instance, definition);
             return instance;
@@ -158,14 +196,13 @@ namespace NzbDrone.Core.ThingiProvider
             definition.Message = provider.Message;
         }
 
-        //TODO: Remove providers even if the ConfigContract can't be deserialized (this will fail to remove providers if the settings can't be deserialized).
         private void RemoveMissingImplementations()
         {
             var storedProvider = _providerRepository.All();
 
             foreach (var invalidDefinition in storedProvider.Where(def => GetImplementation(def) == null))
             {
-                _logger.Debug("Removing {0} ", invalidDefinition.Name);
+                _logger.Warn("Removing {0}", invalidDefinition.Name);
                 _providerRepository.Delete(invalidDefinition);
             }
         }

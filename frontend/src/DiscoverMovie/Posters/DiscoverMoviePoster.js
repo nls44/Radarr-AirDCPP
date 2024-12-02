@@ -2,10 +2,14 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import CheckInput from 'Components/Form/CheckInput';
 import Icon from 'Components/Icon';
+import ImdbRating from 'Components/ImdbRating';
 import Label from 'Components/Label';
 import IconButton from 'Components/Link/IconButton';
 import Link from 'Components/Link/Link';
+import RottenTomatoRating from 'Components/RottenTomatoRating';
+import TmdbRating from 'Components/TmdbRating';
 import Popover from 'Components/Tooltip/Popover';
+import TraktRating from 'Components/TraktRating';
 import AddNewDiscoverMovieModal from 'DiscoverMovie/AddNewDiscoverMovieModal';
 import ExcludeMovieModal from 'DiscoverMovie/Exclusion/ExcludeMovieModal';
 import { icons } from 'Helpers/Props';
@@ -35,31 +39,31 @@ class DiscoverMoviePoster extends Component {
 
   onPress = () => {
     this.setState({ isNewAddMovieModalOpen: true });
-  }
+  };
 
   onAddMovieModalClose = () => {
     this.setState({ isNewAddMovieModalOpen: false });
-  }
+  };
 
   onExcludeMoviePress = () => {
     this.setState({ isExcludeMovieModalOpen: true });
-  }
+  };
 
   onExcludeMovieModalClose = () => {
     this.setState({ isExcludeMovieModalOpen: false });
-  }
+  };
 
   onPosterLoad = () => {
     if (this.state.hasPosterError) {
       this.setState({ hasPosterError: false });
     }
-  }
+  };
 
   onPosterLoadError = () => {
     if (!this.state.hasPosterError) {
       this.setState({ hasPosterError: true });
     }
-  }
+  };
 
   onChange = ({ value, shiftKey }) => {
     const {
@@ -68,7 +72,7 @@ class DiscoverMoviePoster extends Component {
     } = this.props;
 
     onSelectedChange({ id: tmdbId, value, shiftKey });
-  }
+  };
 
   //
   // Render
@@ -86,12 +90,18 @@ class DiscoverMoviePoster extends Component {
       posterWidth,
       posterHeight,
       showTitle,
+      showTmdbRating,
+      showImdbRating,
+      showRottenTomatoesRating,
+      showTraktRating,
+      ratings,
       isExisting,
       isExcluded,
       isSelected,
       showRelativeDates,
       shortDateFormat,
       timeFormat,
+      movieRuntimeFormat,
       ...otherProps
     } = this.props;
 
@@ -110,7 +120,7 @@ class DiscoverMoviePoster extends Component {
 
     return (
       <div className={styles.content}>
-        <div className={styles.posterContainer}>
+        <div className={styles.posterContainer} title={title}>
           {
             <div className={styles.editorSelect}>
               <CheckInput
@@ -158,6 +168,14 @@ class DiscoverMoviePoster extends Component {
               />
           }
 
+          {
+            isExisting &&
+              <div
+                className={styles.existing}
+                title={translate('Existing')}
+              />
+          }
+
           <Link
             className={styles.link}
             style={elementStyle}
@@ -183,17 +201,46 @@ class DiscoverMoviePoster extends Component {
           </Link>
         </div>
 
-        {
-          showTitle &&
-            <div className={styles.title}>
-              {title}
-            </div>
-        }
+        {showTitle ?
+          <div className={styles.title} title={title}>
+            {title}
+          </div> :
+          null}
+
+        {showTmdbRating && !!ratings.tmdb ? (
+          <div className={styles.title}>
+            <TmdbRating ratings={ratings} iconSize={12} />
+          </div>
+        ) : null}
+
+        {showImdbRating && !!ratings.imdb ? (
+          <div className={styles.title}>
+            <ImdbRating ratings={ratings} iconSize={12} />
+          </div>
+        ) : null}
+
+        {showRottenTomatoesRating && !!ratings.rottenTomatoes ? (
+          <div className={styles.title}>
+            <RottenTomatoRating ratings={ratings} iconSize={12} />
+          </div>
+        ) : null}
+
+        {showTraktRating && !!ratings.trakt ? (
+          <div className={styles.title}>
+            <TraktRating ratings={ratings} iconSize={12} />
+          </div>
+        ) : null}
 
         <DiscoverMoviePosterInfo
           showRelativeDates={showRelativeDates}
           shortDateFormat={shortDateFormat}
           timeFormat={timeFormat}
+          movieRuntimeFormat={movieRuntimeFormat}
+          ratings={ratings}
+          showTmdbRating={showTmdbRating}
+          showImdbRating={showImdbRating}
+          showRottenTomatoesRating={showRottenTomatoesRating}
+          showTraktRating={showTraktRating}
           {...otherProps}
         />
 
@@ -233,9 +280,15 @@ DiscoverMoviePoster.propTypes = {
   posterWidth: PropTypes.number.isRequired,
   posterHeight: PropTypes.number.isRequired,
   showTitle: PropTypes.bool.isRequired,
+  showTmdbRating: PropTypes.bool.isRequired,
+  showImdbRating: PropTypes.bool.isRequired,
+  showRottenTomatoesRating: PropTypes.bool.isRequired,
+  showTraktRating: PropTypes.bool.isRequired,
+  ratings: PropTypes.object.isRequired,
   showRelativeDates: PropTypes.bool.isRequired,
   shortDateFormat: PropTypes.string.isRequired,
   timeFormat: PropTypes.string.isRequired,
+  movieRuntimeFormat: PropTypes.string.isRequired,
   isExisting: PropTypes.bool.isRequired,
   isExcluded: PropTypes.bool.isRequired,
   isSelected: PropTypes.bool,

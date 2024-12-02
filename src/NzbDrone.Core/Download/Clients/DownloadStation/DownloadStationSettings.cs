@@ -2,7 +2,6 @@ using System.Text.RegularExpressions;
 using FluentValidation;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Annotations;
-using NzbDrone.Core.ThingiProvider;
 using NzbDrone.Core.Validation;
 
 namespace NzbDrone.Core.Download.Clients.DownloadStation
@@ -26,9 +25,9 @@ namespace NzbDrone.Core.Download.Clients.DownloadStation
         }
     }
 
-    public class DownloadStationSettings : IProviderConfig
+    public class DownloadStationSettings : DownloadClientSettingsBase<DownloadStationSettings>
     {
-        private static readonly DownloadStationSettingsValidator Validator = new DownloadStationSettingsValidator();
+        private static readonly DownloadStationSettingsValidator Validator = new ();
 
         [FieldDefinition(0, Label = "Host", Type = FieldType.Textbox)]
         public string Host { get; set; }
@@ -36,20 +35,21 @@ namespace NzbDrone.Core.Download.Clients.DownloadStation
         [FieldDefinition(1, Label = "Port", Type = FieldType.Textbox)]
         public int Port { get; set; }
 
-        [FieldDefinition(2, Label = "Username", Type = FieldType.Textbox, Privacy = PrivacyLevel.UserName)]
+        [FieldDefinition(2, Label = "UseSsl", Type = FieldType.Checkbox, HelpText = "DownloadClientSettingsUseSslHelpText")]
+        [FieldToken(TokenField.HelpText, "UseSsl", "clientName", "Download Station")]
+        public bool UseSsl { get; set; }
+
+        [FieldDefinition(3, Label = "Username", Type = FieldType.Textbox, Privacy = PrivacyLevel.UserName)]
         public string Username { get; set; }
 
-        [FieldDefinition(3, Label = "Password", Type = FieldType.Password, Privacy = PrivacyLevel.Password)]
+        [FieldDefinition(4, Label = "Password", Type = FieldType.Password, Privacy = PrivacyLevel.Password)]
         public string Password { get; set; }
 
-        [FieldDefinition(4, Label = "Category", Type = FieldType.Textbox, HelpText = "Adding a category specific to Radarr avoids conflicts with unrelated downloads, but it's optional. Creates a [category] subdirectory in the output directory.")]
+        [FieldDefinition(5, Label = "Category", Type = FieldType.Textbox, HelpText = "DownloadClientSettingsCategorySubFolderHelpText")]
         public string TvCategory { get; set; }
 
-        [FieldDefinition(5, Label = "Directory", Type = FieldType.Textbox, HelpText = "Optional shared folder to put downloads into, leave blank to use the default Download Station location")]
+        [FieldDefinition(6, Label = "Directory", Type = FieldType.Textbox, HelpText = "DownloadClientDownloadStationSettingsDirectoryHelpText")]
         public string TvDirectory { get; set; }
-
-        [FieldDefinition(6, Label = "Use SSL", Type = FieldType.Checkbox)]
-        public bool UseSsl { get; set; }
 
         public DownloadStationSettings()
         {
@@ -57,7 +57,7 @@ namespace NzbDrone.Core.Download.Clients.DownloadStation
             Port = 5000;
         }
 
-        public NzbDroneValidationResult Validate()
+        public override NzbDroneValidationResult Validate()
         {
             return new NzbDroneValidationResult(Validator.Validate(this));
         }

@@ -33,8 +33,6 @@ namespace NzbDrone.Integration.Test.ApiTests
         [Order(0)]
         public void add_movie_without_profileid_should_return_badrequest()
         {
-            IgnoreOnMonoVersions("5.12", "5.14");
-
             EnsureNoMovie(680, "Pulp Fiction");
 
             var movie = Movies.Lookup("imdb:tt0110912").Single();
@@ -48,8 +46,6 @@ namespace NzbDrone.Integration.Test.ApiTests
         [Order(0)]
         public void add_movie_without_path_should_return_badrequest()
         {
-            IgnoreOnMonoVersions("5.12", "5.14");
-
             EnsureNoMovie(680, "Pulp Fiction");
 
             var movie = Movies.Lookup("imdb:tt0110912").Single();
@@ -85,9 +81,31 @@ namespace NzbDrone.Integration.Test.ApiTests
             EnsureMovie(680, "Pulp Fiction");
             EnsureMovie(155, "The Dark Knight");
 
-            Movies.All().Should().NotBeNullOrEmpty();
-            Movies.All().Should().Contain(v => v.ImdbId == "tt0110912");
-            Movies.All().Should().Contain(v => v.ImdbId == "tt0468569");
+            var movies = Movies.All();
+
+            movies.Should().NotBeNullOrEmpty();
+            movies.Should().Contain(v => v.ImdbId == "tt0110912");
+            movies.Should().Contain(v => v.ImdbId == "tt0468569");
+            movies.Should().Contain(v => v.Images.All(i => i.RemoteUrl.Contains("https://image.tmdb.org")));
+        }
+
+        [Test]
+        [Order(2)]
+        public void get_movie_by_tmdbid()
+        {
+            EnsureMovie(680, "Pulp Fiction");
+            EnsureMovie(155, "The Dark Knight");
+
+            var queryParams = new Dictionary<string, object>()
+            {
+                { "tmdbId", 680 }
+            };
+
+            var movies = Movies.All(queryParams);
+
+            movies.Should().NotBeNullOrEmpty();
+            movies.Should().Contain(v => v.ImdbId == "tt0110912");
+            movies.Should().Contain(v => v.Images.All(i => i.RemoteUrl.Contains("https://image.tmdb.org")));
         }
 
         [Test]
@@ -104,8 +122,6 @@ namespace NzbDrone.Integration.Test.ApiTests
         [Test]
         public void get_movie_by_unknown_id_should_return_404()
         {
-            IgnoreOnMonoVersions("5.12", "5.14");
-
             var result = Movies.InvalidGet(1000000);
         }
 

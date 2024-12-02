@@ -1,5 +1,5 @@
 using System;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 using NzbDrone.Core.Datastore;
 
 namespace NzbDrone.Core.Qualities
@@ -9,8 +9,6 @@ namespace NzbDrone.Core.Qualities
         public Quality Quality { get; set; }
 
         public Revision Revision { get; set; }
-
-        public string HardcodedSubs { get; set; }
 
         [JsonIgnore]
         public QualityDetectionSource SourceDetectionSource { get; set; }
@@ -45,7 +43,7 @@ namespace NzbDrone.Core.Qualities
             // Overflow is fine, just wrap
             unchecked
             {
-                int hash = 17;
+                var hash = 17;
                 hash = (hash * 23) + Revision.GetHashCode();
                 hash = (hash * 23) + Quality.GetHashCode();
                 return hash;

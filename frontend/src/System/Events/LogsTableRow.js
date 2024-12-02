@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import Icon from 'Components/Icon';
-import RelativeDateCellConnector from 'Components/Table/Cells/RelativeDateCellConnector';
+import RelativeDateCell from 'Components/Table/Cells/RelativeDateCell';
 import TableRowCell from 'Components/Table/Cells/TableRowCell';
 import TableRowButton from 'Components/Table/TableRowButton';
 import { icons } from 'Helpers/Props';
@@ -46,11 +46,11 @@ class LogsTableRow extends Component {
     if (!this.state.isDetailsModalOpen) {
       this.setState({ isDetailsModalOpen: true });
     }
-  }
+  };
 
   onModalClose = () => {
     this.setState({ isDetailsModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -58,9 +58,9 @@ class LogsTableRow extends Component {
   render() {
     const {
       level,
+      time,
       logger,
       message,
-      time,
       exception,
       columns
     } = this.props;
@@ -96,6 +96,15 @@ class LogsTableRow extends Component {
               );
             }
 
+            if (name === 'time') {
+              return (
+                <RelativeDateCell
+                  key={name}
+                  date={time}
+                />
+              );
+            }
+
             if (name === 'logger') {
               return (
                 <TableRowCell key={name}>
@@ -109,15 +118,6 @@ class LogsTableRow extends Component {
                 <TableRowCell key={name}>
                   {message}
                 </TableRowCell>
-              );
-            }
-
-            if (name === 'time') {
-              return (
-                <RelativeDateCellConnector
-                  key={name}
-                  date={time}
-                />
               );
             }
 
@@ -148,9 +148,9 @@ class LogsTableRow extends Component {
 
 LogsTableRow.propTypes = {
   level: PropTypes.string.isRequired,
+  time: PropTypes.string.isRequired,
   logger: PropTypes.string.isRequired,
   message: PropTypes.string.isRequired,
-  time: PropTypes.string.isRequired,
   exception: PropTypes.string,
   columns: PropTypes.arrayOf(PropTypes.object).isRequired
 };

@@ -30,18 +30,18 @@ class ImportLists extends Component {
 
   onAddImportListPress = () => {
     this.setState({ isAddImportListModalOpen: true });
-  }
+  };
 
-  onAddImportListModalClose = ({ importListSelected = false } = {}) => {
+  onAddImportListModalClose = ({ listSelected = false } = {}) => {
     this.setState({
       isAddImportListModalOpen: false,
-      isEditImportListModalOpen: importListSelected
+      isEditImportListModalOpen: listSelected
     });
-  }
+  };
 
   onEditImportListModalClose = () => {
     this.setState({ isEditImportListModalOpen: false });
-  }
+  };
 
   //
   // Render
@@ -49,6 +49,7 @@ class ImportLists extends Component {
   render() {
     const {
       items,
+      tagList,
       onConfirmDeleteImportList,
       ...otherProps
     } = this.props;
@@ -59,18 +60,19 @@ class ImportLists extends Component {
     } = this.state;
 
     return (
-      <FieldSet legend={translate('Lists')}>
+      <FieldSet legend={translate('ImportLists')} >
         <PageSectionContent
-          errorMessage={translate('UnableToLoadLists')}
+          errorMessage={translate('ImportListsLoadError')}
           {...otherProps}
         >
-          <div className={styles.importLists}>
+          <div className={styles.lists}>
             {
               items.map((item) => {
                 return (
                   <ImportList
                     key={item.id}
                     {...item}
+                    tagList={tagList}
                     onConfirmDeleteImportList={onConfirmDeleteImportList}
                   />
                 );
@@ -78,7 +80,7 @@ class ImportLists extends Component {
             }
 
             <Card
-              className={styles.addImportList}
+              className={styles.addList}
               onPress={this.onAddImportListPress}
             >
               <div className={styles.center}>
@@ -109,6 +111,7 @@ ImportLists.propTypes = {
   isFetching: PropTypes.bool.isRequired,
   error: PropTypes.object,
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
+  tagList: PropTypes.arrayOf(PropTypes.object).isRequired,
   onConfirmDeleteImportList: PropTypes.func.isRequired
 };
 

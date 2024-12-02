@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Remote;
@@ -29,7 +29,7 @@ namespace NzbDrone.Automation.Test.PageModel
 
         public void WaitForNoSpinner(int timeout = 30)
         {
-            //give the spinner some time to show up.
+            // give the spinner some time to show up.
             Thread.Sleep(200);
 
             var wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(timeout));
@@ -37,8 +37,12 @@ namespace NzbDrone.Automation.Test.PageModel
             {
                 try
                 {
-                    IWebElement element = d.FindElement(By.ClassName("followingBalls"));
+                    var element = d.FindElement(By.ClassName("followingBalls"));
                     return !element.Displayed;
+                }
+                catch (StaleElementReferenceException)
+                {
+                    return true;
                 }
                 catch (NoSuchElementException)
                 {
@@ -52,6 +56,8 @@ namespace NzbDrone.Automation.Test.PageModel
         public IWebElement CalendarNavIcon => Find(By.LinkText("Calendar"));
 
         public IWebElement ActivityNavIcon => Find(By.LinkText("Activity"));
+
+        public IWebElement WantedNavIcon => Find(By.LinkText("Wanted"));
 
         public IWebElement SettingNavIcon => Find(By.LinkText("Settings"));
 

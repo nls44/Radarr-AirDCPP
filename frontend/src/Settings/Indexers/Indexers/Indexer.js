@@ -4,6 +4,7 @@ import Card from 'Components/Card';
 import Label from 'Components/Label';
 import IconButton from 'Components/Link/IconButton';
 import ConfirmModal from 'Components/Modal/ConfirmModal';
+import TagList from 'Components/TagList';
 import { icons, kinds } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import EditIndexerModalConnector from './EditIndexerModalConnector';
@@ -28,26 +29,26 @@ class Indexer extends Component {
 
   onEditIndexerPress = () => {
     this.setState({ isEditIndexerModalOpen: true });
-  }
+  };
 
   onEditIndexerModalClose = () => {
     this.setState({ isEditIndexerModalOpen: false });
-  }
+  };
 
   onDeleteIndexerPress = () => {
     this.setState({
       isEditIndexerModalOpen: false,
       isDeleteIndexerModalOpen: true
     });
-  }
+  };
 
-  onDeleteIndexerModalClose= () => {
+  onDeleteIndexerModalClose = () => {
     this.setState({ isDeleteIndexerModalOpen: false });
-  }
+  };
 
   onConfirmDeleteIndexer = () => {
     this.props.onConfirmDeleteIndexer(this.props.id);
-  }
+  };
 
   onCloneIndexerPress = () => {
     const {
@@ -56,7 +57,7 @@ class Indexer extends Component {
     } = this.props;
 
     onCloneIndexerPress(id);
-  }
+  };
 
   //
   // Render
@@ -68,6 +69,8 @@ class Indexer extends Component {
       enableRss,
       enableAutomaticSearch,
       enableInteractiveSearch,
+      tags,
+      tagList,
       supportsRss,
       supportsSearch,
       priority,
@@ -98,7 +101,7 @@ class Indexer extends Component {
           {
             supportsRss && enableRss &&
               <Label kind={kinds.SUCCESS}>
-                {translate('RSS')}
+                {translate('Rss')}
               </Label>
           }
 
@@ -133,6 +136,11 @@ class Indexer extends Component {
           }
         </div>
 
+        <TagList
+          tags={tags}
+          tagList={tagList}
+        />
+
         <EditIndexerModalConnector
           id={id}
           isOpen={this.state.isEditIndexerModalOpen}
@@ -144,7 +152,7 @@ class Indexer extends Component {
           isOpen={this.state.isDeleteIndexerModalOpen}
           kind={kinds.DANGER}
           title={translate('DeleteIndexer')}
-          message={translate('DeleteIndexerMessageText', [name])}
+          message={translate('DeleteIndexerMessageText', { name })}
           confirmLabel={translate('Delete')}
           onConfirm={this.onConfirmDeleteIndexer}
           onCancel={this.onDeleteIndexerModalClose}
@@ -160,6 +168,8 @@ Indexer.propTypes = {
   enableRss: PropTypes.bool.isRequired,
   enableAutomaticSearch: PropTypes.bool.isRequired,
   enableInteractiveSearch: PropTypes.bool.isRequired,
+  tags: PropTypes.arrayOf(PropTypes.number).isRequired,
+  tagList: PropTypes.arrayOf(PropTypes.object).isRequired,
   supportsRss: PropTypes.bool.isRequired,
   supportsSearch: PropTypes.bool.isRequired,
   onCloneIndexerPress: PropTypes.func.isRequired,

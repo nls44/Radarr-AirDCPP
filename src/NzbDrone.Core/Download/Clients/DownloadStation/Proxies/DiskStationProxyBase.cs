@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
 using NLog;
 using NzbDrone.Common.Cache;
 using NzbDrone.Common.Http;
@@ -131,7 +132,7 @@ namespace NzbDrone.Core.Download.Clients.DownloadStation.Proxies
         {
             var authInfo = GetApiInfo(DiskStationApi.Auth, settings);
 
-            var requestBuilder = BuildRequest(settings, authInfo, "login", 2);
+            var requestBuilder = BuildRequest(settings, authInfo, "login", authInfo.MaxVersion >= 7 ? 6 : 2);
             requestBuilder.AddQueryParam("account", settings.Username);
             requestBuilder.AddQueryParam("passwd", settings.Password);
             requestBuilder.AddQueryParam("format", "sid");
@@ -142,15 +143,19 @@ namespace NzbDrone.Core.Download.Clients.DownloadStation.Proxies
             return authResponse.Data.SId;
         }
 
-        protected HttpRequestBuilder BuildRequest(DownloadStationSettings settings, string methodName, int apiVersion, HttpMethod httpVerb = HttpMethod.GET)
+        protected HttpRequestBuilder BuildRequest(DownloadStationSettings settings, string methodName, int apiVersion, HttpMethod httpVerb = null)
         {
+            httpVerb ??= HttpMethod.Get;
+
             var info = GetApiInfo(_apiType, settings);
 
             return BuildRequest(settings, info, methodName, apiVersion, httpVerb);
         }
 
-        private HttpRequestBuilder BuildRequest(DownloadStationSettings settings, DiskStationApiInfo apiInfo, string methodName, int apiVersion, HttpMethod httpVerb = HttpMethod.GET)
+        private HttpRequestBuilder BuildRequest(DownloadStationSettings settings, DiskStationApiInfo apiInfo, string methodName, int apiVersion, HttpMethod httpVerb = null)
         {
+            httpVerb ??= HttpMethod.Get;
+
             var requestBuilder = new HttpRequestBuilder(settings.UseSsl, settings.Host, settings.Port).Resource($"webapi/{apiInfo.Path}");
             requestBuilder.Method = httpVerb;
             requestBuilder.LogResponseContent = true;
@@ -163,11 +168,18 @@ namespace NzbDrone.Core.Download.Clients.DownloadStation.Proxies
                 throw new ArgumentOutOfRangeException(nameof(apiVersion));
             }
 
-            if (httpVerb == HttpMethod.POST)
+            if (httpVerb == HttpMethod.Post)
             {
                 if (apiInfo.NeedsAuthentication)
                 {
-                    requestBuilder.AddFormParameter("_sid", _sessionCache.Get(GenerateSessionCacheKey(settings), () => AuthenticateClient(settings), TimeSpan.FromHours(6)));
+                    if (_apiType == DiskStationApi.DownloadStation2Task)
+                    {
+                        requestBuilder.AddQueryParam("_sid", _sessionCache.Get(GenerateSessionCacheKey(settings), () => AuthenticateClient(settings), TimeSpan.FromHours(6)));
+                    }
+                    else
+                    {
+                        requestBuilder.AddFormParameter("_sid", _sessionCache.Get(GenerateSessionCacheKey(settings), () => AuthenticateClient(settings), TimeSpan.FromHours(6)));
+                    }
                 }
 
                 requestBuilder.AddFormParameter("api", apiInfo.Name);
@@ -237,7 +249,14 @@ namespace NzbDrone.Core.Download.Clients.DownloadStation.Proxies
 
                 if (info == null)
                 {
-                    throw new DownloadClientException("Info of {0} not found on {1}:{2}", api, settings.Host, settings.Port);
+                    if (api == DiskStationApi.DownloadStation2Task)
+                    {
+                        _logger.Warn("Info of {0} not found on {1}:{2}", api, settings.Host, settings.Port);
+                    }
+                    else
+                    {
+                        throw new DownloadClientException("Info of {0} not found on {1}:{2}", api, settings.Host, settings.Port);
+                    }
                 }
             }
 

@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using FluentValidation.Results;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Localization;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Notifications.Slack.Payloads;
 using NzbDrone.Core.Validation;
@@ -11,10 +14,12 @@ namespace NzbDrone.Core.Notifications.Slack
     public class Slack : NotificationBase<SlackSettings>
     {
         private readonly ISlackProxy _proxy;
+        private readonly ILocalizationService _localizationService;
 
-        public Slack(ISlackProxy proxy)
+        public Slack(ISlackProxy proxy, ILocalizationService localizationService)
         {
             _proxy = proxy;
+            _localizationService = localizationService;
         }
 
         public override string Name => "Slack";
@@ -23,15 +28,15 @@ namespace NzbDrone.Core.Notifications.Slack
         public override void OnGrab(GrabMessage message)
         {
             var attachments = new List<Attachment>
-                            {
-                                new Attachment
-                                {
-                                    Fallback = message.Message,
-                                    Title = message.Movie.Title,
-                                    Text = message.Message,
-                                    Color = "warning"
-                                }
-                            };
+            {
+                new ()
+                {
+                    Fallback = message.Message,
+                    Title = message.Movie.Title,
+                    Text = message.Message,
+                    Color = "warning"
+                }
+            };
             var payload = CreatePayload($"Grabbed: {message.Message}", attachments);
 
             _proxy.SendPayload(payload, Settings);
@@ -40,31 +45,66 @@ namespace NzbDrone.Core.Notifications.Slack
         public override void OnDownload(DownloadMessage message)
         {
             var attachments = new List<Attachment>
-                                {
-                                    new Attachment
-                                    {
-                                        Fallback = message.Message,
-                                        Title = message.Movie.Title,
-                                        Text = message.Message,
-                                        Color = "good"
-                                    }
-                                };
+            {
+                new ()
+                {
+                    Fallback = message.Message,
+                    Title = message.Movie.Title,
+                    Text = message.Message,
+                    Color = "good"
+                }
+            };
             var payload = CreatePayload($"Imported: {message.Message}", attachments);
 
             _proxy.SendPayload(payload, Settings);
         }
 
-        public override void OnMovieRename(Movie movie)
+        public override void OnMovieRename(Movie movie, List<RenamedMovieFile> renamedFiles)
         {
-            var attachments = new List<Attachment>
-                                {
-                                    new Attachment
-                                    {
-                                        Title = movie.Title,
-                                    }
-                                };
+            var attachments = new List<Attachment>();
+
+            foreach (var renamedFile in renamedFiles)
+            {
+                attachments.Add(new Attachment
+                {
+                    Title = movie.Title,
+                    Text = renamedFile.PreviousRelativePath + " renamed to " + renamedFile.MovieFile.RelativePath,
+                });
+            }
 
             var payload = CreatePayload("Renamed", attachments);
+
+            _proxy.SendPayload(payload, Settings);
+        }
+
+        public override void OnMovieFileDelete(MovieFileDeleteMessage deleteMessage)
+        {
+            var attachments = new List<Attachment>
+            {
+                new ()
+                {
+                    Title = deleteMessage.Movie.Title,
+                    Text = Path.Combine(deleteMessage.Movie.Path, deleteMessage.MovieFile.RelativePath)
+                }
+            };
+
+            var payload = CreatePayload("Movie File Deleted", attachments);
+
+            _proxy.SendPayload(payload, Settings);
+        }
+
+        public override void OnMovieDelete(MovieDeleteMessage deleteMessage)
+        {
+            var attachments = new List<Attachment>
+            {
+                new ()
+                {
+                    Title = deleteMessage.Movie.Title,
+                    Text = deleteMessage.DeletedFilesMessage
+                }
+            };
+
+            var payload = CreatePayload("Movie Deleted", attachments);
 
             _proxy.SendPayload(payload, Settings);
         }
@@ -72,16 +112,67 @@ namespace NzbDrone.Core.Notifications.Slack
         public override void OnHealthIssue(HealthCheck.HealthCheck healthCheck)
         {
             var attachments = new List<Attachment>
-                              {
-                                  new Attachment
-                                  {
-                                      Title = healthCheck.Source.Name,
-                                      Text = healthCheck.Message,
-                                      Color = healthCheck.Type == HealthCheck.HealthCheckResult.Warning ? "warning" : "danger"
-                                  }
-                              };
+            {
+                new ()
+                {
+                    Title = healthCheck.Source.Name,
+                    Text = healthCheck.Message,
+                    Color = healthCheck.Type == HealthCheck.HealthCheckResult.Warning ? "warning" : "danger"
+                }
+            };
 
             var payload = CreatePayload("Health Issue", attachments);
+
+            _proxy.SendPayload(payload, Settings);
+        }
+
+        public override void OnHealthRestored(HealthCheck.HealthCheck previousCheck)
+        {
+            var attachments = new List<Attachment>
+            {
+                new ()
+                {
+                    Title = previousCheck.Source.Name,
+                    Text = $"The following issue is now resolved: {previousCheck.Message}",
+                    Color = "good"
+                }
+            };
+
+            var payload = CreatePayload("Health Issue Resolved", attachments);
+
+            _proxy.SendPayload(payload, Settings);
+        }
+
+        public override void OnApplicationUpdate(ApplicationUpdateMessage updateMessage)
+        {
+            var attachments = new List<Attachment>
+            {
+                new ()
+                {
+                    Title = Environment.MachineName,
+                    Text = updateMessage.Message,
+                    Color = "good"
+                }
+            };
+
+            var payload = CreatePayload("Application Updated", attachments);
+
+            _proxy.SendPayload(payload, Settings);
+        }
+
+        public override void OnManualInteractionRequired(ManualInteractionRequiredMessage message)
+        {
+            var attachments = new List<Attachment>
+            {
+                new ()
+                {
+                    Title = Environment.MachineName,
+                    Text = message.Message,
+                    Color = "warning"
+                }
+            };
+
+            var payload = CreatePayload("Manual Interaction Required", attachments);
 
             _proxy.SendPayload(payload, Settings);
         }
@@ -107,7 +198,7 @@ namespace NzbDrone.Core.Notifications.Slack
             }
             catch (SlackExeption ex)
             {
-                return new NzbDroneValidationFailure("Unable to post", ex.Message);
+                return new NzbDroneValidationFailure("Unable to post", _localizationService.GetLocalizedString("NotificationsValidationUnableToSendTestMessage", new Dictionary<string, object> { { "exceptionMessage", ex.Message } }));
             }
 
             return null;

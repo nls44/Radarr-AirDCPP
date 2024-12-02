@@ -5,9 +5,8 @@ import { createSelector } from 'reselect';
 import * as commandNames from 'Commands/commandNames';
 import withScrollPosition from 'Components/withScrollPosition';
 import { executeCommand } from 'Store/Actions/commandActions';
-import { addImportExclusions, addMovies, clearAddMovie, fetchDiscoverMovies, setListMovieFilter, setListMovieSort, setListMovieTableOption, setListMovieView } from 'Store/Actions/discoverMovieActions';
+import { addImportListExclusions, addMovies, clearAddMovie, fetchDiscoverMovies, setListMovieFilter, setListMovieSort, setListMovieTableOption, setListMovieView } from 'Store/Actions/discoverMovieActions';
 import { fetchRootFolders } from 'Store/Actions/rootFolderActions';
-import { fetchImportExclusions } from 'Store/Actions/Settings/importExclusions';
 import scrollPositions from 'Store/scrollPositions';
 import createCommandExecutingSelector from 'Store/Selectors/createCommandExecutingSelector';
 import createDimensionsSelector from 'Store/Selectors/createDimensionsSelector';
@@ -17,15 +16,18 @@ import DiscoverMovie from './DiscoverMovie';
 
 function createMapStateToProps() {
   return createSelector(
+    (state) => state.discoverMovie,
     createDiscoverMovieClientSideCollectionItemsSelector('discoverMovie'),
     createCommandExecutingSelector(commandNames.IMPORT_LIST_SYNC),
     createDimensionsSelector(),
     (
+      discoverMovie,
       movies,
       isSyncingLists,
       dimensionsState
     ) => {
       return {
+        ...discoverMovie.options,
         ...movies,
         isSyncingLists,
         isSmallScreen: dimensionsState.isSmallScreen
@@ -38,10 +40,6 @@ function createMapDispatchToProps(dispatch, props) {
   return {
     dispatchFetchRootFolders() {
       dispatch(fetchRootFolders());
-    },
-
-    dispatchFetchImportExclusions() {
-      dispatch(fetchImportExclusions());
     },
 
     dispatchClearListMovie() {
@@ -72,13 +70,14 @@ function createMapDispatchToProps(dispatch, props) {
       dispatch(addMovies({ ids, addOptions }));
     },
 
-    dispatchAddImportExclusions(exclusions) {
-      dispatch(addImportExclusions(exclusions));
+    dispatchAddImportListExclusions(exclusions) {
+      dispatch(addImportListExclusions(exclusions));
     },
 
     onImportListSyncPress() {
       dispatch(executeCommand({
-        name: commandNames.IMPORT_LIST_SYNC
+        name: commandNames.IMPORT_LIST_SYNC,
+        commandFinished: this.dispatchFetchListMovies
       }));
     }
   };
@@ -92,7 +91,6 @@ class DiscoverMovieConnector extends Component {
   componentDidMount() {
     registerPagePopulator(this.repopulate);
     this.props.dispatchFetchRootFolders();
-    this.props.dispatchFetchImportExclusions();
     this.props.dispatchFetchListMovies();
   }
 
@@ -106,19 +104,19 @@ class DiscoverMovieConnector extends Component {
 
   onViewSelect = (view) => {
     this.props.dispatchSetListMovieView(view);
-  }
+  };
 
   onScroll = ({ scrollTop }) => {
     scrollPositions.discoverMovie = scrollTop;
-  }
+  };
 
   onAddMoviesPress = ({ ids, addOptions }) => {
     this.props.dispatchAddMovies(ids, addOptions);
-  }
+  };
 
   onExcludeMoviesPress =({ ids }) => {
-    this.props.dispatchAddImportExclusions({ ids });
-  }
+    this.props.dispatchAddImportListExclusions({ ids });
+  };
 
   //
   // Render
@@ -140,13 +138,12 @@ class DiscoverMovieConnector extends Component {
 DiscoverMovieConnector.propTypes = {
   isSmallScreen: PropTypes.bool.isRequired,
   view: PropTypes.string.isRequired,
-  dispatchFetchImportExclusions: PropTypes.func.isRequired,
   dispatchFetchRootFolders: PropTypes.func.isRequired,
   dispatchFetchListMovies: PropTypes.func.isRequired,
   dispatchClearListMovie: PropTypes.func.isRequired,
   dispatchSetListMovieView: PropTypes.func.isRequired,
   dispatchAddMovies: PropTypes.func.isRequired,
-  dispatchAddImportExclusions: PropTypes.func.isRequired
+  dispatchAddImportListExclusions: PropTypes.func.isRequired
 };
 
 export default withScrollPosition(

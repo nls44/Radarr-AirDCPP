@@ -1,8 +1,8 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import Alert from 'Components/Alert';
-import Link from 'Components/Link/Link';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
+import InlineMarkdown from 'Components/Markdown/InlineMarkdown';
 import PageContent from 'Components/Page/PageContent';
 import PageContentBody from 'Components/Page/PageContentBody';
 import PageToolbar from 'Components/Page/Toolbar/PageToolbar';
@@ -11,7 +11,7 @@ import PageToolbarSection from 'Components/Page/Toolbar/PageToolbarSection';
 import PageToolbarSeparator from 'Components/Page/Toolbar/PageToolbarSeparator';
 import Table from 'Components/Table/Table';
 import TableBody from 'Components/Table/TableBody';
-import { icons } from 'Helpers/Props';
+import { icons, kinds } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import LogsNavMenu from '../LogsNavMenu';
 import LogFilesTableRow from './LogFilesTableRow';
@@ -19,12 +19,12 @@ import LogFilesTableRow from './LogFilesTableRow';
 const columns = [
   {
     name: 'filename',
-    label: translate('Filename'),
+    label: () => translate('Filename'),
     isVisible: true
   },
   {
     name: 'lastWriteTime',
-    label: translate('LastWriteTime'),
+    label: () => translate('LastWriteTime'),
     isVisible: true
   },
   {
@@ -67,7 +67,7 @@ class LogFiles extends Component {
             />
 
             <PageToolbarButton
-              label={translate('Delete')}
+              label={translate('Clear')}
               iconName={icons.CLEAR}
               isSpinning={deleteFilesExecuting}
               onPress={onDeleteFilesPress}
@@ -77,13 +77,15 @@ class LogFiles extends Component {
         <PageContentBody>
           <Alert>
             <div>
-              Log files are located in: {location}
+              {translate('LogFilesLocation', {
+                location
+              })}
             </div>
 
             {
               currentLogView === 'Log Files' &&
                 <div>
-                  {translate('TheLogLevelDefault')} <Link to="/settings/general">{translate('GeneralSettings')}</Link>
+                  <InlineMarkdown data={translate('TheLogLevelDefault')} />
                 </div>
             }
           </Alert>
@@ -118,9 +120,9 @@ class LogFiles extends Component {
 
           {
             !isFetching && !items.length &&
-              <div>
+              <Alert kind={kinds.INFO}>
                 {translate('NoLogFiles')}
-              </div>
+              </Alert>
           }
         </PageContentBody>
       </PageContent>

@@ -1,11 +1,11 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Dapper;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Reflection;
+using NzbDrone.Common.Serializer;
 using NzbDrone.Core.Datastore;
-using NzbDrone.Core.Datastore.Converters;
 using NzbDrone.Core.Messaging.Events;
 
 namespace NzbDrone.Core.ThingiProvider
@@ -21,7 +21,7 @@ namespace NzbDrone.Core.ThingiProvider
             var serializerSettings = new JsonSerializerOptions
             {
                 AllowTrailingCommas = true,
-                IgnoreNullValues = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
                 PropertyNameCaseInsensitive = true,
                 DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -29,8 +29,8 @@ namespace NzbDrone.Core.ThingiProvider
             };
 
             serializerSettings.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, true));
-            serializerSettings.Converters.Add(new TimeSpanConverter());
-            serializerSettings.Converters.Add(new UtcConverter());
+            serializerSettings.Converters.Add(new STJTimeSpanConverter());
+            serializerSettings.Converters.Add(new STJUtcConverter());
 
             _serializerSettings = serializerSettings;
         }
@@ -54,7 +54,7 @@ namespace NzbDrone.Core.ThingiProvider
                     var item = parser(reader);
                     var impType = typeof(IProviderConfig).Assembly.FindTypeByName(item.ConfigContract);
 
-                    if (body.IsNullOrWhiteSpace())
+                    if (body.IsNullOrWhiteSpace() || impType == null)
                     {
                         item.Settings = NullConfig.Instance;
                     }

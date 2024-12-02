@@ -20,12 +20,14 @@ namespace NzbDrone.Integration.Test.ApiTests
             NamingConfig.Get(config.Id).Id.Should().Be(config.Id);
         }
 
-        [Test]
-        public void should_be_able_to_update()
+        [TestCase("{Movie Title} {Release Year}")]
+        [TestCase("{Movie Title} {(Release Year)}")]
+        [TestCase("{Movie Title} {[Release Year]}")]
+        public void should_be_able_to_update(string standardMovieFormat)
         {
             var config = NamingConfig.GetSingle();
             config.RenameMovies = false;
-            config.StandardMovieFormat = "{Movie Title}";
+            config.StandardMovieFormat = standardMovieFormat;
 
             var result = NamingConfig.Put(config);
             result.RenameMovies.Should().BeFalse();
@@ -35,8 +37,6 @@ namespace NzbDrone.Integration.Test.ApiTests
         [Test]
         public void should_get_bad_request_if_standard_format_is_empty()
         {
-            IgnoreOnMonoVersions("5.12", "5.14");
-
             var config = NamingConfig.GetSingle();
             config.RenameMovies = true;
             config.StandardMovieFormat = "";
@@ -48,8 +48,6 @@ namespace NzbDrone.Integration.Test.ApiTests
         [Test]
         public void should_get_bad_request_if_standard_format_doesnt_contain_title()
         {
-            IgnoreOnMonoVersions("5.12", "5.14");
-
             var config = NamingConfig.GetSingle();
             config.RenameMovies = true;
             config.StandardMovieFormat = "{quality}";
@@ -61,8 +59,6 @@ namespace NzbDrone.Integration.Test.ApiTests
         [Test]
         public void should_not_require_format_when_rename_episodes_is_false()
         {
-            IgnoreOnMonoVersions("5.12", "5.14");
-
             var config = NamingConfig.GetSingle();
             config.RenameMovies = false;
             config.StandardMovieFormat = "";
@@ -74,8 +70,6 @@ namespace NzbDrone.Integration.Test.ApiTests
         [Test]
         public void should_require_format_when_rename_episodes_is_true()
         {
-            IgnoreOnMonoVersions("5.12", "5.14");
-
             var config = NamingConfig.GetSingle();
             config.RenameMovies = true;
             config.StandardMovieFormat = "";
@@ -87,8 +81,6 @@ namespace NzbDrone.Integration.Test.ApiTests
         [Test]
         public void should_get_bad_request_if_movie_folder_format_does_not_contain_movie_title()
         {
-            IgnoreOnMonoVersions("5.12", "5.14");
-
             var config = NamingConfig.GetSingle();
             config.RenameMovies = true;
             config.MovieFolderFormat = "This and That";

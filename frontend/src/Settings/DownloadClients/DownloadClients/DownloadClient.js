@@ -3,6 +3,7 @@ import React, { Component } from 'react';
 import Card from 'Components/Card';
 import Label from 'Components/Label';
 import ConfirmModal from 'Components/Modal/ConfirmModal';
+import TagList from 'Components/TagList';
 import { kinds } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 import EditDownloadClientModalConnector from './EditDownloadClientModalConnector';
@@ -27,26 +28,26 @@ class DownloadClient extends Component {
 
   onEditDownloadClientPress = () => {
     this.setState({ isEditDownloadClientModalOpen: true });
-  }
+  };
 
   onEditDownloadClientModalClose = () => {
     this.setState({ isEditDownloadClientModalOpen: false });
-  }
+  };
 
   onDeleteDownloadClientPress = () => {
     this.setState({
       isEditDownloadClientModalOpen: false,
       isDeleteDownloadClientModalOpen: true
     });
-  }
+  };
 
-  onDeleteDownloadClientModalClose= () => {
+  onDeleteDownloadClientModalClose = () => {
     this.setState({ isDeleteDownloadClientModalOpen: false });
-  }
+  };
 
   onConfirmDeleteDownloadClient = () => {
     this.props.onConfirmDeleteDownloadClient(this.props.id);
-  }
+  };
 
   //
   // Render
@@ -56,7 +57,9 @@ class DownloadClient extends Component {
       id,
       name,
       enable,
-      priority
+      priority,
+      tags,
+      tagList
     } = this.props;
 
     return (
@@ -89,10 +92,15 @@ class DownloadClient extends Component {
                 kind={kinds.DISABLED}
                 outline={true}
               >
-                {translate('PrioritySettings', [priority])}
+                {translate('PrioritySettings', { priority })}
               </Label>
           }
         </div>
+
+        <TagList
+          tags={tags}
+          tagList={tagList}
+        />
 
         <EditDownloadClientModalConnector
           id={id}
@@ -105,7 +113,7 @@ class DownloadClient extends Component {
           isOpen={this.state.isDeleteDownloadClientModalOpen}
           kind={kinds.DANGER}
           title={translate('DeleteDownloadClient')}
-          message={translate('DeleteDownloadClientMessageText', [name])}
+          message={translate('DeleteDownloadClientMessageText', { name })}
           confirmLabel={translate('Delete')}
           onConfirm={this.onConfirmDeleteDownloadClient}
           onCancel={this.onDeleteDownloadClientModalClose}
@@ -120,6 +128,8 @@ DownloadClient.propTypes = {
   name: PropTypes.string.isRequired,
   enable: PropTypes.bool.isRequired,
   priority: PropTypes.number.isRequired,
+  tags: PropTypes.arrayOf(PropTypes.number).isRequired,
+  tagList: PropTypes.arrayOf(PropTypes.object).isRequired,
   onConfirmDeleteDownloadClient: PropTypes.func.isRequired
 };
 

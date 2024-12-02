@@ -28,8 +28,38 @@
   white-space: nowrap;
 }
 
+.languages,
+.audio,
+.video,
 .actions {
   composes: cell from '~Components/Table/Cells/TableRowCell.css';
 
   width: 100px;
+}
+
+.audioLanguages,
+.videoDynamicRangeType,
+.subtitles {
+  composes: cell from '~Components/Table/Cells/TableRowCell.css';
+
+  width: 165px;
+}
+
+.releaseGroup,
+.dateAdded {
+  composes: cell from '~Components/Table/Cells/TableRowCell.css';
+
+  width: 120px;
+}
+
+.customFormatScore {
+  composes: cell from '~Components/Table/Cells/TableRowCell.css';
+
+  width: 55px;
+}
+
+.indexerFlags {
+  composes: cell from '~Components/Table/Cells/TableRowCell.css';
+
+  width: 50px;
 }

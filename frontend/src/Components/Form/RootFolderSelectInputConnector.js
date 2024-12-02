@@ -3,28 +3,35 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { createSelector } from 'reselect';
 import { addRootFolder } from 'Store/Actions/rootFolderActions';
+import createRootFoldersSelector from 'Store/Selectors/createRootFoldersSelector';
+import translate from 'Utilities/String/translate';
 import RootFolderSelectInput from './RootFolderSelectInput';
 
 const ADD_NEW_KEY = 'addNew';
 
 function createMapStateToProps() {
   return createSelector(
-    (state) => state.rootFolders,
+    createRootFoldersSelector(),
+    (state, { value }) => value,
+    (state, { includeMissingValue }) => includeMissingValue,
     (state, { includeNoChange }) => includeNoChange,
-    (rootFolders, includeNoChange) => {
+    (state, { includeNoChangeDisabled }) => includeNoChangeDisabled,
+    (rootFolders, value, includeMissingValue, includeNoChange, includeNoChangeDisabled = true) => {
       const values = rootFolders.items.map((rootFolder) => {
         return {
           key: rootFolder.path,
           value: rootFolder.path,
-          freeSpace: rootFolder.freeSpace
+          freeSpace: rootFolder.freeSpace,
+          isMissing: false
         };
       });
 
       if (includeNoChange) {
         values.unshift({
           key: 'noChange',
-          value: 'No Change',
-          isDisabled: true
+          value: translate('NoChange'),
+          isDisabled: includeNoChangeDisabled,
+          isMissing: false
         });
       }
 
@@ -34,6 +41,15 @@ function createMapStateToProps() {
           value: '',
           isDisabled: true,
           isHidden: true
+        });
+      }
+
+      if (includeMissingValue && !values.find((v) => v.key === value)) {
+        values.push({
+          key: value,
+          value,
+          isMissing: true,
+          isDisabled: true
         });
       }
 
@@ -121,7 +137,7 @@ class RootFolderSelectInputConnector extends Component {
 
   onNewRootFolderSelect = (path) => {
     this.props.dispatchAddRootFolder(path);
-  }
+  };
 
   //
   // Render
@@ -151,7 +167,8 @@ RootFolderSelectInputConnector.propTypes = {
 };
 
 RootFolderSelectInputConnector.defaultProps = {
-  includeNoChange: false
+  includeNoChange: false,
+  value: ''
 };
 
 export default connect(createMapStateToProps, createMapDispatchToProps)(RootFolderSelectInputConnector);

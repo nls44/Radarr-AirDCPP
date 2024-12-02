@@ -9,9 +9,12 @@ namespace Radarr.Api.V3.Tags
     {
         public string Label { get; set; }
         public List<int> DelayProfileIds { get; set; }
-        public List<int> NotificationIds { get; set; }
-        public List<int> RestrictionIds { get; set; }
         public List<int> ImportListIds { get; set; }
+        public List<int> NotificationIds { get; set; }
+        public List<int> ReleaseProfileIds { get; set; }
+        public List<int> IndexerIds { get; set; }
+        public List<int> DownloadClientIds { get; set; }
+        public List<int> AutoTagIds { get; set; }
         public List<int> MovieIds { get; set; }
     }
 
@@ -29,10 +32,13 @@ namespace Radarr.Api.V3.Tags
                 Id = model.Id,
                 Label = model.Label,
                 DelayProfileIds = model.DelayProfileIds,
-                NotificationIds = model.NotificationIds,
-                RestrictionIds = model.RestrictionIds,
                 ImportListIds = model.ImportListIds,
-                MovieIds = model.MovieIds
+                NotificationIds = model.NotificationIds,
+                ReleaseProfileIds = model.ReleaseProfileIds,
+                IndexerIds = model.IndexerIds,
+                DownloadClientIds = model.DownloadClientIds,
+                AutoTagIds = model.AutoTagIds,
+                MovieIds = model.MovieIds,
             };
         }
 

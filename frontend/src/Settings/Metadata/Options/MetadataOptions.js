@@ -1,26 +1,31 @@
 import PropTypes from 'prop-types';
 import React from 'react';
+import Alert from 'Components/Alert';
 import FieldSet from 'Components/FieldSet';
 import Form from 'Components/Form/Form';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputGroup from 'Components/Form/FormInputGroup';
 import FormLabel from 'Components/Form/FormLabel';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
-import { inputTypes } from 'Helpers/Props';
+import { inputTypes, kinds } from 'Helpers/Props';
 import translate from 'Utilities/String/translate';
 
 // Note: Do Not Translate Certification Countries
 
 export const certificationCountryOptions = [
+  { key: 'us', value: 'United States' },
   { key: 'au', value: 'Australia' },
   { key: 'br', value: 'Brazil' },
   { key: 'ca', value: 'Canada' },
   { key: 'fr', value: 'France' },
   { key: 'de', value: 'Germany' },
   { key: 'gb', value: 'Great Britain' },
+  { key: 'in', value: 'India' },
+  { key: 'ie', value: 'Ireland' },
   { key: 'it', value: 'Italy' },
-  { key: 'es', value: 'Spain' },
-  { key: 'us', value: 'United States' }
+  { key: 'nz', value: 'New Zealand' },
+  { key: 'ro', value: 'Romania' },
+  { key: 'es', value: 'Spain' }
 ];
 
 function MetadataOptions(props) {
@@ -41,9 +46,9 @@ function MetadataOptions(props) {
 
       {
         !isFetching && error &&
-          <div>
+          <Alert kind={kinds.DANGER}>
             {translate('UnableToLoadIndexerOptions')}
-          </div>
+          </Alert>
       }
 
       {

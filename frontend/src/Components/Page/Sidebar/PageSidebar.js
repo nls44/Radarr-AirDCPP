@@ -3,13 +3,13 @@ import _ from 'lodash';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
-import QueueStatusConnector from 'Activity/Queue/Status/QueueStatusConnector';
+import QueueStatus from 'Activity/Queue/Status/QueueStatus';
 import OverlayScroller from 'Components/Scroller/OverlayScroller';
 import Scroller from 'Components/Scroller/Scroller';
 import { icons } from 'Helpers/Props';
 import locationShape from 'Helpers/Props/Shapes/locationShape';
 import dimensions from 'Styles/Variables/dimensions';
-import HealthStatusConnector from 'System/Status/Health/HealthStatusConnector';
+import HealthStatus from 'System/Status/Health/HealthStatus';
 import translate from 'Utilities/String/translate';
 import MessagesConnector from './Messages/MessagesConnector';
 import PageSidebarItem from './PageSidebarItem';
@@ -21,20 +21,24 @@ const SIDEBAR_WIDTH = parseInt(dimensions.sidebarWidth);
 const links = [
   {
     iconName: icons.MOVIE_CONTINUING,
-    title: translate('Movies'),
+    title: () => translate('Movies'),
     to: '/',
     alias: '/movies',
     children: [
       {
-        title: translate('AddNew'),
+        title: () => translate('AddNew'),
         to: '/add/new'
       },
       {
-        title: translate('ImportLibrary'),
+        title: () => translate('ImportLibrary'),
         to: '/add/import'
       },
       {
-        title: translate('Discover'),
+        title: () => translate('Collections'),
+        to: '/collections'
+      },
+      {
+        title: () => translate('Discover'),
         to: '/add/discover'
       }
     ]
@@ -42,82 +46,98 @@ const links = [
 
   {
     iconName: icons.CALENDAR,
-    title: translate('Calendar'),
+    title: () => translate('Calendar'),
     to: '/calendar'
   },
 
   {
     iconName: icons.ACTIVITY,
-    title: translate('Activity'),
+    title: () => translate('Activity'),
     to: '/activity/queue',
     children: [
       {
-        title: translate('Queue'),
+        title: () => translate('Queue'),
         to: '/activity/queue',
-        statusComponent: QueueStatusConnector
+        statusComponent: QueueStatus
       },
       {
-        title: translate('History'),
+        title: () => translate('History'),
         to: '/activity/history'
       },
       {
-        title: translate('Blacklist'),
-        to: '/activity/blacklist'
+        title: () => translate('Blocklist'),
+        to: '/activity/blocklist'
+      }
+    ]
+  },
+
+  {
+    iconName: icons.WARNING,
+    title: () => translate('Wanted'),
+    to: '/wanted/missing',
+    children: [
+      {
+        title: () => translate('Missing'),
+        to: '/wanted/missing'
+      },
+      {
+        title: () => translate('CutoffUnmet'),
+        to: '/wanted/cutoffunmet'
       }
     ]
   },
 
   {
     iconName: icons.SETTINGS,
-    title: translate('Settings'),
+    title: () => translate('Settings'),
     to: '/settings',
     children: [
       {
-        title: translate('MediaManagement'),
+        title: () => translate('MediaManagement'),
         to: '/settings/mediamanagement'
       },
       {
-        title: translate('Profiles'),
+        title: () => translate('Profiles'),
         to: '/settings/profiles'
       },
       {
-        title: translate('Quality'),
+        title: () => translate('Quality'),
         to: '/settings/quality'
       },
       {
-        title: translate('CustomFormats'),
+        title: () => translate('CustomFormats'),
         to: '/settings/customformats'
       },
       {
-        title: translate('Indexers'),
+        title: () => translate('Indexers'),
         to: '/settings/indexers'
       },
       {
-        title: translate('DownloadClients'),
+        title: () => translate('DownloadClients'),
         to: '/settings/downloadclients'
       },
       {
-        title: translate('Lists'),
+        title: () => translate('ImportLists'),
         to: '/settings/importlists'
       },
       {
-        title: translate('Connect'),
+        title: () => translate('Connect'),
         to: '/settings/connect'
       },
       {
-        title: translate('Metadata'),
+        title: () => translate('Metadata'),
         to: '/settings/metadata'
       },
       {
-        title: translate('Tags'),
+        title: () => translate('Tags'),
         to: '/settings/tags'
       },
       {
-        title: translate('General'),
+        title: () => translate('General'),
         to: '/settings/general'
       },
       {
-        title: translate('UI'),
+        title: () => translate('Ui'),
         to: '/settings/ui'
       }
     ]
@@ -125,32 +145,32 @@ const links = [
 
   {
     iconName: icons.SYSTEM,
-    title: translate('System'),
+    title: () => translate('System'),
     to: '/system/status',
     children: [
       {
-        title: translate('Status'),
+        title: () => translate('Status'),
         to: '/system/status',
-        statusComponent: HealthStatusConnector
+        statusComponent: HealthStatus
       },
       {
-        title: translate('Tasks'),
+        title: () => translate('Tasks'),
         to: '/system/tasks'
       },
       {
-        title: translate('Backup'),
+        title: () => translate('Backup'),
         to: '/system/backup'
       },
       {
-        title: translate('Updates'),
+        title: () => translate('Updates'),
         to: '/system/updates'
       },
       {
-        title: translate('Events'),
+        title: () => translate('Events'),
         to: '/system/events'
       },
       {
-        title: translate('LogFiles'),
+        title: () => translate('LogFiles'),
         to: '/system/logs/files'
       }
     ]
@@ -278,7 +298,7 @@ class PageSidebar extends Component {
 
   _setSidebarRef = (ref) => {
     this._sidebarRef = ref;
-  }
+  };
 
   _setSidebarTransform(isSidebarVisible, transition, callback) {
     this.setState({
@@ -307,11 +327,11 @@ class PageSidebar extends Component {
       event.stopPropagation();
       this.props.onSidebarVisibleChange(false);
     }
-  }
+  };
 
   onWindowScroll = () => {
     this.setState(getPositioning());
-  }
+  };
 
   onTouchStart = (event) => {
     const touches = event.touches;
@@ -331,7 +351,7 @@ class PageSidebar extends Component {
 
     this._touchStartX = touchStartX;
     this._touchStartY = touchStartY;
-  }
+  };
 
   onTouchMove = (event) => {
     const touches = event.touches;
@@ -368,7 +388,7 @@ class PageSidebar extends Component {
       transition: 'none',
       transform
     });
-  }
+  };
 
   onTouchEnd = (event) => {
     const touches = event.changedTouches;
@@ -388,16 +408,16 @@ class PageSidebar extends Component {
 
     this._touchStartX = null;
     this._touchStartY = null;
-  }
+  };
 
   onTouchCancel = (event) => {
     this._touchStartX = null;
     this._touchStartY = null;
-  }
+  };
 
   onItemPress = () => {
     this.props.onSidebarVisibleChange(false);
-  }
+  };
 
   //
   // Render

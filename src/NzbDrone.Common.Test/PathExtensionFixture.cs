@@ -1,8 +1,10 @@
 using System;
 using System.IO;
+using System.Text;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Common.Disk;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Test.Common;
@@ -34,7 +36,8 @@ namespace NzbDrone.Common.Test
         [TestCase(@"\\Testserver\\Test\", @"\\Testserver\Test")]
         [TestCase(@"\\Testserver\Test\file.ext", @"\\Testserver\Test\file.ext")]
         [TestCase(@"\\Testserver\Test\file.ext\\", @"\\Testserver\Test\file.ext")]
-        [TestCase(@"\\Testserver\Test\file.ext   \\", @"\\Testserver\Test\file.ext")]
+        [TestCase(@"\\Testserver\Test\file.ext   ", @"\\Testserver\Test\file.ext")]
+        [TestCase(@"//CAPITAL//lower// ", @"\\CAPITAL\lower")]
         public void Clean_Path_Windows(string dirty, string clean)
         {
             WindowsOnly();
@@ -131,11 +134,16 @@ namespace NzbDrone.Common.Test
 
         [TestCase(@"C:\test\", @"C:\Test\mydir")]
         [TestCase(@"C:\test", @"C:\Test\mydir\")]
-        public void path_should_be_parent_on_windows_only(string parentPath, string childPath)
+        public void windows_path_should_be_parent(string parentPath, string childPath)
         {
-            var expectedResult = OsInfo.IsWindows;
+            parentPath.IsParentPath(childPath).Should().Be(true);
+        }
 
-            parentPath.IsParentPath(childPath).Should().Be(expectedResult);
+        [TestCase("/test", "/test/mydir/")]
+        [TestCase("/test/", "/test/mydir")]
+        public void posix_path_should_be_parent(string parentPath, string childPath)
+        {
+            parentPath.IsParentPath(childPath).Should().Be(true);
         }
 
         [TestCase(@"C:\Test\mydir", @"C:\Test")]
@@ -143,18 +151,55 @@ namespace NzbDrone.Common.Test
         [TestCase(@"C:\", null)]
         [TestCase(@"\\server\share", null)]
         [TestCase(@"\\server\share\test", @"\\server\share")]
-        public void path_should_return_parent_windows(string path, string parentPath)
+        public void windows_path_should_return_parent(string path, string parentPath)
         {
-            WindowsOnly();
             path.GetParentPath().Should().Be(parentPath);
         }
 
         [TestCase(@"/", null)]
         [TestCase(@"/test", "/")]
-        public void path_should_return_parent_mono(string path, string parentPath)
+        [TestCase(@"/test/tv", "/test")]
+        public void unix_path_should_return_parent(string path, string parentPath)
         {
-            PosixOnly();
             path.GetParentPath().Should().Be(parentPath);
+        }
+
+        [TestCase(@"C:\Test\mydir", "Test")]
+        [TestCase(@"C:\Test\", @"C:\")]
+        [TestCase(@"C:\Test", @"C:\")]
+        [TestCase(@"C:\", null)]
+        [TestCase(@"\\server\share", null)]
+        [TestCase(@"\\server\share\test", @"\\server\share")]
+        public void path_should_return_parent_name_windows(string path, string parentPath)
+        {
+            path.GetParentName().Should().Be(parentPath);
+        }
+
+        [TestCase(@"/", null)]
+        [TestCase(@"/test", "/")]
+        [TestCase(@"/test/tv", "test")]
+        public void path_should_return_parent_name_mono(string path, string parentPath)
+        {
+            path.GetParentName().Should().Be(parentPath);
+        }
+
+        [TestCase(@"C:\Test\mydir", "mydir")]
+        [TestCase(@"C:\Test\", "Test")]
+        [TestCase(@"C:\Test", "Test")]
+        [TestCase(@"C:\", "C:\\")]
+        [TestCase(@"\\server\share", @"\\server\share")]
+        [TestCase(@"\\server\share\test", "test")]
+        public void path_should_return_directory_name_windows(string path, string parentPath)
+        {
+            path.GetDirectoryName().Should().Be(parentPath);
+        }
+
+        [TestCase(@"/", "/")]
+        [TestCase(@"/test", "test")]
+        [TestCase(@"/test/tv", "tv")]
+        public void path_should_return_directory_name_mono(string path, string parentPath)
+        {
+            path.GetDirectoryName().Should().Be(parentPath);
         }
 
         [Test]
@@ -278,7 +323,7 @@ namespace NzbDrone.Common.Test
         [Test]
         public void GetUpdateClientExePath()
         {
-            GetIAppDirectoryInfo().GetUpdateClientExePath(PlatformType.DotNet).Should().BeEquivalentTo(@"C:\Temp\radarr_update\Radarr.Update.exe".AsOsAgnostic());
+            GetIAppDirectoryInfo().GetUpdateClientExePath().Should().BeEquivalentTo(@"C:\Temp\radarr_update\Radarr.Update".AsOsAgnostic().ProcessNameToExe());
         }
 
         [Test]
@@ -313,6 +358,90 @@ namespace NzbDrone.Common.Test
             result[1].Should().Be(@"Test");
             result[2].Should().Be(@"TV");
             result[3].Should().Be(@"Series Title");
+        }
+
+        [TestCase(@"C:\Test\")]
+        [TestCase(@"C:\Test")]
+        [TestCase(@"C:\Test\TV\")]
+        [TestCase(@"C:\Test\TV")]
+        public void IsPathValid_should_be_true(string path)
+        {
+            path.AsOsAgnostic().IsPathValid(PathValidationType.CurrentOs).Should().BeTrue();
+        }
+
+        [TestCase(@"C:\Test \")]
+        [TestCase(@"C:\Test ")]
+        [TestCase(@"C:\ Test\")]
+        [TestCase(@"C:\ Test")]
+        [TestCase(@"C:\Test \TV")]
+        [TestCase(@"C:\ Test\TV")]
+        [TestCase(@"C:\Test \TV\")]
+        [TestCase(@"C:\ Test\TV\")]
+        [TestCase(@" C:\Test\TV\")]
+        [TestCase(@" C:\Test\TV")]
+
+        public void IsPathValid_should_be_false_on_windows(string path)
+        {
+            WindowsOnly();
+            path.IsPathValid(PathValidationType.CurrentOs).Should().BeFalse();
+        }
+
+        [TestCase(@"")]
+        [TestCase(@"relative/path")]
+        public void IsPathValid_should_be_false_on_unix(string path)
+        {
+            PosixOnly();
+            path.AsOsAgnostic().IsPathValid(PathValidationType.CurrentOs).Should().BeFalse();
+        }
+
+        [TestCase(@"C:\", @"C:\")]
+        [TestCase(@"C:\\", @"C:\")]
+        [TestCase(@"C:\Test", @"C:\Test")]
+        [TestCase(@"C:\Test\", @"C:\Test")]
+        [TestCase(@"\\server\share", @"\\server\share")]
+        [TestCase(@"\\server\share\", @"\\server\share")]
+        public void windows_path_should_return_clean_path(string path, string cleanPath)
+        {
+            path.GetCleanPath().Should().Be(cleanPath);
+        }
+
+        [TestCase("/", "/")]
+        [TestCase("//", "/")]
+        [TestCase("/test", "/test")]
+        [TestCase("/test/", "/test")]
+        [TestCase("/test//", "/test")]
+        public void unix_path_should_return_clean_path(string path, string cleanPath)
+        {
+            path.GetCleanPath().Should().Be(cleanPath);
+        }
+
+        [TestCase(@"C:\Test\", @"C:\Test\Series Title", "Series Title")]
+        [TestCase(@"C:\Test\", @"C:\Test\Collection\Series Title", @"Collection\Series Title")]
+        [TestCase(@"C:\Test\mydir\", @"C:\Test\mydir\Collection\Series Title", @"Collection\Series Title")]
+        [TestCase(@"\\server\share", @"\\server\share\Series Title", "Series Title")]
+        [TestCase(@"\\server\share\mydir\", @"\\server\share\mydir\/Collection\Series Title", @"Collection\Series Title")]
+        public void windows_path_should_return_relative_path(string parentPath, string childPath, string relativePath)
+        {
+            parentPath.GetRelativePath(childPath).Should().Be(relativePath);
+        }
+
+        [TestCase(@"/test", "/test/Series Title", "Series Title")]
+        [TestCase(@"/test/", "/test/Collection/Series Title", "Collection/Series Title")]
+        [TestCase(@"/test/mydir", "/test/mydir/Series Title", "Series Title")]
+        [TestCase(@"/test/mydir/", "/test/mydir/Collection/Series Title", "Collection/Series Title")]
+        [TestCase(@"/test/mydir/", @"/test/mydir/\Collection/Series Title", "Collection/Series Title")]
+        public void unix_path_should_return_relative_path(string parentPath, string childPath, string relativePath)
+        {
+            parentPath.GetRelativePath(childPath).Should().Be(relativePath);
+        }
+
+        [Test]
+        public void should_be_equal_with_different_unicode_representations()
+        {
+            var path1 = @"C:\Test\file.mkv".AsOsAgnostic().Normalize(NormalizationForm.FormC);
+            var path2 = @"C:\Test\file.mkv".AsOsAgnostic().Normalize(NormalizationForm.FormD);
+
+            path1.PathEquals(path2);
         }
     }
 }

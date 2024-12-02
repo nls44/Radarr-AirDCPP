@@ -26,6 +26,8 @@ namespace Radarr.Api.V3.Config
         public int MinimumFreeSpaceWhenImporting { get; set; }
         public bool CopyUsingHardlinks { get; set; }
         public bool CopyUsingSymlinks { get; set; }
+        public bool UseScriptImport { get; set; }
+        public string ScriptImportPath { get; set; }
         public bool ImportExtraFiles { get; set; }
         public string ExtraFileExtensions { get; set; }
         public bool EnableMediaInfo { get; set; }
@@ -55,6 +57,8 @@ namespace Radarr.Api.V3.Config
                 MinimumFreeSpaceWhenImporting = model.MinimumFreeSpaceWhenImporting,
                 CopyUsingHardlinks = model.CopyUsingHardlinks,
                 CopyUsingSymlinks = model.CopyUsingSymlinks,
+                UseScriptImport = model.UseScriptImport,
+                ScriptImportPath = model.ScriptImportPath,
                 ImportExtraFiles = model.ImportExtraFiles,
                 ExtraFileExtensions = model.ExtraFileExtensions,
                 EnableMediaInfo = model.EnableMediaInfo

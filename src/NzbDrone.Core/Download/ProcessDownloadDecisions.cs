@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Download.Clients;
@@ -12,7 +13,8 @@ namespace NzbDrone.Core.Download
 {
     public interface IProcessDownloadDecisions
     {
-        ProcessedDecisions ProcessDecisions(List<DownloadDecision> decisions);
+        Task<ProcessedDecisions> ProcessDecisions(List<DownloadDecision> decisions);
+        Task<ProcessedDecisionResult> ProcessDecision(DownloadDecision decision, int? downloadClientId);
     }
 
     public class ProcessDownloadDecisions : IProcessDownloadDecisions
@@ -33,7 +35,7 @@ namespace NzbDrone.Core.Download
             _logger = logger;
         }
 
-        public ProcessedDecisions ProcessDecisions(List<DownloadDecision> decisions)
+        public async Task<ProcessedDecisions> ProcessDecisions(List<DownloadDecision> decisions)
         {
             var qualifiedReports = GetQualifiedReports(decisions);
             var prioritizedDecisions = _prioritizeDownloadDecision.PrioritizeDecisionsForMovies(qualifiedReports);
@@ -48,7 +50,6 @@ namespace NzbDrone.Core.Download
 
             foreach (var report in prioritizedDecisions)
             {
-                var remoteMovie = report.RemoteMovie;
                 var downloadProtocol = report.RemoteMovie.Release.DownloadProtocol;
 
                 // Skip if already grabbed
@@ -70,37 +71,48 @@ namespace NzbDrone.Core.Download
                     continue;
                 }
 
-                try
-                {
-                    _logger.Trace("Grabbing from Indexer {0} at priority {1}.", remoteMovie.Release.Indexer, remoteMovie.Release.IndexerPriority);
-                    _downloadService.DownloadReport(remoteMovie);
-                    grabbed.Add(report);
-                }
-                catch (ReleaseUnavailableException)
-                {
-                    _logger.Warn("Failed to download release from indexer, no longer available. " + remoteMovie);
-                    rejected.Add(report);
-                }
-                catch (Exception ex)
-                {
-                    if (ex is DownloadClientUnavailableException || ex is DownloadClientAuthenticationException)
-                    {
-                        _logger.Debug(ex, "Failed to send release to download client, storing until later. " + remoteMovie);
-                        PreparePending(pendingAddQueue, grabbed, pending, report, PendingReleaseReason.DownloadClientUnavailable);
+                var result = await ProcessDecisionInternal(report);
 
-                        if (downloadProtocol == DownloadProtocol.Usenet)
+                switch (result)
+                {
+                    case ProcessedDecisionResult.Grabbed:
                         {
-                            usenetFailed = true;
+                            grabbed.Add(report);
+                            break;
                         }
-                        else if (downloadProtocol == DownloadProtocol.Torrent)
+
+                    case ProcessedDecisionResult.Pending:
                         {
-                            torrentFailed = true;
+                            PreparePending(pendingAddQueue, grabbed, pending, report, PendingReleaseReason.Delay);
+                            break;
                         }
-                    }
-                    else
-                    {
-                        _logger.Warn(ex, "Couldn't add report to download queue. " + remoteMovie);
-                    }
+
+                    case ProcessedDecisionResult.Rejected:
+                        {
+                            rejected.Add(report);
+                            break;
+                        }
+
+                    case ProcessedDecisionResult.Failed:
+                        {
+                            PreparePending(pendingAddQueue, grabbed, pending, report, PendingReleaseReason.DownloadClientUnavailable);
+
+                            if (downloadProtocol == DownloadProtocol.Usenet)
+                            {
+                                usenetFailed = true;
+                            }
+                            else if (downloadProtocol == DownloadProtocol.Torrent)
+                            {
+                                torrentFailed = true;
+                            }
+
+                            break;
+                        }
+
+                    case ProcessedDecisionResult.Skipped:
+                        {
+                            break;
+                        }
                 }
             }
 
@@ -112,10 +124,44 @@ namespace NzbDrone.Core.Download
             return new ProcessedDecisions(grabbed, pending, rejected);
         }
 
+        public async Task<ProcessedDecisionResult> ProcessDecision(DownloadDecision decision, int? downloadClientId)
+        {
+            if (decision == null)
+            {
+                return ProcessedDecisionResult.Skipped;
+            }
+
+            if (!IsQualifiedReport(decision))
+            {
+                return ProcessedDecisionResult.Rejected;
+            }
+
+            if (decision.TemporarilyRejected)
+            {
+                _pendingReleaseService.Add(decision, PendingReleaseReason.Delay);
+
+                return ProcessedDecisionResult.Pending;
+            }
+
+            var result = await ProcessDecisionInternal(decision, downloadClientId);
+
+            if (result == ProcessedDecisionResult.Failed)
+            {
+                _pendingReleaseService.Add(decision, PendingReleaseReason.DownloadClientUnavailable);
+            }
+
+            return result;
+        }
+
         internal List<DownloadDecision> GetQualifiedReports(IEnumerable<DownloadDecision> decisions)
         {
-            //Process both approved and temporarily rejected
-            return decisions.Where(c => (c.Approved || c.TemporarilyRejected) && c.RemoteMovie.Movie != null).ToList();
+            return decisions.Where(IsQualifiedReport).ToList();
+        }
+
+        internal bool IsQualifiedReport(DownloadDecision decision)
+        {
+            // Process both approved and temporarily rejected
+            return (decision.Approved || decision.TemporarilyRejected) && decision.RemoteMovie.Movie != null;
         }
 
         private bool IsMovieProcessed(List<DownloadDecision> decisions, DownloadDecision report)
@@ -143,6 +189,39 @@ namespace NzbDrone.Core.Download
 
             queue.Add(Tuple.Create(report, reason));
             pending.Add(report);
+        }
+
+        private async Task<ProcessedDecisionResult> ProcessDecisionInternal(DownloadDecision decision, int? downloadClientId = null)
+        {
+            var remoteMovie = decision.RemoteMovie;
+            var remoteIndexer = remoteMovie.Release.Indexer;
+
+            try
+            {
+                _logger.Trace("Grabbing release '{0}' from Indexer {1} at priority {2}.", remoteMovie, remoteIndexer, remoteMovie.Release.IndexerPriority);
+                await _downloadService.DownloadReport(remoteMovie, downloadClientId);
+
+                return ProcessedDecisionResult.Grabbed;
+            }
+            catch (ReleaseUnavailableException)
+            {
+                _logger.Warn("Failed to download release '{0}' from Indexer {1}. Release not available", remoteMovie, remoteIndexer);
+                return ProcessedDecisionResult.Rejected;
+            }
+            catch (Exception ex)
+            {
+                if (ex is DownloadClientUnavailableException || ex is DownloadClientAuthenticationException)
+                {
+                    _logger.Debug(ex, "Failed to send release '{0}' from Indexer {1} to download client, storing until later.", remoteMovie, remoteIndexer);
+
+                    return ProcessedDecisionResult.Failed;
+                }
+                else
+                {
+                    _logger.Warn(ex, "Couldn't add release '{0}' from Indexer {1} to download queue.", remoteMovie, remoteIndexer);
+                    return ProcessedDecisionResult.Skipped;
+                }
+            }
         }
     }
 }

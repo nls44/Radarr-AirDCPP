@@ -12,7 +12,7 @@ using NzbDrone.Core.History;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Parser.Model;
-using NzbDrone.Core.Profiles;
+using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Test.CustomFormats;
 using NzbDrone.Core.Test.Framework;
@@ -38,15 +38,16 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             Mocker.Resolve<UpgradableSpecification>();
             _upgradeHistory = Mocker.Resolve<HistorySpecification>();
 
-            CustomFormatsFixture.GivenCustomFormats();
+            CustomFormatsTestHelpers.GivenCustomFormats();
 
             _fakeMovie = Builder<Movie>.CreateNew()
-                .With(c => c.Profile = new Profile
+                .With(c => c.QualityProfile = new QualityProfile
                 {
                     Items = Qualities.QualityFixture.GetDefaultQualities(),
                     Cutoff = Quality.Bluray1080p.Id,
-                    FormatItems = CustomFormatsFixture.GetSampleFormatItems("None"),
-                    MinFormatScore = 0
+                    FormatItems = CustomFormatsTestHelpers.GetSampleFormatItems("None"),
+                    MinFormatScore = 0,
+                    UpgradeAllowed = true
                 })
                 .Build();
 
@@ -65,7 +66,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
                   .Returns(true);
 
             Mocker.GetMock<ICustomFormatCalculationService>()
-                .Setup(x => x.ParseCustomFormat(It.IsAny<MovieHistory>()))
+                .Setup(x => x.ParseCustomFormat(It.IsAny<MovieHistory>(), It.IsAny<Movie>()))
                 .Returns(new List<CustomFormat>());
         }
 
@@ -102,7 +103,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             _upgradeHistory.IsSatisfiedBy(_parseResultSingle, null).Accepted.Should().BeTrue();
         }
 
-        //        [Test]
+        // [Test]
         //        public void should_return_true_if_latest_history_has_a_download_id_and_cdh_is_enabled()
         //        {
         //            GivenMostRecentForEpisode(FIRST_EPISODE_ID, "test", _notupgradableQuality, DateTime.UtcNow, HistoryEventType.Grabbed);
@@ -158,11 +159,11 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_not_be_upgradable_if_episode_is_of_same_quality_as_existing()
         {
-            _fakeMovie.Profile = new Profile
+            _fakeMovie.QualityProfile = new QualityProfile
             {
                 Items = Qualities.QualityFixture.GetDefaultQualities(),
                 Cutoff = Quality.Bluray1080p.Id,
-                FormatItems = CustomFormatsFixture.GetSampleFormatItems(),
+                FormatItems = CustomFormatsTestHelpers.GetSampleFormatItems(),
                 MinFormatScore = 0
             };
 
@@ -170,7 +171,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             _upgradableQuality = new QualityModel(Quality.WEBDL1080p, new Revision(version: 1));
 
             Mocker.GetMock<ICustomFormatCalculationService>()
-                .Setup(x => x.ParseCustomFormat(It.IsAny<MovieHistory>()))
+                .Setup(x => x.ParseCustomFormat(It.IsAny<MovieHistory>(), It.IsAny<Movie>()))
                 .Returns(new List<CustomFormat>());
 
             GivenMostRecentForEpisode(FIRST_EPISODE_ID, string.Empty, _upgradableQuality, DateTime.UtcNow, MovieHistoryEventType.Grabbed);
@@ -181,11 +182,11 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_not_be_upgradable_if_cutoff_already_met()
         {
-            _fakeMovie.Profile = new Profile
+            _fakeMovie.QualityProfile = new QualityProfile
             {
                 Items = Qualities.QualityFixture.GetDefaultQualities(),
                 Cutoff = Quality.WEBDL1080p.Id,
-                FormatItems = CustomFormatsFixture.GetSampleFormatItems(),
+                FormatItems = CustomFormatsTestHelpers.GetSampleFormatItems(),
                 MinFormatScore = 0
             };
 
@@ -216,11 +217,11 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         public void should_return_false_if_cutoff_already_met_and_cdh_is_disabled()
         {
             GivenCdhDisabled();
-            _fakeMovie.Profile = new Profile
+            _fakeMovie.QualityProfile = new QualityProfile
             {
                 Items = Qualities.QualityFixture.GetDefaultQualities(),
                 Cutoff = Quality.WEBDL1080p.Id,
-                FormatItems = CustomFormatsFixture.GetSampleFormatItems(),
+                FormatItems = CustomFormatsTestHelpers.GetSampleFormatItems(),
                 MinFormatScore = 0
             };
 

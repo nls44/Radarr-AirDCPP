@@ -1,9 +1,11 @@
 using System;
 using System.Linq;
-using System.Xml.Linq;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.Messaging.Events;
 
@@ -21,25 +23,34 @@ namespace NzbDrone.Core.Authentication
 
     public class UserService : IUserService, IHandle<ApplicationStartedEvent>
     {
+        private const int ITERATIONS = 10000;
+        private const int SALT_SIZE = 128 / 8;
+        private const int NUMBER_OF_BYTES = 256 / 8;
+
         private readonly IUserRepository _repo;
         private readonly IAppFolderInfo _appFolderInfo;
         private readonly IDiskProvider _diskProvider;
+        private readonly IConfigFileProvider _configFileProvider;
 
-        public UserService(IUserRepository repo, IAppFolderInfo appFolderInfo, IDiskProvider diskProvider)
+        public UserService(IUserRepository repo, IAppFolderInfo appFolderInfo, IDiskProvider diskProvider, IConfigFileProvider configFileProvider)
         {
             _repo = repo;
             _appFolderInfo = appFolderInfo;
             _diskProvider = diskProvider;
+            _configFileProvider = configFileProvider;
         }
 
         public User Add(string username, string password)
         {
-            return _repo.Insert(new User
+            var user = new User
             {
                 Identifier = Guid.NewGuid(),
-                Username = username.ToLowerInvariant(),
-                Password = password.SHA256Hash()
-            });
+                Username = username.ToLowerInvariant()
+            };
+
+            SetUserHashedPassword(user, password);
+
+            return _repo.Insert(user);
         }
 
         public User Update(User user)
@@ -58,7 +69,7 @@ namespace NzbDrone.Core.Authentication
 
             if (user.Password != password)
             {
-                user.Password = password.SHA256Hash();
+                SetUserHashedPassword(user, password);
             }
 
             user.Username = username.ToLowerInvariant();
@@ -85,7 +96,20 @@ namespace NzbDrone.Core.Authentication
                 return null;
             }
 
-            if (user.Password == password.SHA256Hash())
+            if (user.Salt.IsNullOrWhiteSpace())
+            {
+                // If password matches stored SHA256 hash, update to salted hash and verify.
+                if (user.Password == password.SHA256Hash())
+                {
+                    SetUserHashedPassword(user, password);
+
+                    return Update(user);
+                }
+
+                return null;
+            }
+
+            if (VerifyHashedPassword(user, password))
             {
                 return user;
             }
@@ -98,6 +122,43 @@ namespace NzbDrone.Core.Authentication
             return _repo.FindUser(identifier);
         }
 
+        private User SetUserHashedPassword(User user, string password)
+        {
+            var salt = GenerateSalt();
+
+            user.Iterations = ITERATIONS;
+            user.Salt = Convert.ToBase64String(salt);
+            user.Password = GetHashedPassword(password, salt, ITERATIONS);
+
+            return user;
+        }
+
+        private byte[] GenerateSalt()
+        {
+            var salt = new byte[SALT_SIZE];
+            RandomNumberGenerator.Create().GetBytes(salt);
+
+            return salt;
+        }
+
+        private string GetHashedPassword(string password, byte[] salt, int iterations)
+        {
+            return Convert.ToBase64String(KeyDerivation.Pbkdf2(
+                password: password,
+                salt: salt,
+                prf: KeyDerivationPrf.HMACSHA512,
+                iterationCount: iterations,
+                numBytesRequested: NUMBER_OF_BYTES));
+        }
+
+        private bool VerifyHashedPassword(User user, string password)
+        {
+            var salt = Convert.FromBase64String(user.Salt);
+            var hashedPassword = GetHashedPassword(password, salt, user.Iterations);
+
+            return user.Password == hashedPassword;
+        }
+
         public void Handle(ApplicationStartedEvent message)
         {
             if (_repo.All().Any())
@@ -105,14 +166,7 @@ namespace NzbDrone.Core.Authentication
                 return;
             }
 
-            var configFile = _appFolderInfo.GetConfigPath();
-
-            if (!_diskProvider.FileExists(configFile))
-            {
-                return;
-            }
-
-            var xDoc = XDocument.Load(configFile);
+            var xDoc = _configFileProvider.LoadConfigFile();
             var config = xDoc.Descendants("Config").Single();
             var usernameElement = config.Descendants("Username").FirstOrDefault();
             var passwordElement = config.Descendants("Password").FirstOrDefault();

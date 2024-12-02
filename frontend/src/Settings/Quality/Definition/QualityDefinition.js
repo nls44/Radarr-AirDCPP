@@ -13,7 +13,8 @@ import QualityDefinitionLimits from './QualityDefinitionLimits';
 import styles from './QualityDefinition.css';
 
 const MIN = 0;
-const MAX = 400;
+const MAX = 2000;
+const MIN_DISTANCE = 1;
 
 const slider = {
   min: MIN,
@@ -69,7 +70,7 @@ class QualityDefinition extends Component {
       preferredSize: sliderPreferredSize === (slider.max - 3) ? null : roundNumber(Math.pow(sliderPreferredSize, 1.1)),
       maxSize: sliderMaxSize === slider.max ? null : roundNumber(Math.pow(sliderMaxSize, 1.1))
     });
-  }
+  };
 
   onAfterSliderChange = () => {
     const {
@@ -83,7 +84,7 @@ class QualityDefinition extends Component {
       sliderMaxSize: getSliderValue(maxSize, slider.max),
       sliderPreferredSize: getSliderValue(preferredSize, (slider.max - 3)) // fix
     });
-  }
+  };
 
   onMinSizeChange = ({ value }) => {
     const minSize = getValue(value);
@@ -97,7 +98,7 @@ class QualityDefinition extends Component {
       maxSize: this.props.maxSize,
       preferredSize: this.props.preferredSize
     });
-  }
+  };
 
   onPreferredSizeChange = ({ value }) => {
     const preferredSize = value === (MAX - 3) ? null : getValue(value);
@@ -111,7 +112,7 @@ class QualityDefinition extends Component {
       maxSize: this.props.maxSize,
       preferredSize
     });
-  }
+  };
 
   onMaxSizeChange = ({ value }) => {
     const maxSize = value === MAX ? null : getValue(value);
@@ -125,7 +126,7 @@ class QualityDefinition extends Component {
       maxSize,
       preferredSize: this.props.preferredSize
     });
-  }
+  };
 
   //
   // Render
@@ -149,13 +150,13 @@ class QualityDefinition extends Component {
     } = this.state;
 
     const minBytes = minSize * 1024 * 1024;
-    const minSixty = `${formatBytes(minBytes * 60)}/h`;
+    const minSixty = `${formatBytes(minBytes * 60)}/${translate('HourShorthand')}`;
 
     const preferredBytes = preferredSize * 1024 * 1024;
-    const preferredSixty = preferredBytes ? `${formatBytes(preferredBytes * 60)}/h` : translate('Unlimited');
+    const preferredSixty = preferredBytes ? `${formatBytes(preferredBytes * 60)}/${translate('HourShorthand')}` : translate('Unlimited');
 
     const maxBytes = maxSize && maxSize * 1024 * 1024;
-    const maxSixty = maxBytes ? `${formatBytes(maxBytes * 60)}/h` : translate('Unlimited');
+    const maxSixty = maxBytes ? `${formatBytes(maxBytes * 60)}/${translate('HourShorthand')}` : translate('Unlimited');
 
     return (
       <div className={styles.qualityDefinition}>
@@ -176,7 +177,7 @@ class QualityDefinition extends Component {
             min={slider.min}
             max={slider.max}
             step={slider.step}
-            minDistance={3}
+            minDistance={MIN_DISTANCE * 3}
             value={[sliderMinSize, sliderPreferredSize, sliderMaxSize]}
             withTracks={true}
             allowCross={false}
@@ -250,7 +251,7 @@ class QualityDefinition extends Component {
                   name={`${id}.min`}
                   value={minSize || MIN}
                   min={MIN}
-                  max={preferredSize ? preferredSize - 5 : MAX - 5}
+                  max={preferredSize ? preferredSize - MIN_DISTANCE : MAX - MIN_DISTANCE}
                   step={0.1}
                   isFloat={true}
                   onChange={this.onMinSizeChange}
@@ -263,9 +264,9 @@ class QualityDefinition extends Component {
                 <NumberInput
                   className={styles.sizeInput}
                   name={`${id}.min`}
-                  value={preferredSize || MAX - 5}
+                  value={preferredSize || MAX - MIN_DISTANCE}
                   min={MIN}
-                  max={maxSize ? maxSize - 5 : MAX - 5}
+                  max={maxSize ? maxSize - MIN_DISTANCE : MAX - MIN_DISTANCE}
                   step={0.1}
                   isFloat={true}
                   onChange={this.onPreferredSizeChange}
@@ -277,9 +278,9 @@ class QualityDefinition extends Component {
 
                 <NumberInput
                   className={styles.sizeInput}
-                  name={`${id}.min`}
+                  name={`${id}.max`}
                   value={maxSize || MAX}
-                  min={minSize + 5}
+                  min={minSize + MIN_DISTANCE}
                   max={MAX}
                   step={0.1}
                   isFloat={true}

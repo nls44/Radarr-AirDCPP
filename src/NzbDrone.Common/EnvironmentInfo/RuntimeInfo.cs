@@ -1,15 +1,11 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Reflection;
 using System.Security.Principal;
-using System.ServiceProcess;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.WindowsServices;
 using NLog;
 using NzbDrone.Common.Processes;
-
-#if NETCOREAPP
-using Microsoft.Extensions.Hosting.WindowsServices;
-#endif
 
 namespace NzbDrone.Common.EnvironmentInfo
 {
@@ -18,22 +14,22 @@ namespace NzbDrone.Common.EnvironmentInfo
         private readonly Logger _logger;
         private readonly DateTime _startTime = DateTime.UtcNow;
 
-        public RuntimeInfo(IServiceProvider serviceProvider, Logger logger)
+        public RuntimeInfo(Logger logger, IHostLifetime hostLifetime = null)
         {
             _logger = logger;
 
-            IsWindowsService = !IsUserInteractive &&
-                               OsInfo.IsWindows &&
-                               serviceProvider.ServiceExist(ServiceProvider.SERVICE_NAME) &&
-                               serviceProvider.GetStatus(ServiceProvider.SERVICE_NAME) == ServiceControllerStatus.StartPending;
+            IsWindowsService = hostLifetime is WindowsServiceLifetime;
+            IsStarting = true;
 
-            //Guarded to avoid issues when running in a non-managed process
-            var entry = Assembly.GetEntryAssembly();
+            // net6.0 will return Radarr.dll for entry assembly, we need the actual
+            // executable name (Radarr on linux).  On mono this will return the location of
+            // the mono executable itself, which is not what we want.
+            var entry = Process.GetCurrentProcess().MainModule;
 
             if (entry != null)
             {
-                ExecutingApplication = entry.Location;
-                IsWindowsTray = OsInfo.IsWindows && entry.ManifestModule.Name == $"{ProcessProvider.RADARR_PROCESS_NAME}.exe";
+                ExecutingApplication = entry.FileName;
+                IsWindowsTray = OsInfo.IsWindows && entry.ModuleName == $"{ProcessProvider.RADARR_PROCESS_NAME}.exe";
             }
         }
 
@@ -59,12 +55,7 @@ namespace NzbDrone.Common.EnvironmentInfo
             }
         }
 
-#if !NETCOREAPP
         public static bool IsUserInteractive => Environment.UserInteractive;
-#else
-        // Note that Environment.UserInteractive is always true on net core: https://stackoverflow.com/a/57325783
-        public static bool IsUserInteractive => OsInfo.IsWindows && !WindowsServiceHelpers.IsWindowsService();
-#endif
 
         bool IRuntimeInfo.IsUserInteractive => IsUserInteractive;
 
@@ -92,6 +83,7 @@ namespace NzbDrone.Common.EnvironmentInfo
 
         public bool IsWindowsService { get; private set; }
 
+        public bool IsStarting { get; set; }
         public bool IsExiting { get; set; }
         public bool IsTray
         {
@@ -214,7 +206,7 @@ namespace NzbDrone.Common.EnvironmentInfo
 
         private static bool InternalIsOfficialBuild()
         {
-            //Official builds will never have such a high revision
+            // Official builds will never have such a high revision
             if (BuildInfo.Version.Major >= 10 || BuildInfo.Version.Revision > 10000)
             {
                 return false;
