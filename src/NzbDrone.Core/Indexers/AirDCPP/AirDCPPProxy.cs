@@ -69,7 +69,7 @@ namespace NzbDrone.Core.Indexers.AirDCPP
         {
             var sw = new Stopwatch();
             sw.Start();
-            bool flag = false;
+            var flag = false;
             while (!flag)
             {
                 if (sw.ElapsedMilliseconds > millisecond)
@@ -136,12 +136,12 @@ namespace NzbDrone.Core.Indexers.AirDCPP
             ProcessRequest<DownloadResultResponse>(downloadRequest);
 
             // next, search for the id of the bundle that has now been added to the queue
-            string downloadBundleId = string.Empty;
+            var downloadBundleId = string.Empty;
 
             while (string.IsNullOrEmpty(downloadBundleId))
             {
                 var queueResults = GetQueueHistory(settings);
-                downloadBundleId = queueResults.Where(result => result.name == title).FirstOrDefault()?.id.ToString();
+                downloadBundleId = queueResults.FirstOrDefault(result => result.name == title)?.id.ToString();
                 Delay(1000);
             }
 

@@ -19,6 +19,6 @@
 .directConnect {
   composes: label from '~Components/Label.css';
 
-  border-color: $usenetColor;
-  background-color: $usenetColor;
+  border-color: var(--usenetColor);
+  background-color: var(--usenetColor);
 }

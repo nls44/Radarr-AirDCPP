@@ -72,12 +72,13 @@ namespace NzbDrone.Core.Jobs
                         TypeName = typeof(MessagingCleanupCommand).FullName
                     },
 
-                    new ScheduledTask 
-                    { 
-                    	Interval = 30,
-                    	TypeName = typeof(MissingMoviesSearchCommand).FullName
+                    new ScheduledTask
+                    {
+                        Interval = 30,
+                        TypeName = typeof(MissingMoviesSearchCommand).FullName
                     },
-                    
+
+                    new ScheduledTask
                     {
                         Interval = 6 * 60,
                         TypeName = typeof(ApplicationCheckUpdateCommand).FullName

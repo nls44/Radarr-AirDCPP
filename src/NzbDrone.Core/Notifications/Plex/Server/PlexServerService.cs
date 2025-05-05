@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using FluentValidation.Results;
@@ -8,6 +9,7 @@ using NLog;
 using NzbDrone.Common.Cache;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Localization;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.RootFolders;
@@ -28,14 +30,24 @@ namespace NzbDrone.Core.Notifications.Plex.Server
         private readonly IPlexServerProxy _plexServerProxy;
         private readonly IRootFolderService _rootFolderService;
         private readonly ILocalizationService _localizationService;
+        private readonly IConfigService _configService;
+        private readonly IDiskProvider _diskProvider;
         private readonly Logger _logger;
 
-        public PlexServerService(ICacheManager cacheManager, IPlexServerProxy plexServerProxy, IRootFolderService rootFolderService, ILocalizationService localizationService, Logger logger)
+        public PlexServerService(ICacheManager cacheManager,
+            IPlexServerProxy plexServerProxy,
+            IRootFolderService rootFolderService,
+            ILocalizationService localizationService,
+            IConfigService configService,
+            IDiskProvider diskProvider,
+            Logger logger)
         {
             _versionCache = cacheManager.GetCache<Version>(GetType(), "versionCache");
             _plexServerProxy = plexServerProxy;
             _rootFolderService = rootFolderService;
             _localizationService = localizationService;
+            _configService = configService;
+            _diskProvider = diskProvider;
             _logger = logger;
         }
 
@@ -99,6 +111,37 @@ namespace NzbDrone.Core.Notifications.Plex.Server
         {
             var rootFolderPath = _rootFolderService.GetBestRootFolderPath(movie.Path);
             var movieRelativePath = rootFolderPath.GetRelativePath(movie.Path);
+
+            var moviePath = movie.Path;
+            _logger.Debug("Movie path: {0}, movie file path: {1}", movie.Path, movie.MovieFile?.Path);
+
+            if (_configService.CopyUsingSymlinks && movie.MovieFile != null)
+            {
+                _logger.Debug("Getting real path from symlink");
+                var realPath = _diskProvider.GetRealPath(movie.MovieFile.Path);
+                moviePath = _diskProvider.GetDirectoryName(realPath);
+                _logger.Debug("Updated movie path: {0}", moviePath);
+
+                var movieLocation = _diskProvider.GetParentFolder(moviePath).TrimEnd(Path.DirectorySeparatorChar);
+                _logger.Debug("Searching matching section for {0}", movieLocation);
+                var matchingSections = sections.Where(section => section.Locations.Any(location =>
+                        location.Path.TrimEnd(Path.DirectorySeparatorChar) == movieLocation))
+                        .ToList();
+
+                if (matchingSections.Any())
+                {
+                    foreach (var matchingSection in matchingSections)
+                    {
+                        _plexServerProxy.UpdateMovie(moviePath, matchingSection.Id, settings);
+                    }
+                }
+                else
+                {
+                    _logger.Warn("Failed to find matching section for {0}", movieLocation);
+                }
+
+                return;
+            }
 
             // Try to update a matching section location before falling back to updating all section locations.
             foreach (var section in sections)

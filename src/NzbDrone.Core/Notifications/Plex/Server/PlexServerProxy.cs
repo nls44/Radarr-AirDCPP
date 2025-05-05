@@ -77,7 +77,7 @@ namespace NzbDrone.Core.Notifications.Plex.Server
         {
             var resource = $"library/sections/{sectionId}/refresh";
 
-            var request = BuildRequest(resource, HttpMethod.GET, settings);
+            var request = BuildRequest(resource, HttpMethod.Get, settings);
             request.AddQueryParam("path", path);
 
             var response = ProcessRequest(request);
