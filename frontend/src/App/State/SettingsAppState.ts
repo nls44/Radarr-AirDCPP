@@ -20,6 +20,7 @@ import NamingConfig from 'typings/Settings/NamingConfig';
 import NamingExample from 'typings/Settings/NamingExample';
 import ReleaseProfile from 'typings/Settings/ReleaseProfile';
 import UiSettings from 'typings/Settings/UiSettings';
+import MetadataAppState from './MetadataAppState';
 
 export interface DownloadClientAppState
   extends AppSectionState<DownloadClient>,
@@ -36,8 +37,7 @@ export interface NamingAppState
   extends AppSectionItemState<NamingConfig>,
     AppSectionSaveState {}
 
-export interface NamingExamplesAppState
-  extends AppSectionItemState<NamingExample> {}
+export type NamingExamplesAppState = AppSectionItemState<NamingExample>;
 
 export interface ImportListAppState
   extends AppSectionState<ImportList>,
@@ -97,6 +97,7 @@ interface SettingsAppState {
   indexerFlags: IndexerFlagSettingsAppState;
   indexers: IndexerAppState;
   languages: LanguageSettingsAppState;
+  metadata: MetadataAppState;
   naming: NamingAppState;
   namingExamples: NamingExamplesAppState;
   notifications: NotificationAppState;

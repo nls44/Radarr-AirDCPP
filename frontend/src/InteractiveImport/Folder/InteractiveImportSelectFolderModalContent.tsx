@@ -3,13 +3,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import { createSelector } from 'reselect';
 import AppState from 'App/State/AppState';
 import * as commandNames from 'Commands/commandNames';
-import PathInputConnector from 'Components/Form/PathInputConnector';
+import PathInput from 'Components/Form/PathInput';
 import Icon from 'Components/Icon';
 import Button from 'Components/Link/Button';
 import ModalBody from 'Components/Modal/ModalBody';
 import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
+import Column from 'Components/Table/Column';
 import Table from 'Components/Table/Table';
 import TableBody from 'Components/Table/TableBody';
 import { icons, kinds, sizes } from 'Helpers/Props';
@@ -20,29 +21,34 @@ import FavoriteFolderRow from './FavoriteFolderRow';
 import RecentFolderRow from './RecentFolderRow';
 import styles from './InteractiveImportSelectFolderModalContent.css';
 
-const favoriteFoldersColumns = [
+const favoriteFoldersColumns: Column[] = [
   {
     name: 'folder',
     label: () => translate('Folder'),
+    isVisible: true,
   },
   {
     name: 'actions',
     label: '',
+    isVisible: true,
   },
 ];
 
-const recentFoldersColumns = [
+const recentFoldersColumns: Column[] = [
   {
     name: 'folder',
     label: () => translate('Folder'),
+    isVisible: true,
   },
   {
     name: 'lastUsed',
     label: () => translate('LastUsed'),
+    isVisible: true,
   },
   {
     name: 'actions',
     label: '',
+    isVisible: true,
   },
 ];
 
@@ -113,9 +119,10 @@ function InteractiveImportSelectFolderModalContent(
       </ModalHeader>
 
       <ModalBody>
-        <PathInputConnector
+        <PathInput
           name="folder"
           value={folder}
+          includeFiles={false}
           onChange={onPathChange}
         />
 

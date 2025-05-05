@@ -275,7 +275,6 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
             movie.Genres = resource.Genres;
             movie.Images = resource.Images.Select(MapImage).ToList();
 
-            // movie.Genres = resource.Genres;
             movie.Recommendations = resource.Recommendations?.Select(r => r.TmdbId).ToList() ?? new List<int>();
 
             // Workaround due to metadata change until cache cleans up
@@ -618,7 +617,7 @@ namespace NzbDrone.Core.MetadataSource.SkyHook
             var newAlternativeTitle = new AlternativeTitle
             {
                 Title = arg.Title,
-                SourceType = SourceType.TMDB,
+                SourceType = SourceType.Tmdb,
                 CleanTitle = arg.Title.CleanMovieTitle()
             };
 

@@ -1,11 +1,16 @@
 import Column from 'Components/Table/Column';
 import { SortDirection } from 'Helpers/Props/sortDirections';
-import { FilterBuilderProp, PropertyFilter } from './AppState';
+import { ValidationFailure } from 'typings/pending';
+import { Filter, FilterBuilderProp } from './AppState';
 
 export interface Error {
-  responseJSON: {
-    message: string;
-  };
+  status?: number;
+  responseJSON:
+    | {
+        message: string | undefined;
+      }
+    | ValidationFailure[]
+    | undefined;
 }
 
 export interface AppSectionDeleteState {
@@ -30,7 +35,7 @@ export interface TableAppSectionState {
 
 export interface AppSectionFilterState<T> {
   selectedFilterKey: string;
-  filters: PropertyFilter[];
+  filters: Filter[];
   filterBuilderProps: FilterBuilderProp<T>[];
 }
 
@@ -49,6 +54,16 @@ export interface AppSectionItemState<T> {
   error: Error;
   pendingChanges: Partial<T>;
   item: T;
+}
+
+export interface AppSectionProviderState<T>
+  extends AppSectionDeleteState,
+    AppSectionSaveState {
+  isFetching: boolean;
+  isPopulated: boolean;
+  error: Error;
+  items: T[];
+  pendingChanges: Partial<T>;
 }
 
 interface AppSectionState<T> {

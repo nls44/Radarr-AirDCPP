@@ -25,6 +25,11 @@ namespace Radarr.Api.V3.ManualImport
         [Produces("application/json")]
         public List<ManualImportResource> GetMediaFiles(string folder, string downloadId, int? movieId, bool filterExistingFiles = true)
         {
+            if (movieId.HasValue && downloadId.IsNullOrWhiteSpace())
+            {
+                return _manualImportService.GetMediaFiles(movieId.Value).ToResource().Select(AddQualityWeight).ToList();
+            }
+
             return _manualImportService.GetMediaFiles(folder, downloadId, movieId, filterExistingFiles).ToResource().Select(AddQualityWeight).ToList();
         }
 
@@ -38,7 +43,7 @@ namespace Radarr.Api.V3.ManualImport
 
                 item.Movie = processedItem.Movie.ToResource(0);
                 item.IndexerFlags = processedItem.IndexerFlags;
-                item.Rejections = processedItem.Rejections;
+                item.Rejections = processedItem.Rejections.Select(r => r.ToResource());
                 item.CustomFormats = processedItem.CustomFormats.ToResource(false);
                 item.CustomFormatScore = processedItem.CustomFormatScore;
 

@@ -66,6 +66,7 @@ namespace NzbDrone.Core.Configuration
         string PostgresMainDb { get; }
         string PostgresLogDb { get; }
         string Theme { get; }
+        bool TrustCgnatIpAddresses { get; }
     }
 
     public class ConfigFileProvider : IConfigFileProvider
@@ -263,7 +264,21 @@ namespace NzbDrone.Core.Configuration
         }
 
         public string UiFolder => BuildInfo.IsDebug ? Path.Combine("..", "UI") : "UI";
-        public string InstanceName => _appOptions.InstanceName ?? GetValue("InstanceName", BuildInfo.AppName);
+
+        public string InstanceName
+        {
+            get
+            {
+                var instanceName = _appOptions.InstanceName ?? GetValue("InstanceName", BuildInfo.AppName);
+
+                if (instanceName.Contains(BuildInfo.AppName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return instanceName;
+                }
+
+                return BuildInfo.AppName;
+            }
+        }
 
         public bool UpdateAutomatically => _updateOptions.Automatically ?? GetValueBoolean("UpdateAutomatically", OsInfo.IsWindows, false);
 
@@ -461,5 +476,7 @@ namespace NzbDrone.Core.Configuration
         {
             SetValue("ApiKey", GenerateApiKey());
         }
+
+        public bool TrustCgnatIpAddresses => _authOptions.TrustCgnatIpAddresses ?? GetValueBoolean("TrustCgnatIpAddresses", false, persist: false);
     }
 }

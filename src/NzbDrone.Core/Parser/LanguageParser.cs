@@ -15,8 +15,9 @@ namespace NzbDrone.Core.Parser
     {
         private static readonly Logger Logger = NzbDroneLogger.GetLogger(typeof(LanguageParser));
 
-        private static readonly Regex LanguageRegex = new Regex(@"(?:\W|_|^)(?<italian>\b(?:ita|italian)\b)|
-                                                                            (?<german>german\b|videomann|ger[. ]dub)|
+        private static readonly Regex LanguageRegex = new Regex(@"(?:\W|_|^)(?<english>\beng\b)|
+                                                                            (?<italian>\b(?:ita|italian)\b)|
+                                                                            (?<german>german\b|videomann|ger[. ]dub|\bger\b)|
                                                                             (?<flemish>flemish)|
                                                                             (?<bulgarian>bgaudio)|
                                                                             (?<romanian>rodubbed)|
@@ -24,7 +25,6 @@ namespace NzbDrone.Core.Parser
                                                                             (?<greek>greek)|
                                                                             (?<french>\b(?:FR|VO|VF|VFF|VFQ|VFI|VF2|TRUEFRENCH|FRENCH|FRE|FRA)\b)|
                                                                             (?<russian>\b(?:rus|ru)\b)|
-                                                                            (?<english>\beng\b)|
                                                                             (?<hungarian>\b(?:HUNDUB|HUN)\b)|
                                                                             (?<hebrew>\b(?:HebDub|HebDubbed)\b)|
                                                                             (?<polish>\b(?:PL\W?DUB|DUB\W?PL|LEK\W?PL|PL\W?LEK)\b)|
@@ -34,14 +34,20 @@ namespace NzbDrone.Core.Parser
                                                                             (?<catalan>\b(?:catalan?|catalán|català)\b)|
                                                                             (?<latvian>\b(?:lat|lav|lv)\b)|
                                                                             (?<telugu>\btel\b)|
-                                                                            (?<vietnamese>\bVIE\b)",
+                                                                            (?<vietnamese>\bVIE\b)|
+                                                                            (?<japanese>\bJAP\b)|
+                                                                            (?<korean>\bKOR\b)|
+                                                                            (?<urdu>\burdu\b)|
+                                                                            (?<original>\b(?:orig|original)\b)",
                                                                 RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace);
 
-        private static readonly Regex CaseSensitiveLanguageRegex = new Regex(@"(?:(?i)(?<!SUB[\W|_|^]))(?:(?<lithuanian>\bLT\b)|
+        private static readonly Regex CaseSensitiveLanguageRegex = new Regex(@"(?:(?i)(?<!SUB[\W|_|^]))(?:(?<english>\bEN\b)|
+                                                                                                          (?<lithuanian>\bLT\b)|
                                                                                                           (?<czech>\bCZ\b)|
                                                                                                           (?<polish>\bPL\b)|
                                                                                                           (?<bulgarian>\bBG\b)|
                                                                                                           (?<slovak>\bSK\b)|
+                                                                                                          (?<german>\bDE\b)|
                                                                                                           (?<spanish>\b(?<!DTS[._ -])ES\b))(?:(?i)(?![\W|_|^]SUB))",
                                                                 RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace);
 
@@ -239,11 +245,26 @@ namespace NzbDrone.Core.Parser
                 languages.Add(Language.Afrikaans);
             }
 
-            // Case sensitive
+            if (lowerTitle.Contains("marathi"))
+            {
+                languages.Add(Language.Marathi);
+            }
+
+            if (lowerTitle.Contains("tagalog"))
+            {
+                languages.Add(Language.Tagalog);
+            }
+
+            // Case-sensitive
             var caseSensitiveMatches = CaseSensitiveLanguageRegex.Matches(title);
 
             foreach (Match match in caseSensitiveMatches)
             {
+                if (match.Groups["english"].Captures.Any())
+                {
+                    languages.Add(Language.English);
+                }
+
                 if (match.Groups["lithuanian"].Captures.Any())
                 {
                     languages.Add(Language.Lithuanian);
@@ -273,12 +294,23 @@ namespace NzbDrone.Core.Parser
                 {
                     languages.Add(Language.Spanish);
                 }
+
+                if (match.Groups["german"].Captures.Any())
+                {
+                    languages.Add(Language.German);
+                }
             }
 
+            // Case-insensitive
             var matches = LanguageRegex.Matches(title);
 
             foreach (Match match in matches)
             {
+                if (match.Groups["english"].Success)
+                {
+                    languages.Add(Language.English);
+                }
+
                 if (match.Groups["italian"].Captures.Any())
                 {
                     languages.Add(Language.Italian);
@@ -307,11 +339,6 @@ namespace NzbDrone.Core.Parser
                 if (match.Groups["russian"].Success)
                 {
                     languages.Add(Language.Russian);
-                }
-
-                if (match.Groups["english"].Success)
-                {
-                    languages.Add(Language.English);
                 }
 
                 if (match.Groups["bulgarian"].Success)
@@ -382,6 +409,26 @@ namespace NzbDrone.Core.Parser
                 if (match.Groups["vietnamese"].Success)
                 {
                     languages.Add(Language.Vietnamese);
+                }
+
+                if (match.Groups["japanese"].Success)
+                {
+                    languages.Add(Language.Japanese);
+                }
+
+                if (match.Groups["korean"].Success)
+                {
+                    languages.Add(Language.Korean);
+                }
+
+                if (match.Groups["urdu"].Success)
+                {
+                    languages.Add(Language.Urdu);
+                }
+
+                if (match.Groups["original"].Success)
+                {
+                    languages.Add(Language.Original);
                 }
             }
 

@@ -6,30 +6,35 @@ import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
 import { scrollDirections } from 'Helpers/Props';
-import InteractiveSearchConnector from 'InteractiveSearch/InteractiveSearchConnector';
+import InteractiveSearch from 'InteractiveSearch/InteractiveSearch';
+import { clearMovieBlocklist } from 'Store/Actions/movieBlocklistActions';
+import { clearMovieHistory } from 'Store/Actions/movieHistoryActions';
 import {
   cancelFetchReleases,
   clearReleases,
 } from 'Store/Actions/releaseActions';
 import translate from 'Utilities/String/translate';
 
-interface MovieInteractiveSearchModalContentProps {
+export interface MovieInteractiveSearchModalContentProps {
   movieId: number;
   movieTitle?: string;
   onModalClose(): void;
 }
 
-function MovieInteractiveSearchModalContent(
-  props: MovieInteractiveSearchModalContentProps
-) {
-  const { movieId, movieTitle, onModalClose } = props;
-
+function MovieInteractiveSearchModalContent({
+  movieId,
+  movieTitle,
+  onModalClose,
+}: MovieInteractiveSearchModalContentProps) {
   const dispatch = useDispatch();
 
   useEffect(() => {
     return () => {
       dispatch(cancelFetchReleases());
       dispatch(clearReleases());
+
+      dispatch(clearMovieBlocklist());
+      dispatch(clearMovieHistory());
     };
   }, [dispatch]);
 
@@ -44,7 +49,7 @@ function MovieInteractiveSearchModalContent(
       </ModalHeader>
 
       <ModalBody scrollDirection={scrollDirections.BOTH}>
-        <InteractiveSearchConnector searchPayload={{ movieId }} />
+        <InteractiveSearch searchPayload={{ movieId }} />
       </ModalBody>
 
       <ModalFooter>

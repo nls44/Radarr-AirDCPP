@@ -6,9 +6,9 @@ import TableSelectCell from 'Components/Table/Cells/TableSelectCell';
 import TableRow from 'Components/Table/TableRow';
 import movieEntities from 'Movie/movieEntities';
 import MovieSearchCell from 'Movie/MovieSearchCell';
-import MovieStatusConnector from 'Movie/MovieStatusConnector';
+import MovieStatus from 'Movie/MovieStatus';
 import MovieTitleLink from 'Movie/MovieTitleLink';
-import MovieFileLanguageConnector from 'MovieFile/MovieFileLanguageConnector';
+import MovieFileLanguages from 'MovieFile/MovieFileLanguages';
 import styles from './CutoffUnmetRow.css';
 
 function CutoffUnmetRow(props) {
@@ -104,7 +104,7 @@ function CutoffUnmetRow(props) {
                 key={name}
                 className={styles.languages}
               >
-                <MovieFileLanguageConnector
+                <MovieFileLanguages
                   movieFileId={movieFileId}
                 />
               </TableRowCell>
@@ -127,7 +127,7 @@ function CutoffUnmetRow(props) {
                 key={name}
                 className={styles.status}
               >
-                <MovieStatusConnector
+                <MovieStatus
                   movieId={id}
                   movieFileId={movieFileId}
                   movieEntity={movieEntities.WANTED_CUTOFF_UNMET}

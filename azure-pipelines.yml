@@ -9,7 +9,7 @@ variables:
   testsFolder: './_tests'
   yarnCacheFolder: $(Pipeline.Workspace)/.yarn
   nugetCacheFolder: $(Pipeline.Workspace)/.nuget/packages
-  majorVersion: '5.16.1'
+  majorVersion: '5.23.2'
   minorVersion: $[counter('minorVersion', 2000)]
   radarrVersion: '$(majorVersion).$(minorVersion)'
   buildName: '$(Build.SourceBranchName).$(radarrVersion)'
@@ -19,7 +19,7 @@ variables:
   nodeVersion: '20.X'
   innoVersion: '6.2.2'
   windowsImage: 'windows-2022'
-  linuxImage: 'ubuntu-20.04'
+  linuxImage: 'ubuntu-22.04'
   macImage: 'macOS-13'
 
 trigger:
@@ -1116,20 +1116,20 @@ stages:
         vmImage: ${{ variables.windowsImage }}
       steps:
       - checkout: self # Need history for Sonar analysis
-      - task: SonarCloudPrepare@2
+      - task: SonarCloudPrepare@3
         env:
           SONAR_SCANNER_OPTS: ''
         inputs:
           SonarCloud: 'SonarCloud'
           organization: 'radarr'
-          scannerMode: 'CLI'
+          scannerMode: 'cli'
           configMode: 'manual'
           cliProjectKey: 'Radarr_Radarr.UI'
           cliProjectName: 'RadarrUI'
           cliProjectVersion: '$(radarrVersion)'
           cliSources: './frontend'
-      - task: SonarCloudAnalyze@2
-      
+      - task: SonarCloudAnalyze@3
+
     - job: Api_Docs
       displayName: API Docs
       dependsOn: Prepare
@@ -1205,12 +1205,12 @@ stages:
         submodules: true
       - powershell: Set-Service SCardSvr -StartupType Manual
         displayName: Enable Windows Test Service
-      - task: SonarCloudPrepare@2
+      - task: SonarCloudPrepare@3
         condition: eq(variables['System.PullRequest.IsFork'], 'False')
         inputs:
           SonarCloud: 'SonarCloud'
           organization: 'radarr'
-          scannerMode: 'MSBuild'
+          scannerMode: 'dotnet'
           projectKey: 'Radarr_Radarr'
           projectName: 'Radarr'
           projectVersion: '$(radarrVersion)'
@@ -1223,7 +1223,7 @@ stages:
           ./build.sh --backend -f net6.0 -r win-x64
           TEST_DIR=_tests/net6.0/win-x64/publish/ ./test.sh Windows Unit Coverage
         displayName: Coverage Unit Tests
-      - task: SonarCloudAnalyze@2
+      - task: SonarCloudAnalyze@3
         condition: eq(variables['System.PullRequest.IsFork'], 'False')
         displayName: Publish SonarCloud Results
       - task: reportgenerator@5.3.11
