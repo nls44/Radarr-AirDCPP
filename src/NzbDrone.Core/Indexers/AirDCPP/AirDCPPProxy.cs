@@ -160,7 +160,7 @@ namespace NzbDrone.Core.Indexers.AirDCPP
             var requestBuilder = new HttpRequestBuilder(Settings.BaseUrl)
             {
                 LogResponseContent = true,
-                NetworkCredential = new NetworkCredential(Settings.Username, Settings.Password)
+                NetworkCredential = new BasicNetworkCredential(Settings.Username, Settings.Password)
             };
             requestBuilder.SetHeader("Content-Type", "application/json");
 
@@ -172,7 +172,7 @@ namespace NzbDrone.Core.Indexers.AirDCPP
             var requestBuilder = new HttpRequestBuilder(settings.BaseUrl)
             {
                 LogResponseContent = true,
-                NetworkCredential = new NetworkCredential(settings.Username, settings.Password)
+                NetworkCredential = new BasicNetworkCredential(settings.Username, settings.Password)
             };
             requestBuilder.SetHeader("Content-Type", "application/json");
 
