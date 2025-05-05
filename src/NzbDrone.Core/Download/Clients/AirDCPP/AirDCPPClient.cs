@@ -7,7 +7,7 @@ using NzbDrone.Common.Disk;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Indexers.AirDCPP;
-using NzbDrone.Core.Organizer;
+using NzbDrone.Core.Localization;
 using NzbDrone.Core.RemotePathMappings;
 
 namespace NzbDrone.Core.Download.Clients.AirDCPP
@@ -21,11 +21,11 @@ namespace NzbDrone.Core.Download.Clients.AirDCPP
         public AirDCPPClient(
                       IHttpClient httpClient,
                       IConfigService configService,
-                      INamingConfigService namingConfigService,
                       IDiskProvider diskProvider,
                       IRemotePathMappingService remotePathMappingService,
-                      Logger logger)
-            : base(httpClient, configService, namingConfigService, diskProvider, remotePathMappingService, logger)
+                      Logger logger,
+                      ILocalizationService localizationService)
+            : base(httpClient, configService, diskProvider, remotePathMappingService, logger, localizationService)
         {
             _airDCPPProxy = new AirDCPPProxy(httpClient, logger);
         }
@@ -35,7 +35,7 @@ namespace NzbDrone.Core.Download.Clients.AirDCPP
             var results = _airDCPPProxy.GetQueueHistory(Settings);
             return results.Select(result => new DownloadClientItem
             {
-                DownloadClientInfo = DownloadClientItemClientInfo.FromDownloadClient(this),
+                DownloadClientInfo = DownloadClientItemClientInfo.FromDownloadClient(this, false),
                 DownloadId = result.id.ToString(),
                 RemainingTime = TimeSpan.FromSeconds((long)result.seconds_left),
                 RemainingSize = (long)(result.size - result.downloaded_bytes),
@@ -46,6 +46,11 @@ namespace NzbDrone.Core.Download.Clients.AirDCPP
             });
         }
 
+        public override void RemoveItem(DownloadClientItem item, bool deleteData)
+        {
+            _logger.Warn("Removing items from AirDCPP is not supported yet");
+        }
+
         public override DownloadClientInfo GetStatus()
         {
             return new DownloadClientInfo
@@ -53,11 +58,6 @@ namespace NzbDrone.Core.Download.Clients.AirDCPP
                 IsLocalhost = false,
                 OutputRootFolders = new List<OsPath> { new OsPath(Settings.DownloadDirectory) }
             };
-        }
-
-        public override void RemoveItem(string downloadId, bool deleteData)
-        {
-            throw new NotImplementedException();
         }
 
         protected override void Test(List<ValidationFailure> failures)
