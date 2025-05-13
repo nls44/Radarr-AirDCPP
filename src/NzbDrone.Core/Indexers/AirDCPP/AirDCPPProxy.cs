@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -55,7 +55,7 @@ namespace NzbDrone.Core.Indexers.AirDCPP
 
             var searchResultsRequest = BuildRequest().Resource($"search/{searchInstanceId}/results/0/1000");
 
-            Delay(settings.Delay);
+            Thread.Sleep(settings.Delay);
 
             return searchResultsRequest.Build();
         }
@@ -63,23 +63,6 @@ namespace NzbDrone.Core.Indexers.AirDCPP
         private string RemoveInvalidChars(string filename)
         {
             return Regex.Replace(filename, @"[^0-9A-Za-z ,]", "");
-        }
-
-        private bool Delay(int millisecond)
-        {
-            var sw = new Stopwatch();
-            sw.Start();
-            var flag = false;
-            while (!flag)
-            {
-                if (sw.ElapsedMilliseconds > millisecond)
-                {
-                    flag = true;
-                }
-            }
-
-            sw.Stop();
-            return true;
         }
 
         private int CreateSearchInstance()
@@ -113,7 +96,7 @@ namespace NzbDrone.Core.Indexers.AirDCPP
             if (response.queue_time > 0)
             {
                 _logger.Debug($"AirDCPP queue time was > 0: waiting for {response.queue_time}ms");
-                Delay(response.queue_time);
+                Thread.Sleep(response.queue_time);
             }
         }
 
@@ -142,7 +125,7 @@ namespace NzbDrone.Core.Indexers.AirDCPP
             {
                 var queueResults = GetQueueHistory(settings);
                 downloadBundleId = queueResults.FirstOrDefault(result => result.name == title)?.id.ToString();
-                Delay(1000);
+                Thread.Sleep(1000);
             }
 
             return downloadBundleId;
