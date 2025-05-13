@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NzbDrone.Common.EnvironmentInfo;
+using NzbDrone.Common.Serializer;
 using NzbDrone.Core.Authentication;
 
 namespace Radarr.Http.Authentication
@@ -16,21 +17,24 @@ namespace Radarr.Http.Authentication
     public class BasicAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
     {
         private readonly IAuthenticationService _authService;
+        private ILogger<BasicAuthenticationHandler> _logger;
 
         public BasicAuthenticationHandler(IAuthenticationService authService,
             IOptionsMonitor<AuthenticationSchemeOptions> options,
-            ILoggerFactory logger,
+            ILoggerFactory loggerFactory,
             UrlEncoder encoder,
             ISystemClock clock)
-            : base(options, logger, encoder, clock)
+            : base(options, loggerFactory, encoder, clock)
         {
             _authService = authService;
+            _logger = loggerFactory.CreateLogger<BasicAuthenticationHandler>();
         }
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
             if (!Request.Headers.ContainsKey("Authorization"))
             {
+                _logger.LogTrace("No Authorization header found for request: {RequestPath}, {Json}", Request.Path, Request.Headers.ToJson());
                 return Task.FromResult(AuthenticateResult.Fail("Authorization header missing."));
             }
 
