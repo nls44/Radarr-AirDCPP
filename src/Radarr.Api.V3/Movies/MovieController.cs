@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Datastore.Events;
@@ -47,6 +48,7 @@ namespace Radarr.Api.V3.Movies
         private readonly IRootFolderService _rootFolderService;
         private readonly IUpgradableSpecification _qualityUpgradableSpecification;
         private readonly IConfigService _configService;
+        private readonly IDiskProvider _diskProvider;
 
         public MovieController(IBroadcastSignalRMessage signalRBroadcaster,
                            IMovieService moviesService,
@@ -58,6 +60,7 @@ namespace Radarr.Api.V3.Movies
                            IRootFolderService rootFolderService,
                            IUpgradableSpecification qualityUpgradableSpecification,
                            IConfigService configService,
+                           IDiskProvider diskProvider,
                            RootFolderValidator rootFolderValidator,
                            MappedNetworkDriveValidator mappedNetworkDriveValidator,
                            MoviePathValidator moviesPathValidator,
@@ -76,6 +79,7 @@ namespace Radarr.Api.V3.Movies
             _movieStatisticsService = movieStatisticsService;
             _qualityUpgradableSpecification = qualityUpgradableSpecification;
             _configService = configService;
+            _diskProvider = diskProvider;
             _coverMapper = coverMapper;
             _commandQueueManager = commandQueueManager;
             _rootFolderService = rootFolderService;
@@ -151,7 +155,11 @@ namespace Radarr.Api.V3.Movies
                 foreach (var movie in movies)
                 {
                     var translation = GetTranslationFromDict(tdict, movie.MovieMetadata, translationLanguage);
-                    moviesResources.Add(movie.ToResource(availDelay, translation, _qualityUpgradableSpecification));
+                    var resource = movie.ToResource(availDelay, translation, _qualityUpgradableSpecification);
+
+                    UpdateMovieResourceWithSymlinks(resource);
+
+                    moviesResources.Add(resource);
                 }
 
                 if (!excludeLocalCovers)
@@ -171,11 +179,26 @@ namespace Radarr.Api.V3.Movies
             return moviesResources;
         }
 
+        private void UpdateMovieResourceWithSymlinks(MovieResource resource)
+        {
+            if (_configService.CopyUsingSymlinks && resource.MovieFile != null)
+            {
+                var realPath = _diskProvider.GetRealPath(resource.MovieFile.Path);
+                resource.Path = _diskProvider.GetDirectoryName(realPath);
+
+                var originalFilePath = string.IsNullOrEmpty(resource.MovieFile.OriginalFilePath) ? resource.MovieFile.RelativePath :
+                    resource.MovieFile.OriginalFilePath.Substring(resource.MovieFile.OriginalFilePath.LastIndexOf(Path.DirectorySeparatorChar) + 1);
+                resource.MovieFile.RelativePath = originalFilePath;
+            }
+        }
+
         protected override MovieResource GetResourceById(int id)
         {
             var movie = _moviesService.GetMovie(id);
 
-            return MapToResource(movie);
+            var resource = MapToResource(movie);
+            UpdateMovieResourceWithSymlinks(resource);
+            return resource;
         }
 
         protected MovieResource MapToResource(Movie movie, Language translationLanguage = null)
