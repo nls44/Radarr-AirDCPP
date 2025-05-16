@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using DryIoc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -26,6 +28,7 @@ using NzbDrone.Host.AccessControl;
 using NzbDrone.Http.Authentication;
 using NzbDrone.SignalR;
 using Radarr.Api.V3.System;
+using Radarr.Api.V4.Movies;
 using Radarr.Http;
 using Radarr.Http.Authentication;
 using Radarr.Http.ClientSchema;
@@ -88,7 +91,10 @@ namespace NzbDrone.Host
             {
                 options.ReturnHttpNotAcceptable = true;
             })
+
+            // Register all controllers from the API and HTTP projects
             .AddApplicationPart(typeof(SystemController).Assembly)
+            .AddApplicationPart(typeof(MovieLookupController).Assembly)
             .AddApplicationPart(typeof(StaticResourceController).Assembly)
             .AddJsonOptions(options =>
             {
@@ -103,6 +109,18 @@ namespace NzbDrone.Host
                     Version = "3.0.0",
                     Title = "Radarr",
                     Description = "Radarr API docs",
+                    License = new OpenApiLicense
+                    {
+                        Name = "GPL-3.0",
+                        Url = new Uri("https://github.com/Radarr/Radarr/blob/develop/LICENSE")
+                    }
+                });
+
+                c.SwaggerDoc("v4", new OpenApiInfo
+                {
+                    Version = "4.0.0",
+                    Title = "Radarr",
+                    Description = "Radarr API docs - The v4 API docs apply to Radarr v6 only.",
                     License = new OpenApiLicense
                     {
                         Name = "GPL-3.0",
@@ -163,6 +181,37 @@ namespace NzbDrone.Host
                 });
 
                 c.DescribeAllParametersInCamelCase();
+
+                // Generate docs based on the controller's API version
+                c.DocInclusionPredicate((docName, apiDesc) =>
+                {
+                    Type type = null;
+
+                    if (apiDesc.ActionDescriptor is ControllerActionDescriptor controllerActionDescriptor)
+                    {
+                        type = controllerActionDescriptor.ControllerTypeInfo;
+                    }
+
+                    if (type == null)
+                    {
+                        return false;
+                    }
+
+                    var versions = new List<int>();
+
+                    versions.AddRange(type
+                        .GetCustomAttributes(true)
+                        .OfType<VersionedApiControllerAttribute>()
+                        .Select(attr => attr.Version));
+
+                    versions.AddRange(type
+                        .GetCustomAttributes(true)
+                        .OfType<VersionedFeedControllerAttribute>()
+                        .Select(attr => attr.Version));
+
+                    // Return anything with no version or a matching version
+                    return !versions.Any() || versions.Any(v => $"v{v}" == docName);
+                });
             });
 
             services
@@ -281,7 +330,7 @@ namespace NzbDrone.Host
             app.UseMiddleware<StartingUpMiddleware>();
             app.UseMiddleware<CacheHeaderMiddleware>();
             app.UseMiddleware<IfModifiedMiddleware>();
-            app.UseMiddleware<BufferingMiddleware>(new List<string> { "/api/v3/command" });
+            app.UseMiddleware<BufferingMiddleware>(new List<string> { "/api/v3/command", "/api/v4/command" });
 
             app.UseWebSockets();
 

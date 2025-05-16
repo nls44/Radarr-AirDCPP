@@ -9,6 +9,9 @@ namespace NzbDrone.Core.Organizer
 {
     public static class FileNameValidation
     {
+        public static readonly Regex DeprecatedMovieFolderTokensRegex = new (@"(\{[- ._\[\(]?(?:Original[- ._](?:Title|Filename)|Release[- ._]Group|Edition[- ._]Tags|Quality[- ._](?:Full|Title|Proper|Real)|MediaInfo[- ._](?:Video|VideoCodec|VideoBitDepth|Audio|AudioCodec|AudioChannels|AudioLanguages|AudioLanguagesAll|SubtitleLanguages|SubtitleLanguagesAll|3D|Simple|Full|VideoDynamicRange|VideoDynamicRangeType))[- ._\]\)]?\})",
+                                                                            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         internal static readonly Regex OriginalTokenRegex = new (@"(\{Original[- ._](?:Title|Filename)\})",
                                                                             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -24,6 +27,7 @@ namespace NzbDrone.Core.Organizer
         {
             ruleBuilder.SetValidator(new NotEmptyValidator(null));
             ruleBuilder.SetValidator(new IllegalCharactersValidator());
+            ruleBuilder.SetValidator(new IllegalMovieFolderTokensValidator());
 
             return ruleBuilder.SetValidator(new ValidMovieFolderFormatValidator());
         }
@@ -56,9 +60,31 @@ namespace NzbDrone.Core.Organizer
                 return false;
             }
 
-            // TODO: Deprecate OriginalTokenRegex use for Movie Folder Format
-            return FileNameBuilder.MovieTitleRegex.IsMatch(value) ||
-                   FileNameValidation.OriginalTokenRegex.IsMatch(value);
+            return FileNameBuilder.MovieTitleRegex.IsMatch(value);
+        }
+    }
+
+    public class IllegalMovieFolderTokensValidator : PropertyValidator
+    {
+        protected override string GetDefaultMessageTemplate() => "Must not contain deprecated tokens derived from file properties: {tokens}";
+
+        protected override bool IsValid(PropertyValidatorContext context)
+        {
+            if (context.PropertyValue is not string value)
+            {
+                return false;
+            }
+
+            var match = FileNameValidation.DeprecatedMovieFolderTokensRegex.Matches(value);
+
+            if (match.Any())
+            {
+                context.MessageFormatter.AppendArgument("tokens", string.Join(", ", match.Select(c => c.Value).ToArray()));
+
+                return false;
+            }
+
+            return true;
         }
     }
 

@@ -9,13 +9,13 @@ variables:
   testsFolder: './_tests'
   yarnCacheFolder: $(Pipeline.Workspace)/.yarn
   nugetCacheFolder: $(Pipeline.Workspace)/.nuget/packages
-  majorVersion: '5.23.3'
+  majorVersion: '6.0.0'
   minorVersion: $[counter('minorVersion', 2000)]
   radarrVersion: '$(majorVersion).$(minorVersion)'
   buildName: '$(Build.SourceBranchName).$(radarrVersion)'
   sentryOrg: 'servarr'
   sentryUrl: 'https://sentry.servarr.com'
-  dotnetVersion: '6.0.427'
+  dotnetVersion: '8.0.405'
   nodeVersion: '20.X'
   innoVersion: '6.2.2'
   windowsImage: 'windows-2022'
@@ -26,6 +26,7 @@ trigger:
   branches:
     include:
     - develop
+    - v6-develop
     - master
   paths:
     exclude:
@@ -36,6 +37,7 @@ pr:
   branches:
     include:
     - develop
+    - v6-develop
   paths:
     exclude:
     - .github
@@ -106,7 +108,7 @@ stages:
             echo "Extra platforms already enabled"
           else
             echo "Enabling extra platform support"
-            sed -i.ORI 's/osx-x64/osx-x64;freebsd-x64;linux-x86/' $BUNDLEDVERSIONS
+            sed -i.ORI 's/osx-x64/osx-x64;freebsd-x64/' "$BUNDLEDVERSIONS"
           fi
         displayName: Enable Extra Platform Support
       - bash: ./build.sh --backend --enable-extra-platforms
@@ -122,27 +124,23 @@ stages:
         artifact: '$(osName)Backend'
         displayName: Publish Backend
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-      - publish: '$(testsFolder)/net6.0/win-x64/publish'
+      - publish: '$(testsFolder)/net8.0/win-x64/publish'
         artifact: win-x64-tests
         displayName: Publish win-x64 Test Package
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-      - publish: '$(testsFolder)/net6.0/linux-x64/publish'
+      - publish: '$(testsFolder)/net8.0/linux-x64/publish'
         artifact: linux-x64-tests
         displayName: Publish linux-x64 Test Package
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-      - publish: '$(testsFolder)/net6.0/linux-x86/publish'
-        artifact: linux-x86-tests
-        displayName: Publish linux-x86 Test Package
-        condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-      - publish: '$(testsFolder)/net6.0/linux-musl-x64/publish'
+      - publish: '$(testsFolder)/net8.0/linux-musl-x64/publish'
         artifact: linux-musl-x64-tests
         displayName: Publish linux-musl-x64 Test Package
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-      - publish: '$(testsFolder)/net6.0/freebsd-x64/publish'
+      - publish: '$(testsFolder)/net8.0/freebsd-x64/publish'
         artifact: freebsd-x64-tests
         displayName: Publish freebsd-x64 Test Package
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-      - publish: '$(testsFolder)/net6.0/osx-x64/publish'
+      - publish: '$(testsFolder)/net8.0/osx-x64/publish'
         artifact: osx-x64-tests
         displayName: Publish osx-x64 Test Package
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
@@ -189,7 +187,7 @@ stages:
         artifact: '$(osName)Frontend'
         displayName: Publish Frontend
         condition: and(succeeded(), eq(variables['osName'], 'Windows'))
-        
+
   - stage: Installer
     dependsOn:
     - Build_Backend
@@ -260,21 +258,21 @@ stages:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).windows-core-x64.zip'
           archiveType: 'zip'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/win-x64/net6.0
+          rootFolderOrFile: $(artifactsFolder)/win-x64/net8.0
       - task: ArchiveFiles@2
         displayName: Create win-x86 zip
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).windows-core-x86.zip'
           archiveType: 'zip'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/win-x86/net6.0
+          rootFolderOrFile: $(artifactsFolder)/win-x86/net8.0
       - task: ArchiveFiles@2
         displayName: Create osx-x64 app
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).osx-app-core-x64.zip'
           archiveType: 'zip'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/osx-x64-app/net6.0
+          rootFolderOrFile: $(artifactsFolder)/osx-x64-app/net8.0
       - task: ArchiveFiles@2
         displayName: Create osx-x64 tar
         inputs:
@@ -282,14 +280,14 @@ stages:
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/osx-x64/net6.0
+          rootFolderOrFile: $(artifactsFolder)/osx-x64/net8.0
       - task: ArchiveFiles@2
         displayName: Create osx-arm64 app
         inputs:
           archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).osx-app-core-arm64.zip'
           archiveType: 'zip'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/osx-arm64-app/net6.0
+          rootFolderOrFile: $(artifactsFolder)/osx-arm64-app/net8.0
       - task: ArchiveFiles@2
         displayName: Create osx-arm64 tar
         inputs:
@@ -297,7 +295,7 @@ stages:
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/osx-arm64/net6.0
+          rootFolderOrFile: $(artifactsFolder)/osx-arm64/net8.0
       - task: ArchiveFiles@2
         displayName: Create linux-x64 tar
         inputs:
@@ -305,7 +303,7 @@ stages:
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-x64/net6.0
+          rootFolderOrFile: $(artifactsFolder)/linux-x64/net8.0
       - task: ArchiveFiles@2
         displayName: Create linux-musl-x64 tar
         inputs:
@@ -313,15 +311,7 @@ stages:
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-musl-x64/net6.0
-      - task: ArchiveFiles@2
-        displayName: Create linux-x86 tar
-        inputs:
-          archiveFile: '$(Build.ArtifactStagingDirectory)/Radarr.$(buildName).linux-core-x86.tar.gz'
-          archiveType: 'tar'
-          tarCompression: 'gz'
-          includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-x86/net6.0
+          rootFolderOrFile: $(artifactsFolder)/linux-musl-x64/net8.0
       - task: ArchiveFiles@2
         displayName: Create linux-arm tar
         inputs:
@@ -329,7 +319,7 @@ stages:
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-arm/net6.0
+          rootFolderOrFile: $(artifactsFolder)/linux-arm/net8.0
       - task: ArchiveFiles@2
         displayName: Create linux-musl-arm tar
         inputs:
@@ -337,7 +327,7 @@ stages:
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-musl-arm/net6.0
+          rootFolderOrFile: $(artifactsFolder)/linux-musl-arm/net8.0
       - task: ArchiveFiles@2
         displayName: Create linux-arm64 tar
         inputs:
@@ -345,7 +335,7 @@ stages:
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-arm64/net6.0
+          rootFolderOrFile: $(artifactsFolder)/linux-arm64/net8.0
       - task: ArchiveFiles@2
         displayName: Create linux-musl-arm64 tar
         inputs:
@@ -353,7 +343,7 @@ stages:
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/linux-musl-arm64/net6.0
+          rootFolderOrFile: $(artifactsFolder)/linux-musl-arm64/net8.0
       - task: ArchiveFiles@2
         displayName: Create freebsd-x64 tar
         inputs:
@@ -361,7 +351,7 @@ stages:
           archiveType: 'tar'
           tarCompression: 'gz'
           includeRootFolder: false
-          rootFolderOrFile: $(artifactsFolder)/freebsd-x64/net6.0
+          rootFolderOrFile: $(artifactsFolder)/freebsd-x64/net8.0
       - publish: $(Build.ArtifactStagingDirectory)
         artifact: 'Packages'
         displayName: Publish Packages
@@ -392,7 +382,7 @@ stages:
           SENTRY_AUTH_TOKEN: $(sentryAuthTokenServarr)
           SENTRY_ORG: $(sentryOrg)
           SENTRY_URL: $(sentryUrl)
-    
+
   - stage: Unit_Test
     displayName: Unit Tests
     dependsOn: Build_Backend
@@ -493,29 +483,19 @@ stages:
             testName: 'Musl Net Core'
             artifactName: linux-musl-x64-tests
             containerImage: ghcr.io/servarr/testimages:alpine
-          linux-x86:
-            testName: 'linux-x86'
-            artifactName: linux-x86-tests
-            containerImage: ghcr.io/servarr/testimages:linux-x86
 
       pool:
         vmImage: ${{ variables.linuxImage }}
-      
+
       container: $[ variables['containerImage'] ]
 
       timeoutInMinutes: 10
-        
+
       steps:
       - task: UseDotNet@2
         displayName: 'Install .NET'
         inputs:
           version: $(dotnetVersion)
-        condition: and(succeeded(), ne(variables['testName'], 'linux-x86'))
-      - bash: |
-          SDKURL=$(curl -s https://api.github.com/repos/Servarr/dotnet-linux-x86/releases | jq -rc '.[].assets[].browser_download_url' | grep sdk-${DOTNETVERSION}.*gz$)
-          curl -fsSL $SDKURL | tar xzf - -C /opt/dotnet
-        displayName: 'Install .NET'
-        condition: and(succeeded(), eq(variables['testName'], 'linux-x86'))
       - checkout: none
       - task: DownloadPipelineArtifact@2
         displayName: Download Test Artifact
@@ -559,7 +539,7 @@ stages:
         vmImage: ${{ variables.linuxImage }}
 
       timeoutInMinutes: 10
-        
+
       steps:
       - task: UseDotNet@2
         displayName: 'Install .net core'
@@ -611,12 +591,12 @@ stages:
         Radarr__Postgres__Port: '5432'
         Radarr__Postgres__User: 'radarr'
         Radarr__Postgres__Password: 'radarr'
-  
+
       pool:
         vmImage: ${{ variables.linuxImage }}
 
       timeoutInMinutes: 10
-        
+
       steps:
       - task: UseDotNet@2
         displayName: 'Install .net core'
@@ -699,7 +679,7 @@ stages:
 
       pool:
         vmImage: $(imageName)
-        
+
       steps:
       - task: UseDotNet@2
         displayName: 'Install .net core'
@@ -721,7 +701,7 @@ stages:
           targetPath: $(Build.ArtifactStagingDirectory)
       - task: ExtractFiles@1
         inputs:
-          archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)' 
+          archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)'
           destinationFolder: '$(Build.ArtifactStagingDirectory)/bin'
         displayName: Extract Package
       - bash: |
@@ -776,7 +756,7 @@ stages:
             targetPath: $(Build.ArtifactStagingDirectory)
         - task: ExtractFiles@1
           inputs:
-            archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)' 
+            archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)'
             destinationFolder: '$(Build.ArtifactStagingDirectory)/bin'
           displayName: Extract Package
         - bash: |
@@ -840,7 +820,7 @@ stages:
             targetPath: $(Build.ArtifactStagingDirectory)
         - task: ExtractFiles@1
           inputs:
-            archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)' 
+            archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)'
             destinationFolder: '$(Build.ArtifactStagingDirectory)/bin'
           displayName: Extract Package
         - bash: |
@@ -926,29 +906,18 @@ stages:
             artifactName: linux-musl-x64-tests
             containerImage: ghcr.io/servarr/testimages:alpine
             pattern: 'Radarr.*.linux-musl-core-x64.tar.gz'
-          linux-x86:
-            testName: 'linux-x86'
-            artifactName: linux-x86-tests
-            containerImage: ghcr.io/servarr/testimages:linux-x86
-            pattern: 'Radarr.*.linux-core-x86.tar.gz'
       pool:
         vmImage: ${{ variables.linuxImage }}
 
       container: $[ variables['containerImage'] ]
 
       timeoutInMinutes: 15
-        
+
       steps:
       - task: UseDotNet@2
         displayName: 'Install .NET'
         inputs:
           version: $(dotnetVersion)
-        condition: and(succeeded(), ne(variables['testName'], 'linux-x86'))
-      - bash: |
-          SDKURL=$(curl -s https://api.github.com/repos/Servarr/dotnet-linux-x86/releases | jq -rc '.[].assets[].browser_download_url' | grep sdk-${DOTNETVERSION}.*gz$)
-          curl -fsSL $SDKURL | tar xzf - -C /opt/dotnet
-        displayName: 'Install .NET'
-        condition: and(succeeded(), eq(variables['testName'], 'linux-x86'))
       - checkout: none
       - task: DownloadPipelineArtifact@2
         displayName: Download Test Artifact
@@ -965,7 +934,7 @@ stages:
           targetPath: $(Build.ArtifactStagingDirectory)
       - task: ExtractFiles@1
         inputs:
-          archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)' 
+          archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)'
           destinationFolder: '$(Build.ArtifactStagingDirectory)/bin'
         displayName: Extract Package
       - bash: |
@@ -988,7 +957,7 @@ stages:
   - stage: Automation
     displayName: Automation
     dependsOn: Packages
-    
+
     jobs:
     - job: Automation
       strategy:
@@ -1014,7 +983,7 @@ stages:
 
       pool:
         vmImage: $(imageName)
-        
+
       steps:
       - task: UseDotNet@2
         displayName: 'Install .net core'
@@ -1036,7 +1005,7 @@ stages:
           targetPath: $(Build.ArtifactStagingDirectory)
       - task: ExtractFiles@1
         inputs:
-          archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)' 
+          archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/**/$(pattern)'
           destinationFolder: '$(Build.ArtifactStagingDirectory)/bin'
         displayName: Extract Package
       - bash: |
@@ -1161,7 +1130,7 @@ stages:
       - checkout: self
         submodules: true
         persistCredentials: true
-        fetchDepth: 1    
+        fetchDepth: 1
       - bash: ./docs.sh Windows
         displayName: Create openapi.json
       - bash: |
@@ -1174,7 +1143,7 @@ stages:
           then
             git commit -am 'Automated API Docs update'
             git push -f --set-upstream origin api-docs
-            curl -X POST -H "Authorization: token ${GITHUBTOKEN}" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/radarr/radarr/pulls -d '{"head":"api-docs","base":"develop","title":"Update API docs"}'
+            curl -X POST -H "Authorization: token ${GITHUBTOKEN}" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/radarr/radarr/pulls -d '{"head":"api-docs","base":"v6-develop","title":"Update API docs"}'
           else
             echo "No changes since last run"
           fi
@@ -1230,8 +1199,8 @@ stages:
             sonar.cs.opencover.reportsPaths=$(Build.SourcesDirectory)/CoverageResults/**/coverage.opencover.xml
             sonar.cs.nunit.reportsPaths=$(Build.SourcesDirectory)/TestResult.xml
       - bash: |
-          ./build.sh --backend -f net6.0 -r win-x64
-          TEST_DIR=_tests/net6.0/win-x64/publish/ ./test.sh Windows Unit Coverage
+          ./build.sh --backend -f net8.0 -r win-x64
+          TEST_DIR=_tests/net8.0/win-x64/publish/ ./test.sh Windows Unit Coverage
         displayName: Coverage Unit Tests
       - task: SonarCloudAnalyze@3
         condition: eq(variables['System.PullRequest.IsFork'], 'False')
@@ -1274,4 +1243,3 @@ stages:
             DISCORDCHANNELID: $(discordChannelId)
             DISCORDWEBHOOKKEY: $(discordWebhookKey)
             DISCORDTHREADID: $(discordThreadId)
-

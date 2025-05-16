@@ -15,6 +15,7 @@ namespace Radarr.Http
             Resource = resource;
             Template = $"api/v{version}/{resource}";
             PolicyName = API_CORS_POLICY;
+            Version = version;
         }
 
         public string Resource { get; }
@@ -22,12 +23,21 @@ namespace Radarr.Http
         public int? Order => 2;
         public string Name { get; set; }
         public string PolicyName { get; set; }
+        public int Version { get; set; }
     }
 
     public class V3ApiControllerAttribute : VersionedApiControllerAttribute
     {
         public V3ApiControllerAttribute(string resource = "[controller]")
             : base(3, resource)
+        {
+        }
+    }
+
+    public class V4ApiControllerAttribute : VersionedApiControllerAttribute
+    {
+        public V4ApiControllerAttribute(string resource = "[controller]")
+            : base(4, resource)
         {
         }
     }
