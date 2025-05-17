@@ -1,0 +1,206 @@
+name: Create new release
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FRAMEWORK: net8.0
+  RAW_BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+  RADARR_MAJOR_VERSION: 6
+  VERSION: 6.0.0
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      framework: ${{ steps.variables.outputs.framework }}
+      major_version: ${{ steps.variables.outputs.major_version }}
+      version: ${{ steps.variables.outputs.version }}
+      branch: ${{ steps.variables.outputs.branch }}
+    steps:
+      - name: Setup Environment Variables
+        id: variables
+        shell: bash
+        run: |
+          echo "framework=${{ env.FRAMEWORK }}" >> "$GITHUB_OUTPUT"
+          echo "major_version=${{ env.RADARR_MAJOR_VERSION }}" >> "$GITHUB_OUTPUT"
+          echo "version=${{ env.VERSION }}.$((${{ github.run_number }}))" >> "$GITHUB_OUTPUT"
+          echo "branch=${RAW_BRANCH_NAME//\//-}" >> "$GITHUB_OUTPUT"
+
+  backend:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: freebsd-x64
+            package_tests: false
+            os: ubuntu-latest
+          - runtime: linux-arm
+            package_tests: false
+            os: ubuntu-latest
+          - runtime: linux-arm64
+            package_tests: false
+            os: ubuntu-latest
+          - runtime: linux-musl-arm64
+            package_tests: false
+            os: ubuntu-latest
+          - runtime: linux-musl-x64
+            package_tests: false
+            os: ubuntu-latest
+          - runtime: linux-x64
+            package_tests: true
+            os: ubuntu-latest
+          - runtime: osx-arm64
+            package_tests: true
+            os: ubuntu-latest
+          - runtime: osx-x64
+            package_tests: false
+            os: ubuntu-latest
+          - runtime: win-x64
+            package_tests: true
+            os: ubuntu-latest
+          - runtime: win-x86
+            package_tests: false
+            os: ubuntu-latest
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Build
+        uses: ./.github/actions/build
+        with:
+          branch: AirDCPP
+          version: ${{ needs.prepare.outputs.version }}
+          framework: ${{ needs.prepare.outputs.framework }}
+          runtime: ${{ matrix.runtime }}
+          package_tests: ${{ matrix.package_tests }}
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Volta
+        uses: volta-cli/action@v4
+
+      - name: Yarn Install
+        run: yarn install
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Build
+        run: yarn run build --env production
+
+      - name: Publish UI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build_ui
+          path: _output/UI/**/*
+
+  package:
+    needs:
+      [
+        prepare,
+        backend,
+        frontend
+      ]
+    strategy:
+      matrix:
+        include:
+          - runtime: freebsd-x64
+            os: ubuntu-latest
+          - runtime: linux-arm
+            os: ubuntu-latest
+          - runtime: linux-arm64
+            os: ubuntu-latest
+          - runtime: linux-musl-arm64
+            os: ubuntu-latest
+          - runtime: linux-musl-x64
+            os: ubuntu-latest
+          - runtime: linux-x64
+            os: ubuntu-latest
+          - runtime: osx-arm64
+            os: ubuntu-latest
+          - runtime: osx-x64
+            os: ubuntu-latest
+          - runtime: win-x64
+            os: windows-latest
+          - runtime: win-x86
+            os: windows-latest
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Package
+        uses: ./.github/actions/package
+        with:
+          framework: ${{ needs.prepare.outputs.framework }}
+          runtime: ${{ matrix.runtime }}
+          artifact: build-${{ matrix.runtime }}
+          branch: AirDCPP
+          major_version: ${{ needs.prepare.outputs.major_version }}
+          version: ${{ needs.prepare.outputs.version }}
+
+  release:
+    needs: [prepare, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: _artifacts
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Get Previous Release
+        id: previous-release
+        uses: cardinalby/git-get-release-action@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          latest: true
+          prerelease: false
+
+      - name: Generate Release Notes
+        id: generate-release-notes
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          result-encoding: string
+          script: |
+            const { data } = await github.rest.repos.generateReleaseNotes({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: 'v${{ needs.prepare.outputs.version }}',
+              target_commitish: '${{ github.sha }}',
+              previous_tag_name: '${{ steps.previous-release.outputs.tag_name }}',
+            })
+            return data.body
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: _artifacts/Sonarr.*
+          commit: ${{ github.sha }}
+          generateReleaseNotes: false
+          body: ${{ steps.generate-release-notes.outputs.result }}
+          name: ${{ needs.prepare.outputs.version }}
+          prerelease: false
+          skipIfReleaseExists: true
+          tag: v${{ needs.prepare.outputs.version }}
