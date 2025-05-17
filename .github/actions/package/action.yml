@@ -48,23 +48,23 @@ runs:
       shell: bash
       run: $GITHUB_ACTION_PATH/package.sh
 
-    - name: Create Windows Installer (x64)
-      if: ${{ inputs.runtime == 'win-x64' }}
-      working-directory: distribution/windows/setup
-      shell: cmd
-      run: |
-        SET RUNTIME=win-x64
+    # - name: Create Windows Installer (x64)
+    #   if: ${{ inputs.runtime == 'win-x64' }}
+    #   working-directory: distribution/windows/setup
+    #   shell: cmd
+    #   run: |
+    #     SET RUNTIME=win-x64
 
-        build.bat
+    #     build.bat
 
-    - name: Create Windows Installer (x86)
-      if: ${{ inputs.runtime == 'win-x86' }}
-      working-directory: distribution/windows/setup
-      shell: cmd
-      run: |
-        SET RUNTIME=win-x86
+    # - name: Create Windows Installer (x86)
+    #   if: ${{ inputs.runtime == 'win-x86' }}
+    #   working-directory: distribution/windows/setup
+    #   shell: cmd
+    #   run: |
+    #     SET RUNTIME=win-x86
 
-        build.bat
+    #     build.bat
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
