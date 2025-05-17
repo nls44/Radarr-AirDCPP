@@ -105,7 +105,7 @@ runs:
             mkdir -p $folder
             cp -r _output/$framework/$runtime/publish/* $folder
             cp -r _output/Radarr.Update/$framework/$runtime/publish $folder/Radarr.Update
-            cp LICENSE.md $folder
+            cp LICENSE $folder
 
             echo "Removing Service helpers"
             rm -f $folder/ServiceUninstall.*
@@ -127,7 +127,7 @@ runs:
             mkdir -p $folder
             cp -r _output/$framework/$runtime/publish/* $folder
             cp -r _output/Radarr.Update/$framework/$runtime/publish $folder/Radarr.Update
-            cp LICENSE.md $folder
+            cp LICENSE $folder
             cp -r _output/$framework-windows/$runtime/publish/* $folder
 
             echo "Removing Radarr.Mono"
@@ -147,7 +147,7 @@ runs:
             mkdir -p $folder
             cp -r _output/$framework/$runtime/publish/* $folder
             cp -r _output/Radarr.Update/$framework/$runtime/publish $folder/Radarr.Update
-            cp LICENSE.md $folder
+            cp LICENSE $folder
 
             echo "Removing Service helpers"
             rm -f $folder/ServiceUninstall.*
