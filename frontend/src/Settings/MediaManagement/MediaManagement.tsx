@@ -271,6 +271,27 @@ function MediaManagement() {
                   isAdvanced={true}
                   size={sizes.MEDIUM}
                 >
+                  <FormLabel>
+                    {translate('UseSymlinksInsteadOfCopy')}
+                  </FormLabel>
+
+                  <FormInputGroup
+                    type={inputTypes.CHECK}
+                    name="copyUsingSymlinks"
+                    helpText={translate('CopyUsingSymlinksHelpText')}
+                    helpTextWarning={translate(
+                      'CopyUsingSymlinksHelpTextWarning'
+                    )}
+                    onChange={handleInputChange}
+                    {...settings.copyUsingSymlinks}
+                  />
+                </FormGroup>
+
+                <FormGroup
+                  advancedSettings={showAdvancedSettings}
+                  isAdvanced={true}
+                  size={sizes.MEDIUM}
+                >
                   <FormLabel>{translate('ImportUsingScript')}</FormLabel>
 
                   <FormInputGroup
