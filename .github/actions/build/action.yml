@@ -61,7 +61,7 @@ runs:
           echo "Updating version info to: $RADARR_VERSION"
           sed -i'' -e "s/<AssemblyVersion>[0-9.*]\+<\/AssemblyVersion>/<AssemblyVersion>$RADARR_VERSION<\/AssemblyVersion>/g" src/Directory.Build.props
           sed -i'' -e "s/<AssemblyConfiguration>[\$()A-Za-z-]\+<\/AssemblyConfiguration>/<AssemblyConfiguration>${BRANCH}<\/AssemblyConfiguration>/g" src/Directory.Build.props
-          sed -i'' -e "s/<string>10.0.0.0<\/string>/<string>$RADARR_VERSION<\/string>/g" distribution/macOS/Radarr.app/Contents/Info.plist
+        sed -i'' -e "s/<string>10.0.0.0<\/string>/<string>$RADARR_VERSION<\/string>/g" distribution/osx/Radarr.app/Contents/Info.plist
         fi
 
     - name: Build Backend
