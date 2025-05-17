@@ -240,7 +240,7 @@ class MediaManagement extends Component {
                           {...settings.copyUsingSymlinks}
                         />
                       </FormGroup>
-                      
+
                       <FormGroup
                         advancedSettings={advancedSettings}
                         isAdvanced={true}
@@ -257,22 +257,22 @@ class MediaManagement extends Component {
                         />
                       </FormGroup>
 
-                        settings.useScriptImport.value ?
-                          <FormGroup
-                            advancedSettings={advancedSettings}
-                            isAdvanced={true}
-                          >
-                            <FormLabel>{translate('ImportScriptPath')}</FormLabel>
+                      settings.useScriptImport.value ?
+                      <FormGroup
+                        advancedSettings={advancedSettings}
+                        isAdvanced={true}
+                      >
+                        <FormLabel>{translate('ImportScriptPath')}</FormLabel>
 
-                            <FormInputGroup
-                              type={inputTypes.PATH}
-                              includeFiles={true}
-                              name="scriptImportPath"
-                              helpText={translate('ImportScriptPathHelpText')}
-                              onChange={onInputChange}
-                              {...settings.scriptImportPath}
-                            />
-                          </FormGroup> : null
+                        <FormInputGroup
+                          type={inputTypes.PATH}
+                          includeFiles={true}
+                          name="scriptImportPath"
+                          helpText={translate('ImportScriptPathHelpText')}
+                          onChange={onInputChange}
+                          {...settings.scriptImportPath}
+                        />
+                      </FormGroup> : null
                       }
 
                       <FormGroup size={sizes.MEDIUM}>
