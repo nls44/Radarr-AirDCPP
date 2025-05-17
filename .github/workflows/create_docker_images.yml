@@ -27,4 +27,6 @@ jobs:
           platforms: linux/arm64/v8,linux/amd64
           push: true
           provenance: false
-          tags: ghcr.io/nls44/radarr-airdcpp:latest
+          tags: |
+              ghcr.io/nls44/radarr-airdcpp:latest
+              ghcr.io/nls44/radarr-airdcpp:${{ github.ref_name }}
