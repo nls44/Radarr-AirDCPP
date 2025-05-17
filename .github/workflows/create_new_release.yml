@@ -196,7 +196,7 @@ jobs:
       - name: Create release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: _artifacts/Sonarr.*
+          artifacts: _artifacts/Radarr.*
           commit: ${{ github.sha }}
           generateReleaseNotes: false
           body: ${{ steps.generate-release-notes.outputs.result }}
