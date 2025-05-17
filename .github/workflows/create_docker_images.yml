@@ -29,4 +29,3 @@ jobs:
           provenance: false
           tags: |
               ghcr.io/nls44/radarr-airdcpp:latest
-              ghcr.io/nls44/radarr-airdcpp:${{ github.ref_name }}
