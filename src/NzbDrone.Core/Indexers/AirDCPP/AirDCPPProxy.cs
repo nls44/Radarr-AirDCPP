@@ -85,7 +85,7 @@ namespace NzbDrone.Core.Indexers.AirDCPP
                 query = new QueryInfo
                 {
                     pattern = searchTerm,
-                    file_type = "directory"
+                    file_type "any"any"
                 }
             };
 
