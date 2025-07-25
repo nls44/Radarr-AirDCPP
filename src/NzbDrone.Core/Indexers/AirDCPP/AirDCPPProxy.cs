@@ -80,14 +80,16 @@ namespace NzbDrone.Core.Indexers.AirDCPP
             _logger.Debug($"Performing hub search for {searchTerm}");
             var searchRequest = BuildRequest().Resource($"search/{searchInstanceId}/hub_search").Post().Build();
 
-            var query = new CustomInfo
+               var query = new CustomInfo
             {
                 query = new QueryInfo
                 {
                     pattern = searchTerm,
-                    file_type "any"any"
+                    file_type = "any"
                 }
             };
+
+            
 
             searchRequest.SetContent(query.ToJson());
 
