@@ -201,7 +201,7 @@ jobs:
           generateReleaseNotes: false
           body: ${{ steps.generate-release-notes.outputs.result }}
           name: ${{ needs.prepare.outputs.version }}
-          prerelease: false
+          prerelease: true
           skipIfReleaseExists: true
           tag: v${{ needs.prepare.outputs.version }}
 
@@ -229,7 +229,6 @@ jobs:
             push: true
             provenance: false
             tags: |
-              ghcr.io/nls44/radarr-airdcpp:latest
               ghcr.io/nls44/radarr-airdcpp:v${{ needs.prepare.outputs.version }}
 
 
