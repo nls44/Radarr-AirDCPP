@@ -1,3 +1,3 @@
-type DownloadProtocol = 'usenet' | 'torrent' | 'unknown';
+type DownloadProtocol = 'usenet' | 'torrent' | 'directConnect' | 'unknown';
 
 export default DownloadProtocol;
