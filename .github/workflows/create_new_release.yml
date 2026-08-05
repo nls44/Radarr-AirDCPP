@@ -228,6 +228,8 @@ jobs:
             platforms: linux/arm64/v8,linux/amd64
             push: true
             provenance: false
+            build-args: |
+              RADARR_RELEASE=tags/v${{ needs.prepare.outputs.version }}
             tags: |
               ghcr.io/nls44/radarr-airdcpp:v${{ needs.prepare.outputs.version }}
 

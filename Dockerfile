@@ -3,6 +3,7 @@ ARG ALPINE_VERSION="3.21.3"
 FROM alpine:${ALPINE_VERSION} AS base
 
 ARG TARGETPLATFORM
+ARG RADARR_RELEASE="latest"
 ENV TARGETPLATFORM=${TARGETPLATFORM:-linux/amd64}
 
 RUN \
@@ -28,7 +29,7 @@ RUN \
    /config && \
   curl -o \
     /tmp/radarr.tar.gz -L \
-	"$(curl -s "https://api.github.com/repos/nls44/Radarr-AirDCPP/releases/latest" | jq '.assets' | jq -r --arg RELEASE_FOR_PLATFORM "$RELEASE_FOR_PLATFORM" '.[].browser_download_url | match($RELEASE_FOR_PLATFORM;"i") | .string')" && \
+	"$(curl -s "https://api.github.com/repos/nls44/Radarr-AirDCPP/releases/${RADARR_RELEASE}" | jq '.assets' | jq -r --arg RELEASE_FOR_PLATFORM "$RELEASE_FOR_PLATFORM" '.[].browser_download_url | match($RELEASE_FOR_PLATFORM;"i") | .string')" && \
   tar xzf \
     /tmp/radarr.tar.gz -C \
     /app/radarr/bin --strip-components=1 && \
