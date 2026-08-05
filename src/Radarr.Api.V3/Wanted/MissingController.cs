@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
+using NzbDrone.Common.Disk;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Datastore;
@@ -26,8 +27,9 @@ namespace Radarr.Api.V3.Wanted
                             ICustomFormatCalculationService formatCalculator,
                             IConfigService configService,
                             IMapCoversToLocal coverMapper,
+                            IDiskProvider diskProvider,
                             IBroadcastSignalRMessage signalRBroadcaster)
-            : base(movieService, movieTranslationService, movieStatisticsService, upgradableSpecification, formatCalculator, configService, coverMapper, signalRBroadcaster)
+            : base(movieService, movieTranslationService, movieStatisticsService, upgradableSpecification, formatCalculator, configService, coverMapper, diskProvider, signalRBroadcaster)
         {
         }
 

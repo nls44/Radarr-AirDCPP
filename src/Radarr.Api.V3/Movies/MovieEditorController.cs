@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.DecisionEngine.Specifications;
@@ -25,6 +26,7 @@ namespace Radarr.Api.V3.Movies
         private readonly IManageCommandQueue _commandQueueManager;
         private readonly MovieEditorValidator _movieEditorValidator;
         private readonly IUpgradableSpecification _upgradableSpecification;
+        private readonly IDiskProvider _diskProvider;
 
         public MovieEditorController(IMovieService movieService,
             IMovieTranslationService movieTranslationService,
@@ -32,7 +34,8 @@ namespace Radarr.Api.V3.Movies
             IConfigService configService,
             IManageCommandQueue commandQueueManager,
             MovieEditorValidator movieEditorValidator,
-            IUpgradableSpecification upgradableSpecification)
+            IUpgradableSpecification upgradableSpecification,
+            IDiskProvider diskProvider)
         {
             _movieService = movieService;
             _movieTranslationService = movieTranslationService;
@@ -41,6 +44,7 @@ namespace Radarr.Api.V3.Movies
             _commandQueueManager = commandQueueManager;
             _movieEditorValidator = movieEditorValidator;
             _upgradableSpecification = upgradableSpecification;
+            _diskProvider = diskProvider;
         }
 
         [HttpPut]
@@ -125,7 +129,7 @@ namespace Radarr.Api.V3.Movies
             foreach (var movie in updatedMovies)
             {
                 var translation = GetTranslationFromDict(tdict, movie.MovieMetadata, configLanguage);
-                var movieResource = movie.ToResource(availabilityDelay, translation, _upgradableSpecification);
+                var movieResource = movie.ToResource(availabilityDelay, translation, _upgradableSpecification, null, _diskProvider, _configService);
 
                 MapCoversToLocal(movieResource);
 
