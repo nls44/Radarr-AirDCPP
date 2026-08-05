@@ -30,30 +30,31 @@ function AddIndexerModalContent({
   const { isSchemaFetching, isSchemaPopulated, schemaError, schema } =
     useSelector((state: AppState) => state.settings.indexers);
 
-  const { usenetIndexers, torrentIndexers, directConnectIndexers } = useMemo(() => {
-    return schema.reduce<{
-      usenetIndexers: Indexer[];
-      torrentIndexers: Indexer[];
-      directConnectIndexers: Indexer[];
-    }>(
-      (acc, item) => {
-        if (item.protocol === 'usenet') {
-          acc.usenetIndexers.push(item);
-        } else if (item.protocol === 'torrent') {
-          acc.torrentIndexers.push(item);
-        } else if (item.protocol === 'directConnect') {
-          acc.directConnectIndexers.push(item);
-        }
+  const { usenetIndexers, torrentIndexers, directConnectIndexers } =
+    useMemo(() => {
+      return schema.reduce<{
+        usenetIndexers: Indexer[];
+        torrentIndexers: Indexer[];
+        directConnectIndexers: Indexer[];
+      }>(
+        (acc, item) => {
+          if (item.protocol === 'usenet') {
+            acc.usenetIndexers.push(item);
+          } else if (item.protocol === 'torrent') {
+            acc.torrentIndexers.push(item);
+          } else if (item.protocol === 'directConnect') {
+            acc.directConnectIndexers.push(item);
+          }
 
-        return acc;
-      },
-      {
-        usenetIndexers: [],
-        torrentIndexers: [],
-        directConnectIndexers: [],
-      }
-    );
-  }, [schema]);
+          return acc;
+        },
+        {
+          usenetIndexers: [],
+          torrentIndexers: [],
+          directConnectIndexers: [],
+        }
+      );
+    }, [schema]);
 
   useEffect(() => {
     dispatch(fetchIndexerSchema());
