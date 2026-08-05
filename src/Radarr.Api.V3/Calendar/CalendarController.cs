@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
+using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
@@ -31,8 +32,9 @@ namespace Radarr.Api.V3.Calendar
                             ICustomFormatCalculationService formatCalculator,
                             ITagService tagService,
                             IMapCoversToLocal coverMapper,
-                            IConfigService configService)
-            : base(movieService, movieTranslationService, movieStatisticsService, upgradableSpecification, formatCalculator, configService, coverMapper, signalR)
+                            IConfigService configService,
+                            IDiskProvider diskProvider)
+            : base(movieService, movieTranslationService, movieStatisticsService, upgradableSpecification, formatCalculator, configService, coverMapper, diskProvider, signalR)
         {
             _moviesService = movieService;
             _tagService = tagService;

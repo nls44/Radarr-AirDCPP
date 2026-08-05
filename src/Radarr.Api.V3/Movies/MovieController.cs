@@ -153,9 +153,7 @@ namespace Radarr.Api.V3.Movies
                 foreach (var movie in movies)
                 {
                     var translation = GetTranslationFromDict(tdict, movie.MovieMetadata, translationLanguage);
-                    var resource = movie.ToResource(availDelay, translation, _qualityUpgradableSpecification);
-
-                    UpdateMovieResourceWithSymlinks(resource);
+                    var resource = movie.ToResource(availDelay, translation, _qualityUpgradableSpecification, null, _diskProvider, _configService);
 
                     moviesResources.Add(resource);
                 }
@@ -175,25 +173,11 @@ namespace Radarr.Api.V3.Movies
             return moviesResources;
         }
 
-        private void UpdateMovieResourceWithSymlinks(MovieResource resource)
-        {
-            if (_configService.CopyUsingSymlinks && resource.MovieFile != null)
-            {
-                var realPath = _diskProvider.GetRealPath(resource.MovieFile.Path);
-                resource.Path = _diskProvider.GetDirectoryName(realPath);
-
-                var originalFilePath = string.IsNullOrEmpty(resource.MovieFile.OriginalFilePath) ? resource.MovieFile.RelativePath :
-                    resource.MovieFile.OriginalFilePath.Substring(resource.MovieFile.OriginalFilePath.LastIndexOf(Path.DirectorySeparatorChar) + 1);
-                resource.MovieFile.RelativePath = originalFilePath;
-            }
-        }
-
         protected override MovieResource GetResourceById(int id)
         {
             var movie = _moviesService.GetMovie(id);
 
             var resource = MapToResource(movie);
-            UpdateMovieResourceWithSymlinks(resource);
             return resource;
         }
 
@@ -210,7 +194,7 @@ namespace Radarr.Api.V3.Movies
             var translations = _movieTranslationService.GetAllTranslationsForMovieMetadata(movie.MovieMetadataId);
             var translation = GetMovieTranslation(translations, movie.MovieMetadata, translationLanguage);
 
-            var resource = movie.ToResource(availDelay, translation, _qualityUpgradableSpecification);
+            var resource = movie.ToResource(availDelay, translation, _qualityUpgradableSpecification, null, _diskProvider, _configService);
             MapCoversToLocal(resource);
             FetchAndLinkMovieStatistics(resource);
 
