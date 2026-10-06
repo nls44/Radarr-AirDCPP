@@ -290,7 +290,7 @@ namespace Radarr.Api.V3.Movies
         {
             foreach (var movieResource in movies)
             {
-                _coverMapper.ConvertToLocalUrls(movieResource.Id, movieResource.Images);
+                _coverMapper.ConvertToLocalUrls(movieResource.Id, movieResource.Images, movieResource.Added);
             }
         }
 
