@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaFiles;

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Common.Crypto;
-using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.MovieImport;
