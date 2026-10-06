@@ -27,14 +27,16 @@ namespace NzbDrone.Core.Notifications.Plex.Server
         private readonly ICached<Version> _versionCache;
         private readonly IPlexServerProxy _plexServerProxy;
         private readonly IRootFolderService _rootFolderService;
+        private readonly IDiskProvider _diskProvider;
         private readonly ILocalizationService _localizationService;
         private readonly Logger _logger;
 
-        public PlexServerService(ICacheManager cacheManager, IPlexServerProxy plexServerProxy, IRootFolderService rootFolderService, ILocalizationService localizationService, Logger logger)
+        public PlexServerService(ICacheManager cacheManager, IPlexServerProxy plexServerProxy, IRootFolderService rootFolderService, IDiskProvider diskProvider, ILocalizationService localizationService, Logger logger)
         {
             _versionCache = cacheManager.GetCache<Version>(GetType(), "versionCache");
             _plexServerProxy = plexServerProxy;
             _rootFolderService = rootFolderService;
+            _diskProvider = diskProvider;
             _localizationService = localizationService;
             _logger = logger;
         }
@@ -97,6 +99,29 @@ namespace NzbDrone.Core.Notifications.Plex.Server
 
         private void UpdateSections(Movie movie, List<PlexSection> sections, PlexServerSettings settings)
         {
+            var resolvedMoviePath = _diskProvider.GetRealPath(movie.Path);
+
+            // A symlinked Radarr movie can live below a different filesystem root
+            // than the path stored in Radarr. Prefer the resolved path when Plex
+            // sees that filesystem path directly.
+            var resolvedLocation = sections
+                .SelectMany(section => section.Locations.Select(location => new { Section = section, Location = location }))
+                .Where(x => x.Location.Path.PathEquals(resolvedMoviePath) || x.Location.Path.IsParentPath(resolvedMoviePath))
+                .OrderByDescending(x => x.Location.Path.Length)
+                .FirstOrDefault();
+
+            if (resolvedLocation != null)
+            {
+                var resolvedRelativePath = resolvedLocation.Location.Path.PathEquals(resolvedMoviePath)
+                    ? string.Empty
+                    : resolvedLocation.Location.Path.GetRelativePath(resolvedMoviePath);
+
+                _logger.Debug("Updating matching resolved section location, {0}", resolvedLocation.Location.Path);
+                UpdateSectionPath(resolvedRelativePath, resolvedLocation.Section, resolvedLocation.Location, settings);
+
+                return;
+            }
+
             var rootFolderPath = _rootFolderService.GetBestRootFolderPath(movie.Path);
             var movieRelativePath = rootFolderPath.GetRelativePath(movie.Path);
 

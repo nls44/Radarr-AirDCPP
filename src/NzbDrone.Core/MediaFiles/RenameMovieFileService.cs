@@ -94,6 +94,7 @@ namespace NzbDrone.Core.MediaFiles
             {
                 var previousRelativePath = movieFile.RelativePath;
                 var previousPath = Path.Combine(movie.Path, movieFile.RelativePath);
+                var resolvedPreviousPath = _diskProvider.GetRealPath(previousPath);
 
                 try
                 {
@@ -106,7 +107,7 @@ namespace NzbDrone.Core.MediaFiles
                                 {
                                     MovieFile = movieFile,
                                     PreviousRelativePath = previousRelativePath,
-                                    PreviousPath = previousPath
+                                    PreviousPath = resolvedPreviousPath
                                 });
 
                     _logger.Debug("Renamed movie file: {0}", movieFile);

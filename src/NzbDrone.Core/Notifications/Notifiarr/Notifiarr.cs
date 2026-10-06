@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using FluentValidation.Results;
+using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Localization;
@@ -16,8 +17,8 @@ namespace NzbDrone.Core.Notifications.Notifiarr
     {
         private readonly INotifiarrProxy _proxy;
 
-        public Notifiarr(INotifiarrProxy proxy, IConfigFileProvider configFileProvider, IConfigService configService, ILocalizationService localizationService, ITagRepository tagRepository, IMapCoversToLocal mediaCoverService)
-            : base(configFileProvider, configService, localizationService, tagRepository, mediaCoverService)
+        public Notifiarr(INotifiarrProxy proxy, IConfigFileProvider configFileProvider, IConfigService configService, ILocalizationService localizationService, ITagRepository tagRepository, IMapCoversToLocal mediaCoverService, IDiskProvider diskProvider)
+            : base(configFileProvider, configService, localizationService, tagRepository, mediaCoverService, diskProvider)
         {
             _proxy = proxy;
         }
