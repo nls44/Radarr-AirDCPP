@@ -2,7 +2,9 @@ using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Common.Crypto;
 using NzbDrone.Core.DecisionEngine;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Languages;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.MovieImport;
 using NzbDrone.Core.MediaFiles.MovieImport.Manual;
 using NzbDrone.Core.Qualities;
@@ -34,7 +36,7 @@ namespace Radarr.Api.V3.ManualImport
 
     public static class ManualImportResourceMapper
     {
-        public static ManualImportResource ToResource(this ManualImportItem model)
+        public static ManualImportResource ToResource(this ManualImportItem model, IMediaPathResolver pathResolver = null, IConfigService configService = null)
         {
             if (model == null)
             {
@@ -52,7 +54,7 @@ namespace Radarr.Api.V3.ManualImport
                 FolderName = model.FolderName,
                 Name = model.Name,
                 Size = model.Size,
-                Movie = model.Movie.ToResource(0),
+                Movie = model.Movie.ToResource(0, null, null, null, pathResolver, configService),
                 MovieFileId = model.MovieFileId,
                 ReleaseGroup = model.ReleaseGroup,
                 Quality = model.Quality,
@@ -67,9 +69,9 @@ namespace Radarr.Api.V3.ManualImport
             };
         }
 
-        public static List<ManualImportResource> ToResource(this IEnumerable<ManualImportItem> models)
+        public static List<ManualImportResource> ToResource(this IEnumerable<ManualImportItem> models, IMediaPathResolver pathResolver = null, IConfigService configService = null)
         {
-            return models.Select(ToResource).ToList();
+            return models.Select(m => ToResource(m, pathResolver, configService)).ToList();
         }
     }
 

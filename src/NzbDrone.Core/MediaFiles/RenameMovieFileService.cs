@@ -30,6 +30,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IEventAggregator _eventAggregator;
         private readonly IBuildFileNames _filenameBuilder;
         private readonly IDiskProvider _diskProvider;
+        private readonly IMediaPathResolver _pathResolver;
         private readonly Logger _logger;
 
         public RenameMovieFileService(IMovieService movieService,
@@ -38,6 +39,7 @@ namespace NzbDrone.Core.MediaFiles
                                       IEventAggregator eventAggregator,
                                       IBuildFileNames filenameBuilder,
                                       IDiskProvider diskProvider,
+                                      IMediaPathResolver pathResolver,
                                       Logger logger)
         {
             _movieService = movieService;
@@ -46,6 +48,7 @@ namespace NzbDrone.Core.MediaFiles
             _eventAggregator = eventAggregator;
             _filenameBuilder = filenameBuilder;
             _diskProvider = diskProvider;
+            _pathResolver = pathResolver;
             _logger = logger;
         }
 
@@ -94,7 +97,7 @@ namespace NzbDrone.Core.MediaFiles
             {
                 var previousRelativePath = movieFile.RelativePath;
                 var previousPath = Path.Combine(movie.Path, movieFile.RelativePath);
-                var resolvedPreviousPath = _diskProvider.GetRealPath(previousPath);
+                var resolvedPreviousPath = _pathResolver.Resolve(previousPath);
 
                 try
                 {

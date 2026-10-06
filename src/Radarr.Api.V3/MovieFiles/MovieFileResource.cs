@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Languages;
@@ -62,7 +64,7 @@ namespace Radarr.Api.V3.MovieFiles
             };
         }
 
-        public static MovieFileResource ToResource(this MovieFile model, NzbDrone.Core.Movies.Movie movie, IUpgradableSpecification upgradableSpecification, ICustomFormatCalculationService formatCalculationService)
+        public static MovieFileResource ToResource(this MovieFile model, NzbDrone.Core.Movies.Movie movie, IUpgradableSpecification upgradableSpecification, ICustomFormatCalculationService formatCalculationService, IMediaPathResolver pathResolver = null, IConfigService configService = null)
         {
             if (model == null)
             {
@@ -99,7 +101,27 @@ namespace Radarr.Api.V3.MovieFiles
                 resource.CustomFormatScore = customFormatScore;
             }
 
+            if (configService?.CopyUsingSymlinks == true && pathResolver != null)
+            {
+                ResolveSymlinkPath(resource, pathResolver, configService);
+            }
+
             return resource;
+        }
+
+        public static void ResolveSymlinkPath(MovieFileResource resource, IMediaPathResolver pathResolver, IConfigService configService)
+        {
+            if (configService?.CopyUsingSymlinks != true || pathResolver == null || resource == null || resource.Path.IsNullOrWhiteSpace())
+            {
+                return;
+            }
+
+            resource.Path = pathResolver.Resolve(resource.Path);
+
+            var originalFilePath = string.IsNullOrEmpty(resource.OriginalFilePath)
+                ? resource.RelativePath
+                : resource.OriginalFilePath.Substring(resource.OriginalFilePath.LastIndexOf(Path.DirectorySeparatorChar) + 1);
+            resource.RelativePath = originalFilePath;
         }
     }
 }

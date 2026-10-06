@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using Moq;
 using NUnit.Framework;
 using NzbDrone.Core.MediaFiles;
@@ -47,6 +48,13 @@ namespace NzbDrone.Core.Test.NotificationTests
                         null)
                 }
             };
+
+            Mocker.GetMock<IMediaPathResolver>()
+                  .Setup(v => v.Resolve(It.IsAny<string>()))
+                  .Returns((string path) => path);
+            Mocker.GetMock<IMediaPathResolver>()
+                  .Setup(v => v.ResolveMovieFilePath(It.IsAny<string>(), It.IsAny<string>()))
+                  .Returns((string moviePath, string relativePath) => Path.Combine(moviePath, relativePath));
 
             Subject.Definition = new NotificationDefinition
             {

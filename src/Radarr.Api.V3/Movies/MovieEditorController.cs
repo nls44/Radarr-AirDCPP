@@ -2,12 +2,12 @@ using System.Collections.Generic;
 using System.Linq;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaCover;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Commands;
@@ -26,7 +26,7 @@ namespace Radarr.Api.V3.Movies
         private readonly IManageCommandQueue _commandQueueManager;
         private readonly MovieEditorValidator _movieEditorValidator;
         private readonly IUpgradableSpecification _upgradableSpecification;
-        private readonly IDiskProvider _diskProvider;
+        private readonly IMediaPathResolver _pathResolver;
 
         public MovieEditorController(IMovieService movieService,
             IMovieTranslationService movieTranslationService,
@@ -35,7 +35,7 @@ namespace Radarr.Api.V3.Movies
             IManageCommandQueue commandQueueManager,
             MovieEditorValidator movieEditorValidator,
             IUpgradableSpecification upgradableSpecification,
-            IDiskProvider diskProvider)
+            IMediaPathResolver pathResolver)
         {
             _movieService = movieService;
             _movieTranslationService = movieTranslationService;
@@ -44,7 +44,7 @@ namespace Radarr.Api.V3.Movies
             _commandQueueManager = commandQueueManager;
             _movieEditorValidator = movieEditorValidator;
             _upgradableSpecification = upgradableSpecification;
-            _diskProvider = diskProvider;
+            _pathResolver = pathResolver;
         }
 
         [HttpPut]
@@ -129,7 +129,7 @@ namespace Radarr.Api.V3.Movies
             foreach (var movie in updatedMovies)
             {
                 var translation = GetTranslationFromDict(tdict, movie.MovieMetadata, configLanguage);
-                var movieResource = movie.ToResource(availabilityDelay, translation, _upgradableSpecification, null, _diskProvider, _configService);
+                var movieResource = movie.ToResource(availabilityDelay, translation, _upgradableSpecification, null, _pathResolver, _configService);
 
                 MapCoversToLocal(movieResource);
 

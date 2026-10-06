@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Languages;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Queue;
 using Radarr.Api.V3.CustomFormats;
@@ -50,7 +52,7 @@ namespace Radarr.Api.V3.Queue
 
     public static class QueueResourceMapper
     {
-        public static QueueResource ToResource(this NzbDrone.Core.Queue.Queue model, bool includeMovie)
+        public static QueueResource ToResource(this NzbDrone.Core.Queue.Queue model, bool includeMovie, IMediaPathResolver pathResolver = null, IConfigService configService = null)
         {
             if (model == null)
             {
@@ -64,7 +66,7 @@ namespace Radarr.Api.V3.Queue
             {
                 Id = model.Id,
                 MovieId = model.Movie?.Id,
-                Movie = includeMovie && model.Movie != null ? model.Movie.ToResource(0) : null,
+                Movie = includeMovie && model.Movie != null ? model.Movie.ToResource(0, null, null, null, pathResolver, configService) : null,
                 Languages = model.Languages,
                 Quality = model.Quality,
                 CustomFormats = customFormats?.ToResource(false),
@@ -97,9 +99,9 @@ namespace Radarr.Api.V3.Queue
             };
         }
 
-        public static List<QueueResource> ToResource(this IEnumerable<NzbDrone.Core.Queue.Queue> models, bool includeMovie)
+        public static List<QueueResource> ToResource(this IEnumerable<NzbDrone.Core.Queue.Queue> models, bool includeMovie, IMediaPathResolver pathResolver = null, IConfigService configService = null)
         {
-            return models.Select((m) => ToResource(m, includeMovie)).ToList();
+            return models.Select((m) => ToResource(m, includeMovie, pathResolver, configService)).ToList();
         }
     }
 }

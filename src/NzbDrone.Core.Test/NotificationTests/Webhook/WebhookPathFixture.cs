@@ -3,7 +3,6 @@ using System.IO;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
-using NzbDrone.Common.Disk;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Notifications;
@@ -52,11 +51,11 @@ namespace NzbDrone.Core.Test.NotificationTests.Webhook
             Mocker.GetMock<ITagRepository>()
                   .Setup(v => v.GetTags(It.IsAny<HashSet<int>>()))
                   .Returns(new List<Tag>());
-            Mocker.GetMock<IDiskProvider>()
-                  .Setup(v => v.GetRealPath(moviePath))
+            Mocker.GetMock<IMediaPathResolver>()
+                  .Setup(v => v.Resolve(moviePath))
                   .Returns(resolvedMoviePath);
-            Mocker.GetMock<IDiskProvider>()
-                  .Setup(v => v.GetRealPath(movieFilePath))
+            Mocker.GetMock<IMediaPathResolver>()
+                  .Setup(v => v.Resolve(movieFilePath))
                   .Returns(resolvedMovieFilePath);
             Mocker.GetMock<IWebhookProxy>()
                   .Setup(v => v.SendWebhook(It.IsAny<WebhookPayload>(), It.IsAny<WebhookSettings>()))

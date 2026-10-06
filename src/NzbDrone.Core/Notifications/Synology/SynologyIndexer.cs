@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using FluentValidation.Results;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
@@ -12,11 +11,13 @@ namespace NzbDrone.Core.Notifications.Synology
     public class SynologyIndexer : NotificationBase<SynologyIndexerSettings>
     {
         private readonly ISynologyIndexerProxy _indexerProxy;
+        private readonly IMediaPathResolver _pathResolver;
         private readonly ILocalizationService _localizationService;
 
-        public SynologyIndexer(ISynologyIndexerProxy indexerProxy, ILocalizationService localizationService)
+        public SynologyIndexer(ISynologyIndexerProxy indexerProxy, IMediaPathResolver pathResolver, ILocalizationService localizationService)
         {
             _indexerProxy = indexerProxy;
+            _pathResolver = pathResolver;
             _localizationService = localizationService;
         }
 
@@ -29,13 +30,13 @@ namespace NzbDrone.Core.Notifications.Synology
             {
                 foreach (var oldFile in message.OldMovieFiles)
                 {
-                    var fullPath = Path.Combine(message.Movie.Path, oldFile.MovieFile.RelativePath);
+                    var fullPath = _pathResolver.ResolveMovieFilePath(message.Movie.Path, oldFile.MovieFile.RelativePath);
 
                     _indexerProxy.DeleteFile(fullPath);
                 }
 
                 {
-                    var fullPath = Path.Combine(message.Movie.Path, message.MovieFile.RelativePath);
+                    var fullPath = _pathResolver.ResolveMovieFilePath(message.Movie.Path, message.MovieFile.RelativePath);
 
                     _indexerProxy.AddFile(fullPath);
                 }
@@ -46,7 +47,7 @@ namespace NzbDrone.Core.Notifications.Synology
         {
             if (Settings.UpdateLibrary)
             {
-                _indexerProxy.UpdateFolder(movie.Path);
+                _indexerProxy.UpdateFolder(_pathResolver.Resolve(movie.Path));
             }
         }
 
@@ -54,7 +55,7 @@ namespace NzbDrone.Core.Notifications.Synology
         {
             if (Settings.UpdateLibrary)
             {
-                var fullPath = Path.Combine(deleteMessage.Movie.Path, deleteMessage.MovieFile.RelativePath);
+                var fullPath = _pathResolver.ResolveMovieFilePath(deleteMessage.Movie.Path, deleteMessage.MovieFile.RelativePath);
                 _indexerProxy.DeleteFile(fullPath);
             }
         }
@@ -65,7 +66,7 @@ namespace NzbDrone.Core.Notifications.Synology
             {
                 if (Settings.UpdateLibrary)
                 {
-                    _indexerProxy.DeleteFolder(deleteMessage.Movie.Path);
+                    _indexerProxy.DeleteFolder(_pathResolver.Resolve(deleteMessage.Movie.Path));
                 }
             }
         }

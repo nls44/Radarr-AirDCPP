@@ -41,11 +41,13 @@ namespace NzbDrone.Core.History
                                   IHandle<DownloadIgnoredEvent>
     {
         private readonly IHistoryRepository _historyRepository;
+        private readonly IMediaPathResolver _pathResolver;
         private readonly Logger _logger;
 
-        public HistoryService(IHistoryRepository historyRepository, Logger logger)
+        public HistoryService(IHistoryRepository historyRepository, IMediaPathResolver pathResolver, Logger logger)
         {
             _historyRepository = historyRepository;
+            _pathResolver = pathResolver;
             _logger = logger;
         }
 
@@ -199,7 +201,7 @@ namespace NzbDrone.Core.History
 
             history.Data.Add("FileId", message.ImportedMovie.Id.ToString());
             history.Data.Add("DroppedPath", message.MovieInfo.Path);
-            history.Data.Add("ImportedPath", Path.Combine(movie.Path, message.ImportedMovie.RelativePath));
+            history.Data.Add("ImportedPath", _pathResolver.ResolveMovieFilePath(movie.Path, message.ImportedMovie.RelativePath));
             history.Data.Add("DownloadClient", message.DownloadClientInfo?.Type);
             history.Data.Add("DownloadClientName", message.DownloadClientInfo?.Name);
             history.Data.Add("ReleaseGroup", message.MovieInfo.ReleaseGroup);
@@ -224,7 +226,7 @@ namespace NzbDrone.Core.History
                 Date = DateTime.UtcNow,
                 Quality = message.MovieFile.Quality,
                 Languages = message.MovieFile.Languages,
-                SourceTitle = message.MovieFile.Path,
+                SourceTitle = _pathResolver.Resolve(message.MovieFile.Path),
                 MovieId = message.MovieFile.MovieId
             };
 
@@ -238,9 +240,9 @@ namespace NzbDrone.Core.History
 
         public void Handle(MovieFileRenamedEvent message)
         {
-            var sourcePath = message.OriginalPath;
+            var sourcePath = _pathResolver.Resolve(message.OriginalPath);
             var sourceRelativePath = message.Movie.Path.GetRelativePath(message.OriginalPath);
-            var path = Path.Combine(message.Movie.Path, message.MovieFile.RelativePath);
+            var path = _pathResolver.ResolveMovieFilePath(message.Movie.Path, message.MovieFile.RelativePath);
             var relativePath = message.MovieFile.RelativePath;
 
             var history = new MovieHistory

@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
-using NzbDrone.Common.Disk;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Datastore;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.MediaCover;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Translations;
 using NzbDrone.Core.MovieStats;
@@ -30,9 +30,9 @@ namespace Radarr.Api.V3.Wanted
                             ICustomFormatCalculationService formatCalculator,
                             IConfigService configService,
                             IMapCoversToLocal coverMapper,
-                            IDiskProvider diskProvider,
+                            IMediaPathResolver pathResolver,
                             IBroadcastSignalRMessage signalRBroadcaster)
-            : base(movieService, movieTranslationService, movieStatisticsService, upgradableSpecification, formatCalculator, configService, coverMapper, diskProvider, signalRBroadcaster)
+            : base(movieService, movieTranslationService, movieStatisticsService, upgradableSpecification, formatCalculator, configService, coverMapper, pathResolver, signalRBroadcaster)
         {
             _movieCutoffService = movieCutoffService;
         }

@@ -9,6 +9,7 @@ using NzbDrone.Common.Cache;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Localization;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.RootFolders;
 using NzbDrone.Core.Validation;
@@ -27,16 +28,16 @@ namespace NzbDrone.Core.Notifications.Plex.Server
         private readonly ICached<Version> _versionCache;
         private readonly IPlexServerProxy _plexServerProxy;
         private readonly IRootFolderService _rootFolderService;
-        private readonly IDiskProvider _diskProvider;
+        private readonly IMediaPathResolver _pathResolver;
         private readonly ILocalizationService _localizationService;
         private readonly Logger _logger;
 
-        public PlexServerService(ICacheManager cacheManager, IPlexServerProxy plexServerProxy, IRootFolderService rootFolderService, IDiskProvider diskProvider, ILocalizationService localizationService, Logger logger)
+        public PlexServerService(ICacheManager cacheManager, IPlexServerProxy plexServerProxy, IRootFolderService rootFolderService, IMediaPathResolver pathResolver, ILocalizationService localizationService, Logger logger)
         {
             _versionCache = cacheManager.GetCache<Version>(GetType(), "versionCache");
             _plexServerProxy = plexServerProxy;
             _rootFolderService = rootFolderService;
-            _diskProvider = diskProvider;
+            _pathResolver = pathResolver;
             _localizationService = localizationService;
             _logger = logger;
         }
@@ -99,7 +100,7 @@ namespace NzbDrone.Core.Notifications.Plex.Server
 
         private void UpdateSections(Movie movie, List<PlexSection> sections, PlexServerSettings settings)
         {
-            var resolvedMoviePath = _diskProvider.GetRealPath(movie.Path);
+            var resolvedMoviePath = _pathResolver.Resolve(movie.Path);
 
             // A symlinked Radarr movie can live below a different filesystem root
             // than the path stored in Radarr. Prefer the resolved path when Plex

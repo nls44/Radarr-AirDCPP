@@ -2,7 +2,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Languages;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.MovieImport.Manual;
 using NzbDrone.Core.Qualities;
 using Radarr.Api.V3.CustomFormats;
@@ -16,10 +18,14 @@ namespace Radarr.Api.V3.ManualImport
     public class ManualImportController : Controller
     {
         private readonly IManualImportService _manualImportService;
+        private readonly IMediaPathResolver _pathResolver;
+        private readonly IConfigService _configService;
 
-        public ManualImportController(IManualImportService manualImportService)
+        public ManualImportController(IManualImportService manualImportService, IMediaPathResolver pathResolver, IConfigService configService)
         {
             _manualImportService = manualImportService;
+            _pathResolver = pathResolver;
+            _configService = configService;
         }
 
         [HttpGet]
@@ -28,10 +34,10 @@ namespace Radarr.Api.V3.ManualImport
         {
             if (movieId.HasValue && downloadId.IsNullOrWhiteSpace())
             {
-                return _manualImportService.GetMediaFiles(movieId.Value).ToResource().Select(AddQualityWeight).ToList();
+                return _manualImportService.GetMediaFiles(movieId.Value).ToResource(_pathResolver, _configService).Select(AddQualityWeight).ToList();
             }
 
-            return _manualImportService.GetMediaFiles(folder, downloadId, movieId, filterExistingFiles).ToResource().Select(AddQualityWeight).ToList();
+            return _manualImportService.GetMediaFiles(folder, downloadId, movieId, filterExistingFiles).ToResource(_pathResolver, _configService).Select(AddQualityWeight).ToList();
         }
 
         [HttpPost]
@@ -47,7 +53,7 @@ namespace Radarr.Api.V3.ManualImport
             {
                 var processedItem = _manualImportService.ReprocessItem(item.Path, item.DownloadId, item.MovieId, item.ReleaseGroup, item.Quality, item.Languages, item.IndexerFlags);
 
-                item.Movie = processedItem.Movie.ToResource(0);
+                item.Movie = processedItem.Movie.ToResource(0, null, null, null, _pathResolver, _configService);
                 item.IndexerFlags = processedItem.IndexerFlags;
                 item.Rejections = processedItem.Rejections.Select(r => r.ToResource());
                 item.CustomFormats = processedItem.CustomFormats.ToResource(false);

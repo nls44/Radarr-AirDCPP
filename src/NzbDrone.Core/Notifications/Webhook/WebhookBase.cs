@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Localization;
@@ -20,16 +19,16 @@ namespace NzbDrone.Core.Notifications.Webhook
         protected readonly ILocalizationService _localizationService;
         private readonly ITagRepository _tagRepository;
         private readonly IMapCoversToLocal _mediaCoverService;
-        private readonly IDiskProvider _diskProvider;
+        private readonly IMediaPathResolver _pathResolver;
 
-        protected WebhookBase(IConfigFileProvider configFileProvider, IConfigService configService, ILocalizationService localizationService, ITagRepository tagRepository, IMapCoversToLocal mediaCoverService, IDiskProvider diskProvider)
+        protected WebhookBase(IConfigFileProvider configFileProvider, IConfigService configService, ILocalizationService localizationService, ITagRepository tagRepository, IMapCoversToLocal mediaCoverService, IMediaPathResolver pathResolver)
         {
             _configFileProvider = configFileProvider;
             _configService = configService;
             _localizationService = localizationService;
             _tagRepository = tagRepository;
             _mediaCoverService = mediaCoverService;
-            _diskProvider = diskProvider;
+            _pathResolver = pathResolver;
         }
 
         protected WebhookGrabPayload BuildOnGrabPayload(GrabMessage message)
@@ -254,7 +253,7 @@ namespace NzbDrone.Core.Notifications.Webhook
             _mediaCoverService.ConvertToLocalUrls(movie.Id, movie.MovieMetadata.Value.Images);
 
             var webhookMovie = new WebhookMovie(movie, GetTagLabels(movie));
-            webhookMovie.FolderPath = _diskProvider.GetRealPath(webhookMovie.FolderPath);
+            webhookMovie.FolderPath = _pathResolver.Resolve(webhookMovie.FolderPath);
 
             return webhookMovie;
         }
@@ -262,7 +261,7 @@ namespace NzbDrone.Core.Notifications.Webhook
         private T ResolveMovieFile<T>(T movieFile)
             where T : WebhookMovieFile
         {
-            movieFile.Path = _diskProvider.GetRealPath(movieFile.Path);
+            movieFile.Path = _pathResolver.Resolve(movieFile.Path);
 
             return movieFile;
         }

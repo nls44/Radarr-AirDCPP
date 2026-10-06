@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using NzbDrone.Core.CustomFormats;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Datastore.Events;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Exceptions;
@@ -32,13 +33,17 @@ namespace Radarr.Api.V3.MovieFiles
         private readonly IMovieService _movieService;
         private readonly ICustomFormatCalculationService _formatCalculator;
         private readonly IUpgradableSpecification _upgradableSpecification;
+        private readonly IMediaPathResolver _pathResolver;
+        private readonly IConfigService _configService;
 
         public MovieFileController(IBroadcastSignalRMessage signalRBroadcaster,
                                IMediaFileService mediaFileService,
                                IDeleteMediaFiles mediaFileDeletionService,
                                IMovieService movieService,
                                ICustomFormatCalculationService formatCalculator,
-                               IUpgradableSpecification upgradableSpecification)
+                               IUpgradableSpecification upgradableSpecification,
+                               IMediaPathResolver pathResolver,
+                               IConfigService configService)
             : base(signalRBroadcaster)
         {
             _mediaFileService = mediaFileService;
@@ -46,6 +51,8 @@ namespace Radarr.Api.V3.MovieFiles
             _movieService = movieService;
             _formatCalculator = formatCalculator;
             _upgradableSpecification = upgradableSpecification;
+            _pathResolver = pathResolver;
+            _configService = configService;
         }
 
         protected override MovieFileResource GetResourceById(int id)
@@ -53,7 +60,7 @@ namespace Radarr.Api.V3.MovieFiles
             var movieFile = _mediaFileService.GetMovie(id);
             var movie = _movieService.GetMovie(movieFile.MovieId);
 
-            var resource = movieFile.ToResource(movie, _upgradableSpecification, _formatCalculator);
+            var resource = movieFile.ToResource(movie, _upgradableSpecification, _formatCalculator, _pathResolver, _configService);
 
             return resource;
         }
@@ -78,7 +85,7 @@ namespace Radarr.Api.V3.MovieFiles
 
             return movieFiles.GroupBy(e => e.MovieId)
                 .SelectMany(f => f.ToList()
-                    .ConvertAll(e => e.ToResource(_movieService.GetMovie(f.Key), _upgradableSpecification, _formatCalculator)))
+                    .ConvertAll(e => e.ToResource(_movieService.GetMovie(f.Key), _upgradableSpecification, _formatCalculator, _pathResolver, _configService)))
                 .ToList();
         }
 
@@ -150,7 +157,7 @@ namespace Radarr.Api.V3.MovieFiles
 
             var movie = _movieService.GetMovie(movieFiles.First().MovieId);
 
-            return Accepted(movieFiles.ConvertAll(f => f.ToResource(movie, _upgradableSpecification, _formatCalculator)));
+            return Accepted(movieFiles.ConvertAll(f => f.ToResource(movie, _upgradableSpecification, _formatCalculator, _pathResolver, _configService)));
         }
 
         [RestDeleteById]
@@ -234,7 +241,7 @@ namespace Radarr.Api.V3.MovieFiles
 
             var movie = _movieService.GetMovie(movieFiles.First().MovieId);
 
-            return Accepted(movieFiles.ConvertAll(f => f.ToResource(movie, _upgradableSpecification, _formatCalculator)));
+            return Accepted(movieFiles.ConvertAll(f => f.ToResource(movie, _upgradableSpecification, _formatCalculator, _pathResolver, _configService)));
         }
 
         [NonAction]

@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using NzbDrone.Core.Datastore.Events;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Download.Pending;
 using NzbDrone.Core.Messaging.Events;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Queue;
 using NzbDrone.SignalR;
 using Radarr.Http;
@@ -18,12 +20,16 @@ namespace Radarr.Api.V3.Queue
     {
         private readonly IQueueService _queueService;
         private readonly IPendingReleaseService _pendingReleaseService;
+        private readonly IMediaPathResolver _pathResolver;
+        private readonly IConfigService _configService;
 
-        public QueueDetailsController(IBroadcastSignalRMessage broadcastSignalRMessage, IQueueService queueService, IPendingReleaseService pendingReleaseService)
+        public QueueDetailsController(IBroadcastSignalRMessage broadcastSignalRMessage, IQueueService queueService, IPendingReleaseService pendingReleaseService, IMediaPathResolver pathResolver, IConfigService configService)
             : base(broadcastSignalRMessage)
         {
             _queueService = queueService;
             _pendingReleaseService = pendingReleaseService;
+            _pathResolver = pathResolver;
+            _configService = configService;
         }
 
         [NonAction]
@@ -46,10 +52,10 @@ namespace Radarr.Api.V3.Queue
 
             if (movieId.HasValue)
             {
-                return fullQueue.Where(q => q.Movie?.Id == movieId.Value).ToResource(includeMovie);
+                return fullQueue.Where(q => q.Movie?.Id == movieId.Value).ToResource(includeMovie, _pathResolver, _configService);
             }
 
-            return fullQueue.ToResource(includeMovie);
+            return fullQueue.ToResource(includeMovie, _pathResolver, _configService);
         }
 
         [NonAction]

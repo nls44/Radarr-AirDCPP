@@ -4,6 +4,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Blocklisting;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Datastore;
 using NzbDrone.Core.Datastore.Events;
 using NzbDrone.Core.Download;
@@ -11,6 +12,7 @@ using NzbDrone.Core.Download.Pending;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Languages;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Profiles.Qualities;
 using NzbDrone.Core.Qualities;
@@ -36,6 +38,8 @@ namespace Radarr.Api.V3.Queue
         private readonly IIgnoredDownloadService _ignoredDownloadService;
         private readonly IProvideDownloadClient _downloadClientProvider;
         private readonly IBlocklistService _blocklistService;
+        private readonly IMediaPathResolver _pathResolver;
+        private readonly IConfigService _configService;
 
         public QueueController(IBroadcastSignalRMessage broadcastSignalRMessage,
                            IQueueService queueService,
@@ -45,7 +49,9 @@ namespace Radarr.Api.V3.Queue
                            IFailedDownloadService failedDownloadService,
                            IIgnoredDownloadService ignoredDownloadService,
                            IProvideDownloadClient downloadClientProvider,
-                           IBlocklistService blocklistService)
+                           IBlocklistService blocklistService,
+                           IMediaPathResolver pathResolver,
+                           IConfigService configService)
             : base(broadcastSignalRMessage)
         {
             _queueService = queueService;
@@ -55,6 +61,8 @@ namespace Radarr.Api.V3.Queue
             _ignoredDownloadService = ignoredDownloadService;
             _downloadClientProvider = downloadClientProvider;
             _blocklistService = blocklistService;
+            _pathResolver = pathResolver;
+            _configService = configService;
 
             _qualityComparer = new QualityModelComparer(qualityProfileService.GetDefaultProfile(string.Empty));
         }
@@ -378,7 +386,7 @@ namespace Radarr.Api.V3.Queue
 
         private QueueResource MapToResource(NzbDrone.Core.Queue.Queue queueItem, bool includeMovie)
         {
-            return queueItem.ToResource(includeMovie);
+            return queueItem.ToResource(includeMovie, _pathResolver, _configService);
         }
 
         [NonAction]

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using NzbDrone.Core.CustomFormats;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Languages;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Qualities;
 using Radarr.Api.V3.CustomFormats;
 using Radarr.Api.V3.Movies;
@@ -27,7 +29,7 @@ namespace Radarr.Api.V3.Blocklist
 
     public static class BlocklistResourceMapper
     {
-        public static BlocklistResource MapToResource(this NzbDrone.Core.Blocklisting.Blocklist model, ICustomFormatCalculationService formatCalculator)
+        public static BlocklistResource MapToResource(this NzbDrone.Core.Blocklisting.Blocklist model, ICustomFormatCalculationService formatCalculator, IMediaPathResolver pathResolver = null, IConfigService configService = null)
         {
             if (model == null)
             {
@@ -48,7 +50,7 @@ namespace Radarr.Api.V3.Blocklist
                 Indexer = model.Indexer,
                 Message = model.Message,
 
-                Movie = model.Movie.ToResource(0)
+                Movie = model.Movie.ToResource(0, null, null, null, pathResolver, configService)
             };
         }
     }

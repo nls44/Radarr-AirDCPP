@@ -21,13 +21,15 @@ namespace NzbDrone.Core.Notifications.Discord
         private readonly IDiscordProxy _proxy;
         private readonly ITagRepository _tagRepository;
         private readonly IConfigFileProvider _configFileProvider;
+        private readonly IMediaPathResolver _pathResolver;
         private readonly ILocalizationService _localizationService;
 
-        public Discord(IDiscordProxy proxy, ITagRepository tagRepository, IConfigFileProvider configFileProvider, ILocalizationService localizationService)
+        public Discord(IDiscordProxy proxy, ITagRepository tagRepository, IConfigFileProvider configFileProvider, IMediaPathResolver pathResolver, ILocalizationService localizationService)
         {
             _proxy = proxy;
             _tagRepository = tagRepository;
             _configFileProvider = configFileProvider;
+            _pathResolver = pathResolver;
             _localizationService = localizationService;
         }
 
@@ -350,7 +352,7 @@ namespace NzbDrone.Core.Notifications.Discord
         public override void OnMovieFileDelete(MovieFileDeleteMessage deleteMessage)
         {
             var movie = deleteMessage.Movie;
-            var deletedFile = deleteMessage.MovieFile.Path;
+            var deletedFile = _pathResolver.Resolve(deleteMessage.MovieFile.Path);
             var reason = deleteMessage.Reason;
 
             var embed = new Embed

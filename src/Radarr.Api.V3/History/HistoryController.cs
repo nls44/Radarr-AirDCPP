@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Datastore;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.History;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using Radarr.Api.V3.Movies;
 using Radarr.Http;
@@ -23,18 +25,24 @@ namespace Radarr.Api.V3.History
         private readonly ICustomFormatCalculationService _formatCalculator;
         private readonly IUpgradableSpecification _upgradableSpecification;
         private readonly IFailedDownloadService _failedDownloadService;
+        private readonly IMediaPathResolver _pathResolver;
+        private readonly IConfigService _configService;
 
         public HistoryController(IHistoryService historyService,
                              IMovieService movieService,
                              ICustomFormatCalculationService formatCalculator,
                              IUpgradableSpecification upgradableSpecification,
-                             IFailedDownloadService failedDownloadService)
+                             IFailedDownloadService failedDownloadService,
+                             IMediaPathResolver pathResolver,
+                             IConfigService configService)
         {
             _historyService = historyService;
             _movieService = movieService;
             _formatCalculator = formatCalculator;
             _upgradableSpecification = upgradableSpecification;
             _failedDownloadService = failedDownloadService;
+            _pathResolver = pathResolver;
+            _configService = configService;
         }
 
         protected HistoryResource MapToResource(MovieHistory model, bool includeMovie)
@@ -48,7 +56,7 @@ namespace Radarr.Api.V3.History
 
             if (includeMovie)
             {
-                resource.Movie = model.Movie.ToResource(0);
+                resource.Movie = model.Movie.ToResource(0, null, null, null, _pathResolver, _configService);
             }
 
             if (model.Movie != null)

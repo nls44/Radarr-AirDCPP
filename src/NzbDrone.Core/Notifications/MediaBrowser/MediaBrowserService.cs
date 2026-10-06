@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Net;
 using FluentValidation.Results;
 using NLog;
-using NzbDrone.Common.Disk;
-using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.Localization;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 
 namespace NzbDrone.Core.Notifications.Emby
@@ -21,12 +20,14 @@ namespace NzbDrone.Core.Notifications.Emby
     public class MediaBrowserService : IMediaBrowserService
     {
         private readonly MediaBrowserProxy _proxy;
+        private readonly IMediaPathResolver _pathResolver;
         private readonly ILocalizationService _localizationService;
         private readonly Logger _logger;
 
-        public MediaBrowserService(MediaBrowserProxy proxy, ILocalizationService localizationService, Logger logger)
+        public MediaBrowserService(MediaBrowserProxy proxy, IMediaPathResolver pathResolver, ILocalizationService localizationService, Logger logger)
         {
             _proxy = proxy;
+            _pathResolver = pathResolver;
             _localizationService = localizationService;
             _logger = logger;
         }
@@ -40,14 +41,7 @@ namespace NzbDrone.Core.Notifications.Emby
         {
             var paths = _proxy.GetPaths(settings, movie);
 
-            var mappedPath = new OsPath(movie.Path);
-
-            if (settings.MapTo.IsNotNullOrWhiteSpace())
-            {
-                mappedPath = new OsPath(settings.MapTo) + (mappedPath - new OsPath(settings.MapFrom));
-            }
-
-            paths.Add(mappedPath.ToString());
+            paths.Add(_pathResolver.ResolveMappedPath(movie.Path, settings.MapFrom, settings.MapTo));
 
             foreach (var path in paths)
             {

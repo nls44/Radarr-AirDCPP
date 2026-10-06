@@ -1,15 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text.Json.Serialization;
-using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaCover;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Translations;
 using Radarr.Api.V3.MovieFiles;
@@ -102,7 +101,7 @@ namespace Radarr.Api.V3.Movies
 
     public static class MovieResourceMapper
     {
-        public static MovieResource ToResource(this Movie model, int availDelay, MovieTranslation movieTranslation = null, IUpgradableSpecification upgradableSpecification = null, ICustomFormatCalculationService formatCalculationService = null, IDiskProvider diskProvider = null, IConfigService configService = null)
+        public static MovieResource ToResource(this Movie model, int availDelay, MovieTranslation movieTranslation = null, IUpgradableSpecification upgradableSpecification = null, ICustomFormatCalculationService formatCalculationService = null, IMediaPathResolver pathResolver = null, IConfigService configService = null)
         {
             if (model == null)
             {
@@ -170,26 +169,13 @@ namespace Radarr.Api.V3.Movies
                 LastSearchTime = model.LastSearchTime,
             };
 
-            ResolveSymlinkPaths(resource, diskProvider, configService);
-
-            return resource;
-        }
-
-        private static void ResolveSymlinkPaths(MovieResource resource, IDiskProvider diskProvider, IConfigService configService)
-        {
-            if (configService?.CopyUsingSymlinks != true || diskProvider == null || resource.MovieFile == null)
+            if (configService?.CopyUsingSymlinks == true && pathResolver != null && resource.MovieFile != null)
             {
-                return;
+                MovieFileResourceMapper.ResolveSymlinkPath(resource.MovieFile, pathResolver, configService);
+                resource.Path = resource.MovieFile.Path.GetDirectoryName();
             }
 
-            var realPath = diskProvider.GetRealPath(resource.MovieFile.Path);
-            resource.Path = diskProvider.GetDirectoryName(realPath);
-            resource.MovieFile.Path = realPath;
-
-            var originalFilePath = string.IsNullOrEmpty(resource.MovieFile.OriginalFilePath)
-                ? resource.MovieFile.RelativePath
-                : resource.MovieFile.OriginalFilePath.Substring(resource.MovieFile.OriginalFilePath.LastIndexOf(Path.DirectorySeparatorChar) + 1);
-            resource.MovieFile.RelativePath = originalFilePath;
+            return resource;
         }
 
         public static Movie ToModel(this MovieResource resource)
@@ -249,9 +235,9 @@ namespace Radarr.Api.V3.Movies
             return movie;
         }
 
-        public static List<MovieResource> ToResource(this IEnumerable<Movie> movies, int availDelay, IUpgradableSpecification upgradableSpecification = null, ICustomFormatCalculationService formatCalculationService = null, IDiskProvider diskProvider = null, IConfigService configService = null)
+        public static List<MovieResource> ToResource(this IEnumerable<Movie> movies, int availDelay, IUpgradableSpecification upgradableSpecification = null, ICustomFormatCalculationService formatCalculationService = null, IMediaPathResolver pathResolver = null, IConfigService configService = null)
         {
-            return movies.Select(x => ToResource(x, availDelay, null, upgradableSpecification, formatCalculationService, diskProvider, configService)).ToList();
+            return movies.Select(x => ToResource(x, availDelay, null, upgradableSpecification, formatCalculationService, pathResolver, configService)).ToList();
         }
 
         public static List<Movie> ToModel(this IEnumerable<MovieResource> resources)

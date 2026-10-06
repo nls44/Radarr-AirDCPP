@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
-using NzbDrone.Common.Disk;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Datastore.Events;
@@ -9,6 +8,7 @@ using NzbDrone.Core.DecisionEngine.Specifications;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaCover;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.Events;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Movies;
@@ -31,7 +31,7 @@ namespace Radarr.Api.V3.Movies
         protected readonly ICustomFormatCalculationService _formatCalculator;
         protected readonly IConfigService _configService;
         protected readonly IMapCoversToLocal _coverMapper;
-        protected readonly IDiskProvider _diskProvider;
+        protected readonly IMediaPathResolver _pathResolver;
 
         protected MovieControllerWithSignalR(IMovieService movieService,
                                            IMovieTranslationService movieTranslationService,
@@ -40,7 +40,7 @@ namespace Radarr.Api.V3.Movies
                                            ICustomFormatCalculationService formatCalculator,
                                            IConfigService configService,
                                            IMapCoversToLocal coverMapper,
-                                           IDiskProvider diskProvider,
+                                           IMediaPathResolver pathResolver,
                                            IBroadcastSignalRMessage signalRBroadcaster)
             : base(signalRBroadcaster)
         {
@@ -51,7 +51,7 @@ namespace Radarr.Api.V3.Movies
             _formatCalculator = formatCalculator;
             _configService = configService;
             _coverMapper = coverMapper;
-            _diskProvider = diskProvider;
+            _pathResolver = pathResolver;
         }
 
         protected MovieControllerWithSignalR(IMovieService movieService,
@@ -86,7 +86,7 @@ namespace Radarr.Api.V3.Movies
             var translations = _movieTranslationService.GetAllTranslationsForMovieMetadata(movie.MovieMetadataId);
             var translation = GetMovieTranslation(translations, movie.MovieMetadata, language);
 
-            var resource = movie.ToResource(availDelay, translation, _upgradableSpecification, _formatCalculator, _diskProvider, _configService);
+            var resource = movie.ToResource(availDelay, translation, _upgradableSpecification, _formatCalculator, _pathResolver, _configService);
             FetchAndLinkMovieStatistics(resource);
 
             _coverMapper.ConvertToLocalUrls(resource.Id, resource.Images);
@@ -110,7 +110,7 @@ namespace Radarr.Api.V3.Movies
                 var translations = _movieTranslationService.GetAllTranslationsForMovieMetadata(movie.MovieMetadataId);
                 var translation = GetMovieTranslation(translations, movie.MovieMetadata, language);
 
-                var resource = movie.ToResource(availDelay, translation, _upgradableSpecification, _formatCalculator, _diskProvider, _configService);
+                var resource = movie.ToResource(availDelay, translation, _upgradableSpecification, _formatCalculator, _pathResolver, _configService);
                 FetchAndLinkMovieStatistics(resource);
 
                 resources.Add(resource);

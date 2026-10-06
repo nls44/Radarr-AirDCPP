@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using FluentValidation.Results;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Localization;
@@ -14,11 +13,13 @@ namespace NzbDrone.Core.Notifications.Slack
     public class Slack : NotificationBase<SlackSettings>
     {
         private readonly ISlackProxy _proxy;
+        private readonly IMediaPathResolver _pathResolver;
         private readonly ILocalizationService _localizationService;
 
-        public Slack(ISlackProxy proxy, ILocalizationService localizationService)
+        public Slack(ISlackProxy proxy, IMediaPathResolver pathResolver, ILocalizationService localizationService)
         {
             _proxy = proxy;
+            _pathResolver = pathResolver;
             _localizationService = localizationService;
         }
 
@@ -84,7 +85,7 @@ namespace NzbDrone.Core.Notifications.Slack
                 new()
                 {
                     Title = deleteMessage.Movie.Title,
-                    Text = Path.Combine(deleteMessage.Movie.Path, deleteMessage.MovieFile.RelativePath)
+                    Text = _pathResolver.ResolveMovieFilePath(deleteMessage.Movie.Path, deleteMessage.MovieFile.RelativePath)
                 }
             };
 
