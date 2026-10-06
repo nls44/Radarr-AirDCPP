@@ -172,7 +172,7 @@ namespace Radarr.Api.V3.Movies
             if (configService?.CopyUsingSymlinks == true && pathResolver != null && resource.MovieFile != null)
             {
                 MovieFileResourceMapper.ResolveSymlinkPath(resource.MovieFile, pathResolver, configService);
-                resource.Path = resource.MovieFile.Path.GetDirectoryName();
+                resource.Path = resource.MovieFile.Path.GetParentPath();
             }
 
             return resource;
