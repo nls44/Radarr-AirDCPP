@@ -1,6 +1,5 @@
 using System.IO;
 using FluentAssertions;
-using Moq;
 using NUnit.Framework;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.MediaFiles;
