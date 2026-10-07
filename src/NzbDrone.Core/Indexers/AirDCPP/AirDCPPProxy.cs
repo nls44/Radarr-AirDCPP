@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
+using Diacritical;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -62,7 +63,7 @@ namespace NzbDrone.Core.Indexers.AirDCPP
 
         private string RemoveInvalidChars(string filename)
         {
-            return Regex.Replace(filename, @"[^0-9A-Za-z ,]", "");
+            return Regex.Replace(filename.RemoveDiacritics(), @"[^0-9A-Za-z ,-]", "");
         }
 
         private int CreateSearchInstance()
