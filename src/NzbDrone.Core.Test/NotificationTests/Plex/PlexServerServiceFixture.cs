@@ -36,7 +36,7 @@ namespace NzbDrone.Core.Test.NotificationTests.Plex
             };
 
             Mocker.GetMock<IMediaPathResolver>()
-                .Setup(s => s.Resolve(_movie.Path))
+                .Setup(s => s.ResolveMovieFolderPath(_movie.Path, null))
                 .Returns(@"C:\Test\ResolvedMovies\Movie Title (2020)".AsOsAgnostic());
 
             Mocker.GetMock<IRootFolderService>()
@@ -169,10 +169,15 @@ namespace NzbDrone.Core.Test.NotificationTests.Plex
                 Host = "plex"
             };
             var moviePath = "/mnt/ext_3/radarr/Nicely Formatted Movie Name (Year)";
+            var relativePath = "Movie.Name.mkv";
             var resolvedMoviePath = "/mnt/plex/X264/Full.Movie.Folder";
             var movie = new Movie
             {
-                Path = moviePath
+                Path = moviePath,
+                MovieFile = new MovieFile
+                {
+                    RelativePath = relativePath
+                }
             };
             var sections = new List<PlexSection>
             {
@@ -203,7 +208,7 @@ namespace NzbDrone.Core.Test.NotificationTests.Plex
                   .Setup(v => v.GetMovieSections(settings))
                   .Returns(sections);
             Mocker.GetMock<IMediaPathResolver>()
-                  .Setup(v => v.Resolve(moviePath))
+                  .Setup(v => v.ResolveMovieFolderPath(moviePath, relativePath))
                   .Returns(resolvedMoviePath);
 
             Subject.UpdateLibrary(movie, settings);
@@ -212,6 +217,56 @@ namespace NzbDrone.Core.Test.NotificationTests.Plex
                   .Verify(v => v.Update(2, resolvedMoviePath, settings), Times.Once());
             Mocker.GetMock<IPlexServerProxy>()
                   .Verify(v => v.Update(1, It.IsAny<string>(), settings), Times.Never());
+            Mocker.GetMock<IRootFolderService>()
+                  .Verify(v => v.GetBestRootFolderPath(It.IsAny<string>(), It.IsAny<List<RootFolder>>()), Times.Never());
+        }
+
+        [Test]
+        public void should_not_construct_a_movie_path_from_the_stored_directory_when_the_resolved_folder_does_not_match()
+        {
+            var settings = new PlexServerSettings
+            {
+                Host = "plex"
+            };
+            var moviePath = "/mnt/ext_3/radarr/Test Movie (2026)";
+            var relativePath = "Test.Movie.mkv";
+            var movie = new Movie
+            {
+                Path = moviePath,
+                MovieFile = new MovieFile
+                {
+                    RelativePath = relativePath
+                }
+            };
+            var sections = new List<PlexSection>
+            {
+                new PlexSection
+                {
+                    Id = 1,
+                    Type = "movie",
+                    Locations = new List<PlexSectionLocation>
+                    {
+                        new PlexSectionLocation { Path = "/mnt/plex/X264" }
+                    }
+                }
+            };
+
+            Mocker.GetMock<IPlexServerProxy>()
+                  .Setup(v => v.Version(settings))
+                  .Returns("1.2.3.4.");
+            Mocker.GetMock<IPlexServerProxy>()
+                  .Setup(v => v.GetMovieSections(settings))
+                  .Returns(sections);
+            Mocker.GetMock<IMediaPathResolver>()
+                  .Setup(v => v.ResolveMovieFolderPath(moviePath, relativePath))
+                  .Returns("/mnt/other/Unmatched.Movie");
+
+            Subject.UpdateLibrary(movie, settings);
+
+            Mocker.GetMock<IPlexServerProxy>()
+                  .Verify(v => v.Update(1, It.Is<string>(path => path == "/mnt/plex/X264/"), settings), Times.Once());
+            Mocker.GetMock<IPlexServerProxy>()
+                  .Verify(v => v.Update(1, It.Is<string>(path => path.Contains("Test Movie")), settings), Times.Never());
             Mocker.GetMock<IRootFolderService>()
                   .Verify(v => v.GetBestRootFolderPath(It.IsAny<string>(), It.IsAny<List<RootFolder>>()), Times.Never());
         }

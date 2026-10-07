@@ -352,7 +352,7 @@ namespace NzbDrone.Core.Notifications.Discord
         public override void OnMovieFileDelete(MovieFileDeleteMessage deleteMessage)
         {
             var movie = deleteMessage.Movie;
-            var deletedFile = _pathResolver.Resolve(deleteMessage.MovieFile.Path);
+            var deletedFile = _pathResolver.ResolveMovieFilePath(deleteMessage.Movie.Path, deleteMessage.MovieFile.RelativePath);
             var reason = deleteMessage.Reason;
 
             var embed = new Embed

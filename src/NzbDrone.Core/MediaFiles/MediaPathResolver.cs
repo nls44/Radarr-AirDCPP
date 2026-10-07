@@ -8,6 +8,7 @@ namespace NzbDrone.Core.MediaFiles
     {
         string Resolve(string path);
         string ResolveMovieFilePath(string moviePath, string relativePath);
+        string ResolveMovieFolderPath(string moviePath, string relativePath);
         string ResolveMappedPath(string path, string mapFrom, string mapTo);
     }
 
@@ -38,6 +39,16 @@ namespace NzbDrone.Core.MediaFiles
             }
 
             return Resolve(Path.Combine(moviePath, relativePath));
+        }
+
+        public string ResolveMovieFolderPath(string moviePath, string relativePath)
+        {
+            if (relativePath.IsNullOrWhiteSpace())
+            {
+                return Resolve(moviePath);
+            }
+
+            return ResolveMovieFilePath(moviePath, relativePath).GetParentPath();
         }
 
         public string ResolveMappedPath(string path, string mapFrom, string mapTo)

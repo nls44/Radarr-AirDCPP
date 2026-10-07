@@ -41,7 +41,8 @@ namespace NzbDrone.Core.Notifications.Emby
         {
             var paths = _proxy.GetPaths(settings, movie);
 
-            paths.Add(_pathResolver.ResolveMappedPath(movie.Path, settings.MapFrom, settings.MapTo));
+            var resolvedMoviePath = _pathResolver.ResolveMovieFolderPath(movie.Path, movie.MovieFile?.RelativePath);
+            paths.Add(_pathResolver.ResolveMappedPath(resolvedMoviePath, settings.MapFrom, settings.MapTo));
 
             foreach (var path in paths)
             {

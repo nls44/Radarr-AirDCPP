@@ -111,7 +111,7 @@ namespace NzbDrone.Core.Notifications.CustomScript
             environmentVariables.Add("Radarr_Movie_OriginalLanguage", IsoLanguages.Get(movie.MovieMetadata.Value.OriginalLanguage).ThreeLetterCode);
             environmentVariables.Add("Radarr_Movie_Genres", string.Join("|", movie.MovieMetadata.Value.Genres));
             environmentVariables.Add("Radarr_Movie_Tags", string.Join("|", GetTagLabels(movie)));
-            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.Resolve(movie.Path));
+            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.ResolveMovieFolderPath(movie.Path, movieFile.RelativePath));
             environmentVariables.Add("Radarr_Movie_ImdbId", movie.MovieMetadata.Value.ImdbId ?? string.Empty);
             environmentVariables.Add("Radarr_Movie_TmdbId", movie.MovieMetadata.Value.TmdbId.ToString());
             environmentVariables.Add("Radarr_Movie_In_Cinemas_Date", movie.MovieMetadata.Value.InCinemas.ToString() ?? string.Empty);
@@ -168,7 +168,7 @@ namespace NzbDrone.Core.Notifications.CustomScript
             environmentVariables.Add("Radarr_Movie_OriginalLanguage", IsoLanguages.Get(movie.MovieMetadata.Value.OriginalLanguage).ThreeLetterCode);
             environmentVariables.Add("Radarr_Movie_Genres", string.Join("|", movie.MovieMetadata.Value.Genres));
             environmentVariables.Add("Radarr_Movie_Tags", string.Join("|", GetTagLabels(movie)));
-            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.Resolve(movie.Path));
+            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.ResolveMovieFolderPath(movie.Path, movie.MovieFile?.RelativePath ?? renamedFiles.FirstOrDefault()?.MovieFile?.RelativePath));
             environmentVariables.Add("Radarr_Movie_ImdbId", movie.MovieMetadata.Value.ImdbId ?? string.Empty);
             environmentVariables.Add("Radarr_Movie_TmdbId", movie.MovieMetadata.Value.TmdbId.ToString());
             environmentVariables.Add("Radarr_Movie_In_Cinemas_Date", movie.MovieMetadata.Value.InCinemas.ToString() ?? string.Empty);
@@ -195,7 +195,7 @@ namespace NzbDrone.Core.Notifications.CustomScript
             environmentVariables.Add("Radarr_Movie_OriginalLanguage", IsoLanguages.Get(movie.MovieMetadata.Value.OriginalLanguage).ThreeLetterCode);
             environmentVariables.Add("Radarr_Movie_Genres", string.Join("|", movie.MovieMetadata.Value.Genres));
             environmentVariables.Add("Radarr_Movie_Tags", string.Join("|", GetTagLabels(movie)));
-            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.Resolve(movie.Path));
+            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.ResolveMovieFolderPath(movie.Path, movie.MovieFile?.RelativePath));
             environmentVariables.Add("Radarr_Movie_ImdbId", movie.MovieMetadata.Value.ImdbId ?? string.Empty);
             environmentVariables.Add("Radarr_Movie_TmdbId", movie.MovieMetadata.Value.TmdbId.ToString());
             environmentVariables.Add("Radarr_Movie_AddMethod", movie.AddOptions.AddMethod.ToString());
@@ -220,7 +220,7 @@ namespace NzbDrone.Core.Notifications.CustomScript
             environmentVariables.Add("Radarr_Movie_OriginalLanguage", IsoLanguages.Get(movie.MovieMetadata.Value.OriginalLanguage).ThreeLetterCode);
             environmentVariables.Add("Radarr_Movie_Genres", string.Join("|", movie.MovieMetadata.Value.Genres));
             environmentVariables.Add("Radarr_Movie_Tags", string.Join("|", GetTagLabels(movie)));
-            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.Resolve(movie.Path));
+            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.ResolveMovieFolderPath(movie.Path, movieFile.RelativePath));
             environmentVariables.Add("Radarr_Movie_ImdbId", movie.MovieMetadata.Value.ImdbId ?? string.Empty);
             environmentVariables.Add("Radarr_Movie_TmdbId", movie.MovieMetadata.Value.TmdbId.ToString());
             environmentVariables.Add("Radarr_Movie_Overview", movie.MovieMetadata.Value.Overview);
@@ -250,7 +250,7 @@ namespace NzbDrone.Core.Notifications.CustomScript
             environmentVariables.Add("Radarr_Movie_OriginalLanguage", IsoLanguages.Get(movie.MovieMetadata.Value.OriginalLanguage).ThreeLetterCode);
             environmentVariables.Add("Radarr_Movie_Genres", string.Join("|", movie.MovieMetadata.Value.Genres));
             environmentVariables.Add("Radarr_Movie_Tags", string.Join("|", GetTagLabels(movie)));
-            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.Resolve(movie.Path));
+            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.ResolveMovieFolderPath(movie.Path, movie.MovieFile?.RelativePath));
             environmentVariables.Add("Radarr_Movie_ImdbId", movie.MovieMetadata.Value.ImdbId ?? string.Empty);
             environmentVariables.Add("Radarr_Movie_TmdbId", movie.MovieMetadata.Value.TmdbId.ToString());
             environmentVariables.Add("Radarr_Movie_DeletedFiles", deleteMessage.DeletedFiles.ToString());
@@ -322,7 +322,7 @@ namespace NzbDrone.Core.Notifications.CustomScript
             environmentVariables.Add("Radarr_Movie_OriginalLanguage", IsoLanguages.Get(movie?.MovieMetadata.Value.OriginalLanguage)?.ThreeLetterCode);
             environmentVariables.Add("Radarr_Movie_Genres", string.Join("|", movie?.MovieMetadata.Value.Genres ?? new List<string>()));
             environmentVariables.Add("Radarr_Movie_Tags", string.Join("|", GetTagLabels(movie)));
-            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.Resolve(movie?.Path));
+            environmentVariables.Add("Radarr_Movie_Path", _pathResolver.ResolveMovieFolderPath(movie?.Path, movie?.MovieFile?.RelativePath));
             environmentVariables.Add("Radarr_Movie_ImdbId", movie?.MovieMetadata.Value.ImdbId ?? string.Empty);
             environmentVariables.Add("Radarr_Movie_TmdbId", movie?.MovieMetadata.Value.TmdbId.ToString());
             environmentVariables.Add("Radarr_Movie_Overview", movie?.MovieMetadata.Value.Overview);

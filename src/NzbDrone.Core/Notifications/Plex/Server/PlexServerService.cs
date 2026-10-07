@@ -100,7 +100,7 @@ namespace NzbDrone.Core.Notifications.Plex.Server
 
         private void UpdateSections(Movie movie, List<PlexSection> sections, PlexServerSettings settings)
         {
-            var resolvedMoviePath = _pathResolver.Resolve(movie.Path);
+            var resolvedMoviePath = _pathResolver.ResolveMovieFolderPath(movie.Path, movie.MovieFile?.RelativePath);
 
             // A symlinked Radarr movie can live below a different filesystem root
             // than the path stored in Radarr. Prefer the resolved path when Plex
@@ -119,6 +119,21 @@ namespace NzbDrone.Core.Notifications.Plex.Server
 
                 _logger.Debug("Updating matching resolved section location, {0}", resolvedLocation.Location.Path);
                 UpdateSectionPath(resolvedRelativePath, resolvedLocation.Section, resolvedLocation.Location, settings);
+
+                return;
+            }
+
+            if (movie.MovieFile?.RelativePath.IsNotNullOrWhiteSpace() == true)
+            {
+                _logger.Debug("Unable to find matching section location for resolved movie path, updating all Movie sections at their root locations");
+
+                foreach (var section in sections)
+                {
+                    foreach (var location in section.Locations)
+                    {
+                        UpdateSectionPath(string.Empty, section, location, settings);
+                    }
+                }
 
                 return;
             }

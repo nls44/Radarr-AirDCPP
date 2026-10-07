@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using FluentValidation.Results;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
@@ -47,7 +48,8 @@ namespace NzbDrone.Core.Notifications.Synology
         {
             if (Settings.UpdateLibrary)
             {
-                _indexerProxy.UpdateFolder(_pathResolver.Resolve(movie.Path));
+                var relativePath = renamedFiles.FirstOrDefault()?.MovieFile?.RelativePath ?? movie.MovieFile?.RelativePath;
+                _indexerProxy.UpdateFolder(_pathResolver.ResolveMovieFolderPath(movie.Path, relativePath));
             }
         }
 
@@ -66,7 +68,7 @@ namespace NzbDrone.Core.Notifications.Synology
             {
                 if (Settings.UpdateLibrary)
                 {
-                    _indexerProxy.DeleteFolder(_pathResolver.Resolve(deleteMessage.Movie.Path));
+                    _indexerProxy.DeleteFolder(_pathResolver.ResolveMovieFolderPath(deleteMessage.Movie.Path, deleteMessage.Movie.MovieFile?.RelativePath));
                 }
             }
         }

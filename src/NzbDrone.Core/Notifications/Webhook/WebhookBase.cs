@@ -62,7 +62,7 @@ namespace NzbDrone.Core.Notifications.Webhook
                 EventType = WebhookEventType.Download,
                 InstanceName = _configFileProvider.InstanceName,
                 ApplicationUrl = _configService.ApplicationUrl,
-                Movie = GetMovie(message.Movie),
+                Movie = GetMovie(message.Movie, message.MovieFile),
                 RemoteMovie = new WebhookRemoteMovie(message.Movie),
                 MovieFile = webhookMovieFile,
                 Release = new WebhookGrabbedRelease(message.Release, movieFile.IndexerFlags),
@@ -109,7 +109,7 @@ namespace NzbDrone.Core.Notifications.Webhook
                 EventType = WebhookEventType.MovieFileDelete,
                 InstanceName = _configFileProvider.InstanceName,
                 ApplicationUrl = _configService.ApplicationUrl,
-                Movie = GetMovie(deleteMessage.Movie),
+                Movie = GetMovie(deleteMessage.Movie, deleteMessage.MovieFile),
                 MovieFile = ResolveMovieFile(new WebhookMovieFile(deleteMessage.MovieFile)),
                 DeleteReason = deleteMessage.Reason
             };
@@ -243,7 +243,7 @@ namespace NzbDrone.Core.Notifications.Webhook
             };
         }
 
-        private WebhookMovie GetMovie(Movie movie)
+        private WebhookMovie GetMovie(Movie movie, MovieFile movieFile = null)
         {
             if (movie == null)
             {
@@ -253,7 +253,7 @@ namespace NzbDrone.Core.Notifications.Webhook
             _mediaCoverService.ConvertToLocalUrls(movie.Id, movie.MovieMetadata.Value.Images, movie.Added);
 
             var webhookMovie = new WebhookMovie(movie, GetTagLabels(movie));
-            webhookMovie.FolderPath = _pathResolver.Resolve(webhookMovie.FolderPath);
+            webhookMovie.FolderPath = _pathResolver.ResolveMovieFolderPath(movie.Path, movieFile?.RelativePath ?? movie.MovieFile?.RelativePath);
 
             return webhookMovie;
         }

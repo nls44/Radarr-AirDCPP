@@ -52,7 +52,7 @@ namespace NzbDrone.Core.Test.NotificationTests.Webhook
                   .Setup(v => v.GetTags(It.IsAny<HashSet<int>>()))
                   .Returns(new List<Tag>());
             Mocker.GetMock<IMediaPathResolver>()
-                  .Setup(v => v.Resolve(moviePath))
+                  .Setup(v => v.ResolveMovieFolderPath(moviePath, movieFile.RelativePath))
                   .Returns(resolvedMoviePath);
             Mocker.GetMock<IMediaPathResolver>()
                   .Setup(v => v.Resolve(movieFilePath))

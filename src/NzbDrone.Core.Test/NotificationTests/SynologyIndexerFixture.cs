@@ -53,6 +53,9 @@ namespace NzbDrone.Core.Test.NotificationTests
                   .Setup(v => v.Resolve(It.IsAny<string>()))
                   .Returns((string path) => path);
             Mocker.GetMock<IMediaPathResolver>()
+                  .Setup(v => v.ResolveMovieFolderPath(It.IsAny<string>(), It.IsAny<string>()))
+                  .Returns((string moviePath, string relativePath) => moviePath);
+            Mocker.GetMock<IMediaPathResolver>()
                   .Setup(v => v.ResolveMovieFilePath(It.IsAny<string>(), It.IsAny<string>()))
                   .Returns((string moviePath, string relativePath) => Path.Combine(moviePath, relativePath));
 
